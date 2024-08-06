@@ -39,7 +39,10 @@ func NewClient(host, token *string) (*Client, error) {
 
 	c.Token = *token
 
-	c.checkAuth()
+	err := c.checkAuth()
+	if err != nil {
+		return nil, err
+	}
 
 	return &c, nil
 }
