@@ -2,7 +2,7 @@ package client
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 )
@@ -39,6 +39,8 @@ func NewClient(host, token *string) (*Client, error) {
 
 	c.Token = *token
 
+	c.checkAuth()
+
 	return &c, nil
 }
 
@@ -58,7 +60,7 @@ func (c *Client) doRequest(req *http.Request, authToken *string) ([]byte, error)
 	}
 	defer res.Body.Close()
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
 	}
