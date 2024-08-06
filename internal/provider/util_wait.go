@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 )
 
 const (
@@ -19,7 +19,7 @@ const (
 
 func waitForKafkaClusterToProvision(ctx context.Context, c *client.Client, clusterId, cloudProvider string) error {
 	delay, pollInterval := getDelayAndPollInterval(5*time.Second, 1*time.Minute, false)
-	stateConf := &resource.StateChangeConf{
+	stateConf := &retry.StateChangeConf{
 		Pending:      []string{stateCreating},
 		Target:       []string{stateAvailable},
 		Refresh:      kafkaClusterProvisionStatus(ctx, c, clusterId),
@@ -35,7 +35,7 @@ func waitForKafkaClusterToProvision(ctx context.Context, c *client.Client, clust
 	return nil
 }
 
-func kafkaClusterProvisionStatus(ctx context.Context, c *client.Client, clusterId string) resource.StateRefreshFunc {
+func kafkaClusterProvisionStatus(ctx context.Context, c *client.Client, clusterId string) retry.StateRefreshFunc {
 	return func() (result interface{}, s string, err error) {
 		cluster, err := c.GetKafkaInstance(clusterId)
 		if err != nil {
