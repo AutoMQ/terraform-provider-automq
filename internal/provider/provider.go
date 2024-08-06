@@ -166,15 +166,11 @@ func (p *AutoMQProvider) Resources(ctx context.Context) []func() resource.Resour
 }
 
 func (p *AutoMQProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{
-		NewExampleDataSource,
-	}
+	return []func() datasource.DataSource{}
 }
 
 func (p *AutoMQProvider) Functions(ctx context.Context) []func() function.Function {
-	return []func() function.Function{
-		NewExampleFunction,
-	}
+	return []func() function.Function{}
 }
 
 func New(version string) func() provider.Provider {
