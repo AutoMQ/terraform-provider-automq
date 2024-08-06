@@ -8,6 +8,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -37,6 +39,7 @@ type KafkaInstanceResource struct {
 
 // KafkaInstanceResourceModel describes the resource data model.
 type KafkaInstanceResourceModel struct {
+	InstanceID    types.String      `tfsdk:"instance_id"`
 	DisplayName   types.String      `tfsdk:"display_name"`
 	Description   types.String      `tfsdk:"description"`
 	CloudProvider types.String      `tfsdk:"cloud_provider"`
@@ -65,6 +68,13 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 		MarkdownDescription: "AutoMQ Kafka instance resource",
 
 		Attributes: map[string]schema.Attribute{
+			"instance_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "The ID of the Kafka instance",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"display_name": schema.StringAttribute{
 				MarkdownDescription: "The display name of the Kafka instance",
 				Required:            true,
@@ -174,6 +184,7 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 	}
 
 	instanceId := apiResp.InstanceID
+	data.InstanceID = types.StringValue(instanceId)
 
 	if err := waitForKafkaClusterToProvision(ctx, r.client, instanceId, data.CloudProvider.ValueString()); err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error waiting for Kafka Cluster %q to provision: %s", instanceId, createDescriptiveError(err)))
