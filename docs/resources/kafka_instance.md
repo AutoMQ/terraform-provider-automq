@@ -28,6 +28,10 @@ AutoMQ Kafka instance resource
 
 - `description` (String) The description of the Kafka instance
 
+### Read-Only
+
+- `instance_id` (String) The ID of the Kafka instance
+
 <a id="nestedatt--compute_specs"></a>
 ### Nested Schema for `compute_specs`
 
