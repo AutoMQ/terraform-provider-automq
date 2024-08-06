@@ -1,29 +1,83 @@
 package provider
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/wiremock/go-wiremock"
+	"terraform-provider-automq/client"
 )
 
+const (
+	expectedCountOne = int64(1)
+)
+
+var createKafkaInstancePath = "/api/v1/instances"
+var getKafkaInstancePath = "/api/v1/instances/%s"
+
 func TestAccKafkaInstanceResource(t *testing.T) {
+	ctx := context.Background()
+
+	wiremockContainer, err := setupWiremock(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// nolint:errcheck
+	defer wiremockContainer.Terminate(ctx)
+
+	mockAutoMQTestServerUrl := wiremockContainer.URI
+	wiremockClient := wiremock.NewClient(mockAutoMQTestServerUrl)
+
+	creatingResponse := testAccKafkaInstanceResponseInCreating()
+	creatingResponseJson, err := json.Marshal(creatingResponse)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	availableResponse := testAccKafkaInstanceResponseInAvailable()
+	availableResponseJson, err := json.Marshal(availableResponse)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	createInstanceStub := wiremock.Post(wiremock.
+		URLPathEqualTo(createKafkaInstancePath)).
+		WillReturnResponse(wiremock.NewResponse().WithBody(string(creatingResponseJson)).WithStatus(http.StatusOK))
+	_ = wiremockClient.StubFor(createInstanceStub)
+
+	getInstanceStub := wiremock.Get(wiremock.
+		URLPathEqualTo(fmt.Sprintf(getKafkaInstancePath, creatingResponse.InstanceID))).
+		WillReturnResponse(wiremock.NewResponse().WithBody(string(availableResponseJson)).WithStatus(http.StatusOK))
+	_ = wiremockClient.StubFor(getInstanceStub)
+
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: providerConfig + testAccKafkaInstanceResourceConfig(),
+				Config: testAccKafkaInstanceResourceConfig(mockAutoMQTestServerUrl),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("automq_kafka_instance.test", "display_name", "test"),
 				),
 			},
 		},
 	})
+
+	checkStubCount(t, wiremockClient, createInstanceStub, fmt.Sprintf("POST %s", createKafkaInstancePath), expectedCountOne)
+	checkStubCount(t, wiremockClient, getInstanceStub, fmt.Sprintf("GET %s", getKafkaInstancePath), expectedCountOne)
 }
 
-func testAccKafkaInstanceResourceConfig() string {
-	return `
+func testAccKafkaInstanceResourceConfig(mockServerUrl string) string {
+	return fmt.Sprintf(`
+provider "automq" {
+  host  = "%s"
+  token = "123456"
+}
 resource "automq_kafka_instance" "test" {
   display_name   = "test"
   description    = "test"
@@ -38,5 +92,23 @@ resource "automq_kafka_instance" "test" {
     aku = "6"
   }
 }
-`
+`, mockServerUrl)
+}
+
+// Return a json string for a KafkaInstanceResponse with Creating status
+func testAccKafkaInstanceResponseInCreating() client.KafkaInstanceResponse {
+	createInstanceResponse := client.KafkaInstanceResponse{}
+	createInstanceResponse.Status = stateCreating
+	createInstanceResponse.DisplayName = "test"
+	createInstanceResponse.InstanceID = "test"
+	return createInstanceResponse
+}
+
+// Return a json string for a KafkaInstanceResponse with Available status
+func testAccKafkaInstanceResponseInAvailable() client.KafkaInstanceResponse {
+	createInstanceResponse := client.KafkaInstanceResponse{}
+	createInstanceResponse.Status = stateAvailable
+	createInstanceResponse.DisplayName = "test"
+	createInstanceResponse.InstanceID = "test"
+	return createInstanceResponse
 }

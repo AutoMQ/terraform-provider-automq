@@ -33,13 +33,12 @@ type KafkaInstanceRequestNetwork struct {
 	Subnet string `json:"subnet"`
 }
 
-type KafkaInstanceResponce struct {
+type KafkaInstanceResponse struct {
 	InstanceID  string    `json:"instanceId"`
 	GmtCreate   time.Time `json:"gmtCreate"`
 	GmtModified time.Time `json:"gmtModified"`
 	DisplayName string    `json:"displayName"`
 	Description string    `json:"description"`
-	ClusterID   string    `json:"clusterId"`
 	Status      string    `json:"status"`
 	Provider    string    `json:"provider"`
 	Region      string    `json:"region"`
