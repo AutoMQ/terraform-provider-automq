@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func (c *Client) CreateKafkaInstance(kafka KafkaInstanceRequest) (*KafkaInstanceResponce, error) {
+func (c *Client) CreateKafkaInstance(kafka KafkaInstanceRequest) (*KafkaInstanceResponse, error) {
 	kafkaRequest, err := json.Marshal(kafka)
 	if err != nil {
 		return nil, err
@@ -21,7 +21,7 @@ func (c *Client) CreateKafkaInstance(kafka KafkaInstanceRequest) (*KafkaInstance
 		return nil, err
 	}
 
-	newkafka := KafkaInstanceResponce{}
+	newkafka := KafkaInstanceResponse{}
 	err = json.Unmarshal(body, &newkafka)
 	if err != nil {
 		return nil, err
@@ -30,7 +30,7 @@ func (c *Client) CreateKafkaInstance(kafka KafkaInstanceRequest) (*KafkaInstance
 	return &newkafka, nil
 }
 
-func (c *Client) GetKafkaInstance(id string) (*KafkaInstanceResponce, error) {
+func (c *Client) GetKafkaInstance(id string) (*KafkaInstanceResponse, error) {
 	req, err := http.NewRequest("GET", c.HostURL+"/api/v1/instances/"+id, nil)
 	if err != nil {
 		return nil, err
@@ -41,7 +41,7 @@ func (c *Client) GetKafkaInstance(id string) (*KafkaInstanceResponce, error) {
 		return nil, err
 	}
 
-	kafka := KafkaInstanceResponce{}
+	kafka := KafkaInstanceResponse{}
 	err = json.Unmarshal(body, &kafka)
 	if err != nil {
 		return nil, err
