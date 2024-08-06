@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -14,7 +13,7 @@ func TestAccKafkaInstanceResource(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: testAccKafkaInstanceResourceConfig(),
+				Config: providerConfig + testAccKafkaInstanceResourceConfig(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("automq_kafka_instance.test", "display_name", "test"),
 				),
@@ -24,7 +23,7 @@ func TestAccKafkaInstanceResource(t *testing.T) {
 }
 
 func testAccKafkaInstanceResourceConfig() string {
-	return fmt.Sprintf(`
+	return `
 resource "automq_kafka_instance" "test" {
   display_name   = "test"
   description    = "test"
@@ -39,5 +38,5 @@ resource "automq_kafka_instance" "test" {
     aku = "6"
   }
 }
-`)
+`
 }
