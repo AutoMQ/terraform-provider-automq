@@ -14,7 +14,7 @@ provider "automq" {
 
 resource "automq_kafka_acl" "example" {
   environment_id  = "example123"
-  kafka_instance  = "example"
+  kafka_instance  = "kf-rrn5s50fzpr23urd"
   resource_type   = "TOPIC"
   resource_name   = "example-"
   pattern_type    = "PREFIXED"

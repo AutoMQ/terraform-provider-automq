@@ -13,5 +13,8 @@ provider "automq" {
 }
 
 resource "automq_kafka_user" "example" {
-
+  evnironment_id = "example123"
+  kafka_instance = "kf-rrn5s50fzpr23urd"
+  username       = "automq_kafka_user"
+  password       = "example"
 }
