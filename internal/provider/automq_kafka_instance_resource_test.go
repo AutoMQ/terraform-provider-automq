@@ -63,7 +63,7 @@ func TestAccKafkaInstanceResource(t *testing.T) {
 			{
 				Config: testAccKafkaInstanceResourceConfig(mockAutoMQTestServerUrl),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "display_name", "test"),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "name", "test"),
 				),
 			},
 		},
