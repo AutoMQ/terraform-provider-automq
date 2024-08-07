@@ -29,4 +29,4 @@ Kafka Topic resource
 
 ### Read-Only
 
-- `id` (String) Kafka topic identifier
+- `topic_id` (String) Kafka topic identifier
