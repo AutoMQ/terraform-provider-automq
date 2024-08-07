@@ -59,6 +59,9 @@ func (c *Client) GetKafkaInstanceByName(name string) (*KafkaInstanceResponse, er
 	}
 	kafka := KafkaInstanceResponse{}
 	err = json.Unmarshal(body, &kafka)
+	if err != nil {
+		return nil, err
+	}
 	klist := KafkaInstanceResponseList{}
 
 	err = json.Unmarshal(body, &klist)
