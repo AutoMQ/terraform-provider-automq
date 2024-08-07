@@ -26,11 +26,15 @@ AutoMQ Kafka instance resource
 
 ### Optional
 
+- `config` (Attributes) The config of the Kafka instance (see [below for nested schema](#nestedatt--config))
 - `description` (String) The description of the Kafka instance
+- `integrations` (Attributes List) The integrations of the Kafka instance (see [below for nested schema](#nestedatt--integrations))
 
 ### Read-Only
 
+- `acl` (Boolean) The ACL of the Kafka instance
 - `instance_id` (String) The ID of the Kafka instance
+- `last_updated` (String)
 
 <a id="nestedatt--compute_specs"></a>
 ### Nested Schema for `compute_specs`
@@ -51,3 +55,21 @@ Required:
 
 - `subnet` (String) The subnetId of the network
 - `zone` (String) The zone of the network
+
+
+<a id="nestedatt--config"></a>
+### Nested Schema for `config`
+
+Required:
+
+- `key` (String) The key of the config
+- `value` (String) The value of the config
+
+
+<a id="nestedatt--integrations"></a>
+### Nested Schema for `integrations`
+
+Required:
+
+- `integration_id` (String) The ID of the integration
+- `integration_type` (String) The type of the integration

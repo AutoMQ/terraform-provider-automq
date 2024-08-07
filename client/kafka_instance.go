@@ -35,10 +35,7 @@ func (c *Client) GetKafkaInstance(instanceId string) (*KafkaInstanceResponse, er
 	}
 	body, err := c.doRequest(req, &c.Token)
 	if err != nil {
-		if err.(*ErrorResponse).Code == 404 {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("error doing request: %v", err)
+		return nil, err
 	}
 	instance := KafkaInstanceResponse{}
 	err = json.Unmarshal(body, &instance)
@@ -89,4 +86,42 @@ func (c *Client) DeleteKafkaInstance(instanceId string) error {
 		return err
 	}
 	return nil
+}
+
+func (c *Client) UpdateKafkaInstanceBasicInfo(instanceId string, updateParam InstanceBasicParam) (*KafkaInstanceResponse, error) {
+	return c.updateInstance(instanceId, updateParam, "/basic")
+}
+
+func (c *Client) UpdateKafkaInstanceVersion(instanceId string, version string) (*KafkaInstanceResponse, error) {
+	updateParam := InstanceVersionUpgradeParam{Version: version}
+	return c.updateInstance(instanceId, updateParam, "/versions/"+version)
+}
+
+func (c *Client) UpdateKafkaInstanceConfig(instanceId string, updateParam InstanceConfigParam) (*KafkaInstanceResponse, error) {
+	return c.updateInstance(instanceId, updateParam, "/configurations")
+}
+
+func (c *Client) UpdateKafkaInstanceComputeSpecs(instanceId string, updateParam SpecificationUpdateParam) (*KafkaInstanceResponse, error) {
+	return c.updateInstance(instanceId, updateParam, "/spec")
+}
+
+func (c *Client) updateInstance(instanceId string, updateParam interface{}, path string) (*KafkaInstanceResponse, error) {
+	updateRequest, err := json.Marshal(updateParam)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest("PATCH", c.HostURL+instancePath+"/"+instanceId+path, strings.NewReader(string(updateRequest)))
+	if err != nil {
+		return nil, err
+	}
+	body, err := c.doRequest(req, &c.Token)
+	if err != nil {
+		return nil, err
+	}
+	instance := KafkaInstanceResponse{}
+	err = json.Unmarshal(body, &instance)
+	if err != nil {
+		return nil, err
+	}
+	return &instance, nil
 }

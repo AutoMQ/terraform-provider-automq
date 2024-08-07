@@ -11,6 +11,23 @@ type KafkaInstanceRequest struct {
 	Networks    []KafkaInstanceRequestNetwork `json:"networks"`
 }
 
+type InstanceBasicParam struct {
+	DisplayName string `json:"displayName"`
+	Description string `json:"description"`
+}
+
+type InstanceVersionUpgradeParam struct {
+	Version string `json:"version"`
+}
+
+type InstanceConfigParam struct {
+	Configs []KafkaInstanceRequestValues `json:"configs"`
+}
+
+type SpecificationUpdateParam struct {
+	Values []KafkaInstanceRequestValues `json:"values"`
+}
+
 type KafkaInstanceRequestSpec struct {
 	Version     string                          `json:"version"`
 	Template    string                          `json:"template"`
