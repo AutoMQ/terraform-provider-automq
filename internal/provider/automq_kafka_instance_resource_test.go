@@ -76,11 +76,11 @@ func TestAccKafkaInstanceResource(t *testing.T) {
 func testAccKafkaInstanceResourceConfig(mockServerUrl string) string {
 	return fmt.Sprintf(`
 provider "automq" {
-  host  = "%s"
+  byoc_host  = "%s"
   token = "123456"
 }
 resource "automq_kafka_instance" "test" {
-  display_name   = "test"
+  name   = "test"
   description    = "test"
   cloud_provider = "aliyun"
   region         = "cn-hangzhou"
