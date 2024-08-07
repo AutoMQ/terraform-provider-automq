@@ -80,7 +80,7 @@ func kafkaClusterDeletedStatus(ctx context.Context, c *client.Client, clusterId 
 			return nil, stateUnknown, err
 		}
 		if cluster == nil {
-			return nil, stateNotFound, nil
+			return &client.KafkaInstanceResponse{}, stateNotFound, nil
 		}
 		tflog.Debug(ctx, fmt.Sprintf("Waiting for Kafka Cluster %q provisioning status to become %q: current status is %q", clusterId, stateDeleting, cluster.Status))
 		if cluster.Status == stateError {
