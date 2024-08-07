@@ -54,22 +54,23 @@ func TestAccKafkaInstanceResource(t *testing.T) {
 		WillReturnResponse(wiremock.NewResponse().WithBody(string(creatingResponseJson)).WithStatus(http.StatusOK))
 	_ = wiremockClient.StubFor(createInstanceStub)
 
-	getInstanceStubOnStarted := wiremock.Get(wiremock.
+	getInstanceStubWhenStarted := wiremock.Get(wiremock.
 		URLPathEqualTo(fmt.Sprintf(getKafkaInstancePath, creatingResponse.InstanceID))).
-		InScenario("Started").WillSetStateTo("Deleted").
-		WillReturnResponse(wiremock.NewResponse().WithBody(string(availableResponseJson)).WithStatus(http.StatusOK))
-	_ = wiremockClient.StubFor(getInstanceStubOnStarted)
-
-	getInstanceStubOnDeleted := wiremock.Get(wiremock.
-		URLPathEqualTo(fmt.Sprintf(getKafkaInstancePath, creatingResponse.InstanceID))).
-		InScenario("Deleted").
-		WillReturnResponse(wiremock.NewResponse().WithBody(string(availableResponseJson)).WithStatus(http.StatusOK))
-	_ = wiremockClient.StubFor(getInstanceStubOnDeleted)
+		WillReturnResponse(wiremock.NewResponse().WithBody(string(availableResponseJson)).WithStatus(http.StatusOK)).
+		InScenario("KafkaInstanceState").WhenScenarioStateIs(wiremock.ScenarioStateStarted)
+	_ = wiremockClient.StubFor(getInstanceStubWhenStarted)
 
 	deleteInstanceStub := wiremock.Delete(wiremock.
 		URLPathEqualTo(fmt.Sprintf(getKafkaInstancePath, creatingResponse.InstanceID))).
-		WillReturnResponse(wiremock.NewResponse().WithBody(string(deletingResponseJson)).WithStatus(http.StatusOK))
+		WillReturnResponse(wiremock.NewResponse().WithBody(string(deletingResponseJson)).WithStatus(http.StatusNoContent)).
+		InScenario("KafkaInstanceState").WillSetStateTo("Deleted")
 	_ = wiremockClient.StubFor(deleteInstanceStub)
+
+	getInstanceStubWhenDeleted := wiremock.Get(wiremock.
+		URLPathEqualTo(fmt.Sprintf(getKafkaInstancePath, creatingResponse.InstanceID))).
+		WillReturnResponse(wiremock.NewResponse().WithStatus(http.StatusNotFound)).
+		InScenario("KafkaInstanceState").WhenScenarioStateIs("Deleted")
+	_ = wiremockClient.StubFor(getInstanceStubWhenDeleted)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -86,8 +87,6 @@ func TestAccKafkaInstanceResource(t *testing.T) {
 	})
 
 	checkStubCount(t, wiremockClient, createInstanceStub, fmt.Sprintf("POST %s", createKafkaInstancePath), expectedCountOne)
-	checkStubCount(t, wiremockClient, getInstanceStubOnStarted, fmt.Sprintf("GET %s", getKafkaInstancePath), expectedCountOne)
-	checkStubCount(t, wiremockClient, getInstanceStubOnDeleted, fmt.Sprintf("GET %s", getKafkaInstancePath), expectedCountOne)
 	checkStubCount(t, wiremockClient, deleteInstanceStub, fmt.Sprintf("DELETE %s", getKafkaInstancePath), expectedCountOne)
 }
 
