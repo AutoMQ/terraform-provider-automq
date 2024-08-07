@@ -19,6 +19,7 @@ const (
 	stateAvailable  = "Available"
 	stateChanging   = "Changing"
 	stateDeleting   = "Deleting"
+	stateNotFound   = "NotFound"
 	stateError      = "Error"
 	stateUnexpected = "Unexpected"
 	stateUnknown    = "Unknown"
@@ -40,7 +41,7 @@ type KafkaInstanceResource struct {
 // KafkaInstanceResourceModel describes the resource data model.
 type KafkaInstanceResourceModel struct {
 	InstanceID    types.String      `tfsdk:"instance_id"`
-	DisplayName   types.String      `tfsdk:"display_name"`
+	Name          types.String      `tfsdk:"name"`
 	Description   types.String      `tfsdk:"description"`
 	CloudProvider types.String      `tfsdk:"cloud_provider"`
 	Region        types.String      `tfsdk:"region"`
@@ -55,7 +56,8 @@ type NetworkModel struct {
 }
 
 type ComputeSpecsModel struct {
-	Aku types.Int64 `tfsdk:"aku"`
+	Aku     types.Int64  `tfsdk:"aku"`
+	Version types.String `tfsdk:"version"`
 }
 
 func (r *KafkaInstanceResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -75,8 +77,8 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"display_name": schema.StringAttribute{
-				MarkdownDescription: "The display name of the Kafka instance",
+			"name": schema.StringAttribute{
+				MarkdownDescription: "The name of the Kafka instance",
 				Required:            true,
 			},
 			"description": schema.StringAttribute{
@@ -119,6 +121,10 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						Required:    true,
 						Description: "The template of the compute specs",
 					},
+					"version": schema.StringAttribute{
+						Optional:    true,
+						Description: "The version of the compute specs",
+					},
 				},
 			},
 		},
@@ -157,7 +163,7 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 
 	// Generate API request body from plan
 	request := client.KafkaInstanceRequest{
-		DisplayName: data.DisplayName.ValueString(),
+		DisplayName: data.Name.ValueString(),
 		Description: data.Description.ValueString(),
 		Provider:    data.CloudProvider.ValueString(),
 		Region:      data.Region.ValueString(),
@@ -168,6 +174,11 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 			Values:      []client.KafkaInstanceRequestValues{{Key: "aku", Value: fmt.Sprintf("%d", data.ComputeSpecs.Aku.ValueInt64())}},
 		},
 	}
+
+	if !data.ComputeSpecs.Version.IsUnknown() && !data.ComputeSpecs.Version.IsNull() {
+		request.Spec.Version = data.ComputeSpecs.Version.ValueString()
+	}
+
 	for i, network := range data.Networks {
 		request.Networks[i] = client.KafkaInstanceRequestNetwork{
 			Zone:   network.Zone.ValueString(),
@@ -218,6 +229,10 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	if data.InstanceID.IsNull() && data.InstanceID.ValueString() == "" {
+		resp.Diagnostics.AddError("Client Error", "Instance ID is required for updating Kafka instance")
+		return
+	}
 
 	// If applicable, this is a great opportunity to initialize any necessary
 	// provider client data and make a call using it.
@@ -241,13 +256,47 @@ func (r *KafkaInstanceResource) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete example, got error: %s", err))
-	//     return
-	// }
+	instance, err := GetKafkaInstance(&data, r.client)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", data.InstanceID.ValueString(), err))
+		return
+	}
+	if instance == nil {
+		return
+	}
+
+	instanceId := data.InstanceID.ValueString()
+
+	if instance.Status != stateDeleting {
+		err = r.client.DeleteKafkaInstance(instanceId)
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete Kafka instance %q, got error: %s", data.InstanceID.ValueString(), err))
+			return
+		}
+	}
+
+	if err := waitForKafkaClusterToDeleted(ctx, r.client, instanceId, data.CloudProvider.ValueString()); err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error waiting for Kafka Cluster %q to provision: %s", instanceId, createDescriptiveError(err)))
+		return
+	}
+}
+
+func GetKafkaInstance(data *KafkaInstanceResourceModel, client *client.Client) (*client.KafkaInstanceResponse, error) {
+	if data.InstanceID.IsNull() && !data.Name.IsNull() {
+		kafka, err := client.GetKafkaInstanceByName(data.Name.ValueString())
+		if err != nil {
+			return nil, fmt.Errorf("error getting Kafka instance by name %s: %v", data.Name.ValueString(), err)
+		}
+		return kafka, nil
+	}
+	if !data.InstanceID.IsNull() {
+		kafka, err := client.GetKafkaInstance(data.InstanceID.ValueString())
+		if err != nil {
+			return nil, fmt.Errorf("error getting Kafka instance by ID %s: %v", data.InstanceID.ValueString(), err)
+		}
+		return kafka, nil
+	}
+	return nil, fmt.Errorf("both Kafka instance ID and name are null")
 }
 
 func (r *KafkaInstanceResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

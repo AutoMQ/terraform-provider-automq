@@ -29,10 +29,10 @@ type AutoMQProvider struct {
 
 // autoMQProviderModel describes the provider data model.
 type autoMQProviderModel struct {
-	AccessKey types.String `tfsdk:"access_key"`
-	SecretKey types.String `tfsdk:"secret_key"`
-	Token     types.String `tfsdk:"token"`
-	Host      types.String `tfsdk:"host"`
+	BYOCAccessKey types.String `tfsdk:"byoc_access_key"`
+	BYOCSecretKey types.String `tfsdk:"byoc_secret_key"`
+	BYOCHost      types.String `tfsdk:"byoc_host"`
+	Token         types.String `tfsdk:"token"`
 }
 
 func (p *AutoMQProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -43,19 +43,19 @@ func (p *AutoMQProvider) Metadata(ctx context.Context, req provider.MetadataRequ
 func (p *AutoMQProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"access_key": schema.StringAttribute{
+			"byoc_access_key": schema.StringAttribute{
 				MarkdownDescription: "Example provider attribute",
 				Optional:            true,
 			},
-			"secret_key": schema.StringAttribute{
+			"byoc_secret_key": schema.StringAttribute{
+				MarkdownDescription: "Example provider attribute",
+				Optional:            true,
+			},
+			"byoc_host": schema.StringAttribute{
 				MarkdownDescription: "Example provider attribute",
 				Optional:            true,
 			},
 			"token": schema.StringAttribute{
-				MarkdownDescription: "Example provider attribute",
-				Optional:            true,
-			},
-			"host": schema.StringAttribute{
 				MarkdownDescription: "Example provider attribute",
 				Optional:            true,
 			},
@@ -72,9 +72,9 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 	// Configuration values are now available.
-	if data.Host.IsUnknown() {
+	if data.BYOCHost.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("host"),
+			path.Root("byoc_host"),
 			"Unknown AutoMQ API Host",
 			"The provider cannot create the AutoMQ API client as there is an unknown configuration value for the AutoMQ API host. "+
 				"Either target apply the source of the value first, set the value statically in the configuration, or use the AUTOMQ_HOST environment variable.",
@@ -97,11 +97,11 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	// Default values to environment variables, but override
 	// with Terraform configuration value if set.
 
-	host := os.Getenv("AUTOMQ_HOST")
+	byco_host := os.Getenv("AUTOMQ_BYOC_HOST")
 	token := os.Getenv("AUTOMQ_TOKEN")
 
-	if !data.Host.IsNull() {
-		host = data.Host.ValueString()
+	if !data.BYOCHost.IsNull() {
+		byco_host = data.BYOCHost.ValueString()
 	}
 	if !data.Token.IsNull() {
 		token = data.Token.ValueString()
@@ -110,9 +110,9 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	// If any of the expected configurations are missing, return
 	// errors with provider-specific guidance.
 
-	if host == "" {
+	if byco_host == "" {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("host"),
+			path.Root("byoc_host"),
 			"Missing AutoMQ API Host",
 			"The provider cannot create the AutoMQ API client as there is a missing or empty value for the AutoMQ API host. "+
 				"Set the host value in the configuration or use the AUTOMQ_HOST environment variable. "+
@@ -134,13 +134,13 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 
-	ctx = tflog.SetField(ctx, "automq_env_host", host)
+	ctx = tflog.SetField(ctx, "automq_env_byoc_host", byco_host)
 	ctx = tflog.SetField(ctx, "automq_env_token", token)
 	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "automq_env_token")
 
 	tflog.Debug(ctx, "Creating AutoMQ client")
 
-	client, err := client.NewClient(&host, &token)
+	client, err := client.NewClient(&byco_host, &token)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Create AutoMQ API Client",

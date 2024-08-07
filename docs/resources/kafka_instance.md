@@ -19,7 +19,7 @@ AutoMQ Kafka instance resource
 
 - `cloud_provider` (String) The cloud provider of the Kafka instance
 - `compute_specs` (Attributes) The compute specs of the Kafka instance (see [below for nested schema](#nestedatt--compute_specs))
-- `display_name` (String) The display name of the Kafka instance
+- `name` (String) The name of the Kafka instance
 - `network_type` (String) The network type of the Kafka instance
 - `networks` (Attributes List) The networks of the Kafka instance (see [below for nested schema](#nestedatt--networks))
 - `region` (String) The region of the Kafka instance
@@ -38,6 +38,10 @@ AutoMQ Kafka instance resource
 Required:
 
 - `aku` (Number) The template of the compute specs
+
+Optional:
+
+- `version` (String) The version of the compute specs
 
 
 <a id="nestedatt--networks"></a>

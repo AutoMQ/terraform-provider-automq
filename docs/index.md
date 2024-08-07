@@ -23,7 +23,7 @@ provider "scaffolding" {
 
 ### Optional
 
-- `access_key` (String) Example provider attribute
-- `host` (String) Example provider attribute
-- `secret_key` (String) Example provider attribute
+- `byoc_access_key` (String) Example provider attribute
+- `byoc_host` (String) Example provider attribute
+- `byoc_secret_key` (String) Example provider attribute
 - `token` (String) Example provider attribute

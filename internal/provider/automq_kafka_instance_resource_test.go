@@ -7,9 +7,10 @@ import (
 	"net/http"
 	"testing"
 
+	"terraform-provider-automq/client"
+
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/wiremock/go-wiremock"
-	"terraform-provider-automq/client"
 )
 
 const (
