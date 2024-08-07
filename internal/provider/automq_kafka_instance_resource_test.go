@@ -7,9 +7,10 @@ import (
 	"net/http"
 	"testing"
 
+	"terraform-provider-automq/client"
+
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/wiremock/go-wiremock"
-	"terraform-provider-automq/client"
 )
 
 const (
@@ -43,16 +44,33 @@ func TestAccKafkaInstanceResource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	deletingResponse := testAccKafkaInstanceResponseInDeleting()
+	deletingResponseJson, err := json.Marshal(deletingResponse)
+	if err != nil {
+		t.Fatal(err)
+	}
 	createInstanceStub := wiremock.Post(wiremock.
 		URLPathEqualTo(createKafkaInstancePath)).
 		WillReturnResponse(wiremock.NewResponse().WithBody(string(creatingResponseJson)).WithStatus(http.StatusOK))
 	_ = wiremockClient.StubFor(createInstanceStub)
 
-	getInstanceStub := wiremock.Get(wiremock.
+	getInstanceStubWhenStarted := wiremock.Get(wiremock.
 		URLPathEqualTo(fmt.Sprintf(getKafkaInstancePath, creatingResponse.InstanceID))).
-		WillReturnResponse(wiremock.NewResponse().WithBody(string(availableResponseJson)).WithStatus(http.StatusOK))
-	_ = wiremockClient.StubFor(getInstanceStub)
+		WillReturnResponse(wiremock.NewResponse().WithBody(string(availableResponseJson)).WithStatus(http.StatusOK)).
+		InScenario("KafkaInstanceState").WhenScenarioStateIs(wiremock.ScenarioStateStarted)
+	_ = wiremockClient.StubFor(getInstanceStubWhenStarted)
+
+	deleteInstanceStub := wiremock.Delete(wiremock.
+		URLPathEqualTo(fmt.Sprintf(getKafkaInstancePath, creatingResponse.InstanceID))).
+		WillReturnResponse(wiremock.NewResponse().WithBody(string(deletingResponseJson)).WithStatus(http.StatusNoContent)).
+		InScenario("KafkaInstanceState").WillSetStateTo("Deleted")
+	_ = wiremockClient.StubFor(deleteInstanceStub)
+
+	getInstanceStubWhenDeleted := wiremock.Get(wiremock.
+		URLPathEqualTo(fmt.Sprintf(getKafkaInstancePath, creatingResponse.InstanceID))).
+		WillReturnResponse(wiremock.NewResponse().WithStatus(http.StatusNotFound)).
+		InScenario("KafkaInstanceState").WhenScenarioStateIs("Deleted")
+	_ = wiremockClient.StubFor(getInstanceStubWhenDeleted)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -62,24 +80,24 @@ func TestAccKafkaInstanceResource(t *testing.T) {
 			{
 				Config: testAccKafkaInstanceResourceConfig(mockAutoMQTestServerUrl),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "display_name", "test"),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "name", "test"),
 				),
 			},
 		},
 	})
 
 	checkStubCount(t, wiremockClient, createInstanceStub, fmt.Sprintf("POST %s", createKafkaInstancePath), expectedCountOne)
-	checkStubCount(t, wiremockClient, getInstanceStub, fmt.Sprintf("GET %s", getKafkaInstancePath), expectedCountOne)
+	checkStubCount(t, wiremockClient, deleteInstanceStub, fmt.Sprintf("DELETE %s", getKafkaInstancePath), expectedCountOne)
 }
 
 func testAccKafkaInstanceResourceConfig(mockServerUrl string) string {
 	return fmt.Sprintf(`
 provider "automq" {
-  host  = "%s"
+  byoc_host  = "%s"
   token = "123456"
 }
 resource "automq_kafka_instance" "test" {
-  display_name   = "test"
+  name   = "test"
   description    = "test"
   cloud_provider = "aliyun"
   region         = "cn-hangzhou"
@@ -108,6 +126,15 @@ func testAccKafkaInstanceResponseInCreating() client.KafkaInstanceResponse {
 func testAccKafkaInstanceResponseInAvailable() client.KafkaInstanceResponse {
 	createInstanceResponse := client.KafkaInstanceResponse{}
 	createInstanceResponse.Status = stateAvailable
+	createInstanceResponse.DisplayName = "test"
+	createInstanceResponse.InstanceID = "test"
+	return createInstanceResponse
+}
+
+// Return a json string for a KafkaInstanceResponse with Available status
+func testAccKafkaInstanceResponseInDeleting() client.KafkaInstanceResponse {
+	createInstanceResponse := client.KafkaInstanceResponse{}
+	createInstanceResponse.Status = stateDeleting
 	createInstanceResponse.DisplayName = "test"
 	createInstanceResponse.InstanceID = "test"
 	return createInstanceResponse
