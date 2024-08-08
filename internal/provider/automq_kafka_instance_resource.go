@@ -9,6 +9,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-timetypes/timetypes"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -274,39 +275,25 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	out, err = r.client.GetKafkaInstance(instanceId)
-	FlattenKafkaInstanceModel(out, &instance)
-
+	resp.Diagnostics.Append(ReadKafkaInstance(r, instanceId, &instance))
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &instance)...)
 }
 
 func (r *KafkaInstanceResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data KafkaInstanceResourceModel
+	var state KafkaInstanceResourceModel
 
 	// Read Terraform prior state data into the model
-	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	instance, err := GetKafkaInstance(&data, r.client)
-	if err != nil {
-		if isNotFoundError(err) {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", data.InstanceID.ValueString(), err))
-			return
-		}
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", data.InstanceID.ValueString(), err))
-		return
-	}
-	if instance == nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Kafka instance %q not found", data.InstanceID.ValueString()))
-		return
-	}
-	FlattenKafkaInstanceModel(instance, &data)
+	instanceId := state.InstanceID.ValueString()
 
+	resp.Diagnostics.Append(ReadKafkaInstance(r, instanceId, &state))
 	// Save updated data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -395,10 +382,24 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	// get latest info
-	out, err := r.client.GetKafkaInstance(instanceId)
-	FlattenKafkaInstanceModel(out, &plan)
+	resp.Diagnostics.Append(ReadKafkaInstance(r, instanceId, &plan))
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+func ReadKafkaInstance(r *KafkaInstanceResource, instanceId string, plan *KafkaInstanceResourceModel) diag.Diagnostic {
+	instance, err := GetKafkaInstance(plan, r.client)
+	if err != nil {
+		if isNotFoundError(err) {
+			return diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", plan.InstanceID.ValueString(), err))
+		}
+		diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", plan.InstanceID.ValueString(), err))
+	}
+	if instance == nil {
+		diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Kafka instance %q not found", plan.InstanceID.ValueString()))
+	}
+	FlattenKafkaInstanceModel(instance, plan)
+	return nil
 }
 
 func (r *KafkaInstanceResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
