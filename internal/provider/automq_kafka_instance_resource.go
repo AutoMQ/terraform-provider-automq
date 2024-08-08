@@ -4,13 +4,17 @@ import (
 	"context"
 	"fmt"
 	"terraform-provider-automq/client"
+	"terraform-provider-automq/internal/framework"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
+	"github.com/hashicorp/terraform-plugin-framework-timetypes/timetypes"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -32,28 +36,36 @@ var _ resource.Resource = &KafkaInstanceResource{}
 var _ resource.ResourceWithImportState = &KafkaInstanceResource{}
 
 func NewKafkaInstanceResource() resource.Resource {
-	return &KafkaInstanceResource{}
+	r := &KafkaInstanceResource{}
+	r.SetDefaultCreateTimeout(15 * time.Minute)
+	r.SetDefaultUpdateTimeout(20 * time.Minute)
+	r.SetDefaultDeleteTimeout(15 * time.Minute)
+	return r
 }
 
 // KafkaInstanceResource defines the resource implementation.
 type KafkaInstanceResource struct {
 	client *client.Client
+	framework.WithTimeouts
 }
 
 // KafkaInstanceResourceModel describes the resource data model.
 type KafkaInstanceResourceModel struct {
-	InstanceID    types.String       `tfsdk:"instance_id"`
-	Name          types.String       `tfsdk:"name"`
-	Description   types.String       `tfsdk:"description"`
-	CloudProvider types.String       `tfsdk:"cloud_provider"`
-	Region        types.String       `tfsdk:"region"`
-	NetworkType   types.String       `tfsdk:"network_type"`
-	Networks      []NetworkModel     `tfsdk:"networks"`
-	ComputeSpecs  ComputeSpecsModel  `tfsdk:"compute_specs"`
-	Config        []ConfigModel      `tfsdk:"config"`
-	ACL           types.Bool         `tfsdk:"acl"`
-	Integrations  []IntegrationModel `tfsdk:"integrations"`
-	LastUpdated   types.String       `tfsdk:"last_updated"`
+	InstanceID     types.String       `tfsdk:"instance_id"`
+	Name           types.String       `tfsdk:"name"`
+	Description    types.String       `tfsdk:"description"`
+	CloudProvider  types.String       `tfsdk:"cloud_provider"`
+	Region         types.String       `tfsdk:"region"`
+	NetworkType    types.String       `tfsdk:"network_type"`
+	Networks       []NetworkModel     `tfsdk:"networks"`
+	ComputeSpecs   ComputeSpecsModel  `tfsdk:"compute_specs"`
+	Config         []ConfigModel      `tfsdk:"config"`
+	ACL            types.Bool         `tfsdk:"acl"`
+	Integrations   []IntegrationModel `tfsdk:"integrations"`
+	CreatedAt      timetypes.RFC3339  `tfsdk:"created_at"`
+	LastUpdated    types.String       `tfsdk:"last_updated"`
+	InstanceStatus types.String       `tfsdk:"instance_status"`
+	Timeouts       timeouts.Value     `tfsdk:"timeouts"`
 }
 
 type NetworkModel struct {
@@ -143,6 +155,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					},
 					"version": schema.StringAttribute{
 						Optional:    true,
+						Default:     stringdefault.StaticString("latest"),
 						Description: "The version of the compute specs",
 					},
 				},
@@ -183,9 +196,27 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				Default:     booldefault.StaticBool(false),
 				Description: "The ACL of the Kafka instance",
 			},
-			"last_updated": schema.StringAttribute{
-				Computed: true,
+			"created_at": schema.StringAttribute{
+				CustomType: timetypes.RFC3339Type{},
+				Computed:   true,
 			},
+			"last_updated": schema.StringAttribute{
+				CustomType: timetypes.RFC3339Type{},
+				Computed:   true,
+			},
+			"instance_status": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "The status of the Kafka instance",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+		},
+		Blocks: map[string]schema.Block{
+			"Timeouts": timeouts.Block(ctx, timeouts.Opts{
+				Create: true,
+				Delete: true,
+			}),
 		},
 	}
 }
@@ -211,60 +242,48 @@ func (r *KafkaInstanceResource) Configure(ctx context.Context, req resource.Conf
 }
 
 func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data KafkaInstanceResourceModel
-
+	var instance KafkaInstanceResourceModel
 	// Read Terraform plan data into the model
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &instance)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Generate API request body from plan
-	request := client.KafkaInstanceRequest{
-		DisplayName: data.Name.ValueString(),
-		Description: data.Description.ValueString(),
-		Provider:    data.CloudProvider.ValueString(),
-		Region:      data.Region.ValueString(),
-		Networks:    make([]client.KafkaInstanceRequestNetwork, len(data.Networks)),
-		Spec: client.KafkaInstanceRequestSpec{
-			Template:    "aku",
-			PaymentPlan: client.KafkaInstanceRequestPaymentPlan{PaymentType: "ON_DEMAND", Period: 1, Unit: "MONTH"},
-			Values:      []client.KafkaInstanceRequestValues{{Key: "aku", Value: fmt.Sprintf("%d", data.ComputeSpecs.Aku.ValueInt64())}},
-		},
+	in := client.KafkaInstanceRequest{}
+	ExpandKafkaInstanceResource(instance, &in)
+	tflog.Debug(ctx, fmt.Sprintf("Creating new Kafka Cluster: %s", fmt.Sprintf("%v", in)))
+
+	out, err := r.client.CreateKafkaInstance(in)
+	if resp.Diagnostics.HasError() {
+		return
 	}
-
-	if !data.ComputeSpecs.Version.IsUnknown() && !data.ComputeSpecs.Version.IsNull() {
-		request.Spec.Version = data.ComputeSpecs.Version.ValueString()
-	}
-
-	for i, network := range data.Networks {
-		request.Networks[i] = client.KafkaInstanceRequestNetwork{
-			Zone:   network.Zone.ValueString(),
-			Subnet: network.Subnet.ValueString(),
-		}
-	}
-
-	tflog.Debug(ctx, fmt.Sprintf("Creating new Kafka Cluster: %s", fmt.Sprintf("%v", request)))
-
-	apiResp, err := r.client.CreateKafkaInstance(request)
 	if err != nil {
+		// TODO: Standard Error
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create Kafka instance, got error: %s", err))
 		return
 	}
+	if out == nil {
+		// TODO: Standard Error
+		resp.Diagnostics.AddError("Client Error", "Unable to create Kafka instance, got empty response")
+		return
+	}
 
-	instanceId := apiResp.InstanceID
-	data.InstanceID = types.StringValue(instanceId)
+	// Flatten API response into Terraform state
+	FlattenKafkaInstanceModel(out, &instance)
 
-	if err := waitForKafkaClusterToProvision(ctx, r.client, instanceId, data.CloudProvider.ValueString(), stateCreating); err != nil {
+	instanceId := instance.InstanceID.ValueString()
+
+	createTimeout := r.CreateTimeout(ctx, instance.Timeouts)
+	if err := waitForKafkaClusterToProvision(ctx, r.client, instanceId, stateCreating, createTimeout); err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error waiting for Kafka Cluster %q to provision: %s", instanceId, err))
 		return
 	}
 
-	data.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
+	instance.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
 
 	// Save data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &instance)...)
 }
 
 func (r *KafkaInstanceResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -339,7 +358,9 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		}
 	}
 
-	if err := waitForKafkaClusterToProvision(ctx, r.client, instanceId, data.CloudProvider.ValueString(), stateChanging); err != nil {
+	updateTimeout := r.UpdateTimeout(ctx, data.Timeouts)
+
+	if err := waitForKafkaClusterToProvision(ctx, r.client, instanceId, stateChanging, updateTimeout); err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error waiting for Kafka Cluster %q to provision: %s", instanceId, err))
 		return
 	}
@@ -349,7 +370,7 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update Kafka instance %q, got error: %s", data.InstanceID.ValueString(), err))
 		return
 	}
-	if err := waitForKafkaClusterToProvision(ctx, r.client, instanceId, data.CloudProvider.ValueString(), stateChanging); err != nil {
+	if err := waitForKafkaClusterToProvision(ctx, r.client, instanceId, stateChanging, updateTimeout); err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error waiting for Kafka Cluster %q to provision: %s", instanceId, err))
 		return
 	}
@@ -360,59 +381,48 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 }
 
 func (r *KafkaInstanceResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data KafkaInstanceResourceModel
+	var state KafkaInstanceResourceModel
 
 	// Read Terraform prior state data into the model
-	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	instance, err := GetKafkaInstance(&data, r.client)
+	instanceId := state.InstanceID.ValueString()
+	instance, err := GetKafkaInstance(&state, r.client)
 	if err != nil {
 		if isNotFoundError(err) {
 			return
 		}
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", data.InstanceID.ValueString(), err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", instanceId, err))
 		return
 	}
 	if instance == nil {
 		return
 	}
 
-	instanceId := data.InstanceID.ValueString()
-
 	if instance.Status != stateDeleting {
 		err = r.client.DeleteKafkaInstance(instanceId)
 		if err != nil {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete Kafka instance %q, got error: %s", data.InstanceID.ValueString(), err))
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete Kafka instance %q, got error: %s", instanceId, err))
 			return
 		}
 	}
 
-	if err := waitForKafkaClusterToDeleted(ctx, r.client, instanceId, data.CloudProvider.ValueString()); err != nil {
+	deleteTimeout := r.DeleteTimeout(ctx, state.Timeouts)
+	if err := waitForKafkaClusterToDeleted(ctx, r.client, instanceId, deleteTimeout); err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error waiting for Kafka Cluster %q to provision: %s", instanceId, err))
 		return
 	}
 }
 
-func GetKafkaInstance(data *KafkaInstanceResourceModel, client *client.Client) (*client.KafkaInstanceResponse, error) {
-	if data.InstanceID.IsNull() && !data.Name.IsNull() {
-		kafka, err := client.GetKafkaInstanceByName(data.Name.ValueString())
-		if err != nil {
-			return nil, fmt.Errorf("error getting Kafka instance by name %s: %v", data.Name.ValueString(), err)
-		}
-		return kafka, nil
+func GetKafkaInstance(instance *KafkaInstanceResourceModel, client *client.Client) (*client.KafkaInstanceResponse, error) {
+	kafka, err := client.GetKafkaInstanceByName(instance.Name.ValueString())
+	if err != nil {
+		return nil, fmt.Errorf("error getting Kafka instance by name %s: %v", instance.Name.ValueString(), err)
 	}
-	if !data.InstanceID.IsNull() {
-		kafka, err := client.GetKafkaInstance(data.InstanceID.ValueString())
-		if err != nil {
-			return nil, err
-		}
-		return kafka, nil
-	}
-	return nil, fmt.Errorf("both Kafka instance ID and name are null")
+	return kafka, nil
 }
 
 func (r *KafkaInstanceResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

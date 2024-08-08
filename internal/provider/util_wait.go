@@ -11,19 +11,17 @@ import (
 )
 
 const (
-	stateUp                        = "UP"
-	stateCreated                   = "CREATED"
 	acceptanceTestModeWaitTime     = 1 * time.Second
 	acceptanceTestModePollInterval = 1 * time.Second
 )
 
-func waitForKafkaClusterState(ctx context.Context, c *client.Client, clusterId, cloudProvider, pendingState, targetState string, refreshFunc retry.StateRefreshFunc) error {
+func waitForKafkaClusterState(ctx context.Context, c *client.Client, clusterId, pendingState, targetState string, timeout time.Duration, refreshFunc retry.StateRefreshFunc) error {
 	delay, pollInterval := getDelayAndPollInterval(5*time.Second, 1*time.Minute, false)
 	stateConf := &retry.StateChangeConf{
 		Pending:      []string{pendingState},
 		Target:       []string{targetState},
 		Refresh:      refreshFunc,
-		Timeout:      getTimeoutFor(cloudProvider),
+		Timeout:      timeout,
 		Delay:        delay,
 		PollInterval: pollInterval,
 	}
@@ -35,19 +33,19 @@ func waitForKafkaClusterState(ctx context.Context, c *client.Client, clusterId, 
 	return nil
 }
 
-func waitForKafkaClusterToProvision(ctx context.Context, c *client.Client, clusterId, cloudProvider, pendingState string) error {
-	return waitForKafkaClusterState(ctx, c, clusterId, cloudProvider, pendingState, stateAvailable, kafkaClusterStatus(ctx, c, clusterId, stateAvailable))
+func waitForKafkaClusterToProvision(ctx context.Context, c *client.Client, clusterId, pendingState string, timeout time.Duration) error {
+	return waitForKafkaClusterState(ctx, c, clusterId, pendingState, stateAvailable, timeout, kafkaClusterStatus(ctx, c, clusterId, stateAvailable))
 }
 
-func waitForKafkaClusterToDeleted(ctx context.Context, c *client.Client, clusterId, cloudProvider string) error {
-	return waitForKafkaClusterState(ctx, c, clusterId, cloudProvider, stateDeleting, stateNotFound, kafkaClusterStatus(ctx, c, clusterId, stateNotFound))
+func waitForKafkaClusterToDeleted(ctx context.Context, c *client.Client, clusterId string, timeout time.Duration) error {
+	return waitForKafkaClusterState(ctx, c, clusterId, stateDeleting, stateNotFound, timeout, kafkaClusterStatus(ctx, c, clusterId, stateNotFound))
 }
 
 func kafkaClusterStatus(ctx context.Context, c *client.Client, clusterId string, targetState string) retry.StateRefreshFunc {
 	return func() (result interface{}, s string, err error) {
 		cluster, err := c.GetKafkaInstance(clusterId)
 		if err != nil {
-			if isNotFoundError(err) && targetState == stateNotFound {
+			if isNotFoundError(err) {
 				return &client.KafkaInstanceResponse{}, stateNotFound, nil
 			}
 			tflog.Warn(ctx, fmt.Sprintf("Error reading Kafka Cluster %q: %s", clusterId, err))
