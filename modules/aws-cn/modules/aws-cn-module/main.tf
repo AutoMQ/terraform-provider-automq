@@ -215,6 +215,15 @@ resource "aws_instance" "web" {
   }
 }
 
+# 创建 Route53 private zone 并绑定到当前 VPC
+resource "aws_route53_zone" "private" {
+  name = "cmp_route53_zone"
+
+  vpc {
+    vpc_id = var.aws_vpc_id
+  }
+}
+
 resource "aws_eip" "web_ip" {
   instance = aws_instance.web.id
 }

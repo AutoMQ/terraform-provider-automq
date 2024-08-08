@@ -24,6 +24,11 @@ output "cmp_policy_arn" {
   value = aws_iam_policy.cmp_policy.arn
 }
 
+output "route53_zone_id" {
+  description = "The ID of the Route 53 zone"
+  value       = aws_route53_zone.private.zone_id
+}
+
 output "cmp_instance_profile_arn" {
   description = "The ARN of the instance profile for cmp_service_role"
   value       = aws_iam_instance_profile.cmp_instance_profile.arn

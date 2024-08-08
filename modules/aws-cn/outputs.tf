@@ -46,3 +46,7 @@ output "cmp_instance_profile_arn" {
   description = "实例配置文件 ARN: "
   value = module.cmp_service.cmp_instance_profile_arn
 }
+
+output "route53_zone_id" {
+  value = module.cmp_service.route53_zone_id
+}
