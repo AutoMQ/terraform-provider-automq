@@ -33,3 +33,16 @@ output "ops_bucket_name" {
 output "ops_bucket_arn" {
   value = module.ops_bucket.s3_bucket_arn
 }
+
+output "cmp_role_arn" {
+  value = module.cmp_service.cmp_role_arn
+}
+
+output "cmp_policy_arn" {
+  value = module.cmp_service.cmp_policy_arn
+}
+
+output "cmp_instance_profile_arn" {
+  description = "实例配置文件 ARN: "
+  value = module.cmp_service.cmp_instance_profile_arn
+}
