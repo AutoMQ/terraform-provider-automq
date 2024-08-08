@@ -162,6 +162,10 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 func (p *AutoMQProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewKafkaInstanceResource,
+		NewKafkaTopicResource,
+		NewKafkaUserResource,
+		NewKafkaAclResource,
+		NewIntegrationResource,
 	}
 }
 
