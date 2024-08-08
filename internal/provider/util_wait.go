@@ -11,83 +11,55 @@ import (
 )
 
 const (
-	stateUp                        = "UP"
-	stateCreated                   = "CREATED"
 	acceptanceTestModeWaitTime     = 1 * time.Second
 	acceptanceTestModePollInterval = 1 * time.Second
 )
 
-func waitForKafkaClusterToProvision(ctx context.Context, c *client.Client, clusterId, cloudProvider string) error {
+func waitForKafkaClusterState(ctx context.Context, c *client.Client, clusterId, pendingState, targetState string, timeout time.Duration, refreshFunc retry.StateRefreshFunc) error {
 	delay, pollInterval := getDelayAndPollInterval(5*time.Second, 1*time.Minute, false)
 	stateConf := &retry.StateChangeConf{
-		Pending:      []string{stateCreating},
-		Target:       []string{stateAvailable},
-		Refresh:      kafkaClusterProvisionStatus(ctx, c, clusterId),
-		Timeout:      getTimeoutFor(cloudProvider),
+		Pending:      []string{pendingState},
+		Target:       []string{targetState},
+		Refresh:      refreshFunc,
+		Timeout:      timeout,
 		Delay:        delay,
 		PollInterval: pollInterval,
 	}
 
-	tflog.Debug(ctx, fmt.Sprintf("Waiting for Kafka Cluster %q provisioning status to become %q", clusterId, stateAvailable))
+	tflog.Debug(ctx, fmt.Sprintf("Waiting for Kafka Cluster %q status to become %q", clusterId, targetState))
 	if _, err := stateConf.WaitForStateContext(ctx); err != nil {
 		return err
 	}
 	return nil
 }
 
-func waitForKafkaClusterToDeleted(ctx context.Context, c *client.Client, clusterId, cloudProvider string) error {
-	delay, pollInterval := getDelayAndPollInterval(5*time.Second, 1*time.Minute, false)
-	stateConf := &retry.StateChangeConf{
-		Pending:      []string{stateDeleting},
-		Target:       []string{stateNotFound},
-		Refresh:      kafkaClusterDeletedStatus(ctx, c, clusterId),
-		Timeout:      getTimeoutFor(cloudProvider),
-		Delay:        delay,
-		PollInterval: pollInterval,
-	}
-
-	tflog.Debug(ctx, fmt.Sprintf("Waiting for Kafka Cluster %q provisioning status to become %q", clusterId, stateAvailable))
-	if _, err := stateConf.WaitForStateContext(ctx); err != nil {
-		return err
-	}
-	return nil
+func waitForKafkaClusterToProvision(ctx context.Context, c *client.Client, clusterId, pendingState string, timeout time.Duration) error {
+	return waitForKafkaClusterState(ctx, c, clusterId, pendingState, stateAvailable, timeout, kafkaClusterStatus(ctx, c, clusterId, stateAvailable))
 }
 
-func kafkaClusterProvisionStatus(ctx context.Context, c *client.Client, clusterId string) retry.StateRefreshFunc {
+func waitForKafkaClusterToDeleted(ctx context.Context, c *client.Client, clusterId string, timeout time.Duration) error {
+	return waitForKafkaClusterState(ctx, c, clusterId, stateDeleting, stateNotFound, timeout, kafkaClusterStatus(ctx, c, clusterId, stateNotFound))
+}
+
+func kafkaClusterStatus(ctx context.Context, c *client.Client, clusterId string, targetState string) retry.StateRefreshFunc {
 	return func() (result interface{}, s string, err error) {
 		cluster, err := c.GetKafkaInstance(clusterId)
 		if err != nil {
-			tflog.Warn(ctx, fmt.Sprintf("Error reading Kafka Cluster %q: %s", clusterId, createDescriptiveError(err)))
-			return nil, stateUnknown, err
-		}
-
-		tflog.Debug(ctx, fmt.Sprintf("Waiting for Kafka Cluster %q provisioning status to become %q: current status is %q", clusterId, stateAvailable, cluster.Status))
-		if cluster.Status == stateCreating || cluster.Status == stateAvailable {
-			return cluster, cluster.Status, nil
-		} else if cluster.Status == stateError {
-			return nil, stateError, fmt.Errorf("kafka Cluster %q provisioning status is %q", clusterId, stateError)
-		}
-		// Kafka Cluster is in an unexpected state
-		return nil, stateUnexpected, fmt.Errorf("kafka Cluster %q is an unexpected state %q", clusterId, cluster.Status)
-	}
-}
-
-func kafkaClusterDeletedStatus(ctx context.Context, c *client.Client, clusterId string) retry.StateRefreshFunc {
-	return func() (result interface{}, s string, err error) {
-		cluster, err := c.GetKafkaInstance(clusterId)
-		if err != nil {
-			tflog.Warn(ctx, fmt.Sprintf("Error reading Kafka Cluster %q: %s", clusterId, createDescriptiveError(err)))
+			if isNotFoundError(err) {
+				return &client.KafkaInstanceResponse{}, stateNotFound, nil
+			}
+			tflog.Warn(ctx, fmt.Sprintf("Error reading Kafka Cluster %q: %s", clusterId, err))
 			return nil, stateUnknown, err
 		}
 		if cluster == nil {
-			return &client.KafkaInstanceResponse{}, stateNotFound, nil
+			return nil, stateUnknown, fmt.Errorf("Kafka Cluster %q not found", cluster.InstanceID)
 		}
-		tflog.Debug(ctx, fmt.Sprintf("Waiting for Kafka Cluster %q provisioning status to become %q: current status is %q", clusterId, stateDeleting, cluster.Status))
+
+		tflog.Debug(ctx, fmt.Sprintf("Waiting for Kafka Cluster %q status to become %q: current status is %q", clusterId, targetState, cluster.Status))
 		if cluster.Status == stateError {
-			return nil, stateError, fmt.Errorf("kafka Cluster %q provisioning status is %q", clusterId, stateError)
-		} else {
-			return cluster, cluster.Status, nil
+			return nil, stateError, fmt.Errorf("Kafka Cluster %q status is %q", clusterId, stateError)
 		}
+		return cluster, cluster.Status, nil
 	}
 }
 

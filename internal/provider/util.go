@@ -2,59 +2,77 @@ package provider
 
 import (
 	"fmt"
-	"reflect"
-	"time"
+	"terraform-provider-automq/client"
+
+	"github.com/hashicorp/terraform-plugin-framework-timetypes/timetypes"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-const (
-	Aliyun = "aliyun"
-	AWS    = "aws"
-)
-
-func getTimeoutFor(cloudProvider string) time.Duration {
-	if cloudProvider == Aliyun {
-		return 20 * time.Minute
-	} else {
-		return 30 * time.Minute
-	}
+func isNotFoundError(err error) bool {
+	condition, ok := err.(*client.ErrorResponse)
+	return ok && condition.Code == 404
 }
 
-type GenericOpenAPIError interface {
-	Model() interface{}
-}
-
-// createDescriptiveError will convert GenericOpenAPIError error into an error with a more descriptive error message.
-// diag.FromErr(createDescriptiveError(err)) should be used instead of diag.FromErr(err) in this project
-// since GenericOpenAPIError.Error() returns just HTTP status code and its generic name (i.e., "400 Bad Request")
-func createDescriptiveError(err error) error {
-	if err == nil {
-		return nil
+func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *client.KafkaInstanceRequest) {
+	request.DisplayName = instance.Name.ValueString()
+	request.Description = instance.Description.ValueString()
+	request.Provider = instance.CloudProvider.ValueString()
+	request.Region = instance.Region.ValueString()
+	request.Networks = make([]client.KafkaInstanceRequestNetwork, len(instance.Networks))
+	request.Spec = client.KafkaInstanceRequestSpec{
+		Template:    "aku",
+		PaymentPlan: client.KafkaInstanceRequestPaymentPlan{PaymentType: "ON_DEMAND", Period: 1, Unit: "MONTH"},
+		Values:      []client.KafkaInstanceRequestValues{{Key: "aku", Value: fmt.Sprintf("%d", instance.ComputeSpecs.Aku.ValueInt64())}},
 	}
-	// At this point it's just status code and its generic name
-	errorMessage := err.Error()
-	// Add error.detail to the final error message
-	if genericOpenAPIError, ok := err.(GenericOpenAPIError); ok {
-		failure := genericOpenAPIError.Model()
-		reflectedFailure := reflect.ValueOf(&failure).Elem().Elem()
-		reflectedFailureValue := reflect.Indirect(reflectedFailure)
-		if reflectedFailureValue.IsValid() {
-			errs := reflectedFailureValue.FieldByName("Errors")
-			kafkaRestOrConnectErr := reflectedFailureValue.FieldByName("Message")
-			if errs.Kind() == reflect.Slice && errs.Len() > 0 {
-				nest := errs.Index(0)
-				detailPtr := nest.FieldByName("Detail")
-				if detailPtr.IsValid() {
-					errorMessage = fmt.Sprintf("%s: %s", errorMessage, reflect.Indirect(detailPtr))
-				}
-			} else if kafkaRestOrConnectErr.IsValid() && kafkaRestOrConnectErr.Kind() == reflect.Struct {
-				detailPtr := kafkaRestOrConnectErr.FieldByName("value")
-				if detailPtr.IsValid() {
-					errorMessage = fmt.Sprintf("%s: %s", errorMessage, reflect.Indirect(detailPtr))
-				}
-			} else if kafkaRestOrConnectErr.IsValid() && kafkaRestOrConnectErr.Kind() == reflect.Pointer {
-				errorMessage = fmt.Sprintf("%s: %s", errorMessage, reflect.Indirect(kafkaRestOrConnectErr))
-			}
+	request.Spec.Version = instance.ComputeSpecs.Version.ValueString()
+	for i, network := range instance.Networks {
+		request.Networks[i] = client.KafkaInstanceRequestNetwork{
+			Zone:   network.Zone.ValueString(),
+			Subnet: network.Subnet.ValueString(),
 		}
 	}
-	return fmt.Errorf(errorMessage)
+}
+
+func FlattenKafkaInstanceModel(instance *client.KafkaInstanceResponse, resource *KafkaInstanceResourceModel) {
+	resource.InstanceID = types.StringValue(instance.InstanceID)
+	resource.Name = types.StringValue(instance.DisplayName)
+	resource.Description = types.StringValue(instance.Description)
+	resource.CloudProvider = types.StringValue(instance.Provider)
+	resource.Region = types.StringValue(instance.Region)
+
+	resource.Networks = flattenNetworks(instance.Networks)
+	resource.ComputeSpecs = flattenComputeSpecs(instance.Spec)
+
+	resource.CreatedAt = timetypes.NewRFC3339TimePointerValue(&instance.GmtCreate)
+	resource.LastUpdated = timetypes.NewRFC3339TimePointerValue(&instance.GmtModified)
+
+	resource.InstanceStatus = types.StringValue(instance.Status)
+}
+
+func flattenNetworks(networks []client.Network) []NetworkModel {
+	networksModel := make([]NetworkModel, 0, len(networks))
+	for _, network := range networks {
+		zone := types.StringValue(network.Zone)
+		for _, subnet := range network.Subnets {
+			networksModel = append(networksModel, NetworkModel{
+				Zone:   zone,
+				Subnet: types.StringValue(subnet.Subnet),
+			})
+		}
+	}
+	return networksModel
+}
+
+func flattenComputeSpecs(spec client.Spec) ComputeSpecsModel {
+	var aku types.Int64
+	for _, value := range spec.Values {
+		if value.Key == "aku" {
+			aku = types.Int64Value(int64(value.Value))
+			break
+		}
+	}
+	return ComputeSpecsModel{
+		Aku:     aku,
+		Version: types.StringValue(spec.Version),
+	}
 }

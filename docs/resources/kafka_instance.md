@@ -20,17 +20,23 @@ AutoMQ Kafka instance resource
 - `cloud_provider` (String) The cloud provider of the Kafka instance
 - `compute_specs` (Attributes) The compute specs of the Kafka instance (see [below for nested schema](#nestedatt--compute_specs))
 - `name` (String) The name of the Kafka instance
-- `network_type` (String) The network type of the Kafka instance
 - `networks` (Attributes List) The networks of the Kafka instance (see [below for nested schema](#nestedatt--networks))
 - `region` (String) The region of the Kafka instance
 
 ### Optional
 
+- `config` (Attributes) The config of the Kafka instance (see [below for nested schema](#nestedatt--config))
 - `description` (String) The description of the Kafka instance
+- `integrations` (Attributes List) The integrations of the Kafka instance (see [below for nested schema](#nestedatt--integrations))
+- `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 
 ### Read-Only
 
+- `acl` (Boolean) The ACL of the Kafka instance
+- `created_at` (String)
 - `instance_id` (String) The ID of the Kafka instance
+- `instance_status` (String) The status of the Kafka instance
+- `last_updated` (String)
 
 <a id="nestedatt--compute_specs"></a>
 ### Nested Schema for `compute_specs`
@@ -51,3 +57,30 @@ Required:
 
 - `subnet` (String) The subnetId of the network
 - `zone` (String) The zone of the network
+
+
+<a id="nestedatt--config"></a>
+### Nested Schema for `config`
+
+Required:
+
+- `key` (String) The key of the config
+- `value` (String) The value of the config
+
+
+<a id="nestedatt--integrations"></a>
+### Nested Schema for `integrations`
+
+Required:
+
+- `integration_id` (String) The ID of the integration
+- `integration_type` (String) The type of the integration
+
+
+<a id="nestedblock--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `create` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
+- `delete` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.

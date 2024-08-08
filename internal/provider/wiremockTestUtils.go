@@ -3,11 +3,12 @@ package provider
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"github.com/wiremock/go-wiremock"
-	"testing"
 )
 
 type WiremockContainer struct {
@@ -45,6 +46,7 @@ func setupWiremock(ctx context.Context) (*WiremockContainer, error) {
 
 	return &WiremockContainer{Container: container, URI: uri}, nil
 }
+
 func checkStubCount(t *testing.T, client *wiremock.Client, rule *wiremock.StubRule, requestTypeAndEndpoint string, expectedCount int64) {
 	verifyStub, _ := client.Verify(rule.Request(), expectedCount)
 	actualCount, _ := client.GetCountRequests(rule.Request())

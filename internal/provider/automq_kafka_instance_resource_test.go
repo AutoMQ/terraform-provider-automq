@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"terraform-provider-automq/client"
 
@@ -101,7 +102,6 @@ resource "automq_kafka_instance" "test" {
   description    = "test"
   cloud_provider = "aliyun"
   region         = "cn-hangzhou"
-  network_type   = "vpc"
   networks = [{
     zone   = "cn-hangzhou-b"
     subnet = "vsw-bp14v5eikr8wrgoqje7hr"
@@ -115,27 +115,44 @@ resource "automq_kafka_instance" "test" {
 
 // Return a json string for a KafkaInstanceResponse with Creating status
 func testAccKafkaInstanceResponseInCreating() client.KafkaInstanceResponse {
-	createInstanceResponse := client.KafkaInstanceResponse{}
-	createInstanceResponse.Status = stateCreating
-	createInstanceResponse.DisplayName = "test"
-	createInstanceResponse.InstanceID = "test"
-	return createInstanceResponse
+	instanceResponse := newInstanceResponse()
+
+	instanceResponse.Status = stateCreating
+	instanceResponse.GmtCreate = time.Now()
+	instanceResponse.GmtModified = time.Now()
+	return instanceResponse
 }
 
 // Return a json string for a KafkaInstanceResponse with Available status
 func testAccKafkaInstanceResponseInAvailable() client.KafkaInstanceResponse {
-	createInstanceResponse := client.KafkaInstanceResponse{}
-	createInstanceResponse.Status = stateAvailable
-	createInstanceResponse.DisplayName = "test"
-	createInstanceResponse.InstanceID = "test"
-	return createInstanceResponse
+	instanceResponse := newInstanceResponse()
+
+	instanceResponse.Status = stateAvailable
+	instanceResponse.GmtModified = time.Now()
+	return instanceResponse
 }
 
 // Return a json string for a KafkaInstanceResponse with Available status
 func testAccKafkaInstanceResponseInDeleting() client.KafkaInstanceResponse {
-	createInstanceResponse := client.KafkaInstanceResponse{}
-	createInstanceResponse.Status = stateDeleting
-	createInstanceResponse.DisplayName = "test"
-	createInstanceResponse.InstanceID = "test"
-	return createInstanceResponse
+	instanceResponse := newInstanceResponse()
+
+	instanceResponse.Status = stateDeleting
+	instanceResponse.GmtModified = time.Now()
+	return instanceResponse
+}
+
+func newInstanceResponse() client.KafkaInstanceResponse {
+	instanceResponse := client.KafkaInstanceResponse{}
+	instanceResponse.InstanceID = "kf-cakz90r71mspc7vy"
+	instanceResponse.DisplayName = "test"
+	instanceResponse.Description = "test"
+	instanceResponse.Provider = "aliyun"
+	instanceResponse.Region = "cn-hangzhou"
+	instanceResponse.Spec.Version = "1.2.0"
+	instanceResponse.Spec.PaymentPlan.PaymentType = "ON_DEMAND"
+	instanceResponse.Spec.PaymentPlan.Period = 1
+	instanceResponse.Spec.PaymentPlan.Unit = "MONTH"
+	instanceResponse.Spec.Values = []client.Value{{Key: "aku", Value: 6}}
+	instanceResponse.Networks = []client.Network{{Zone: "cn-hangzhou-b", Subnets: []client.Subnet{{Subnet: "vsw-bp14v5eikr8wrgoqje7hr"}}}}
+	return instanceResponse
 }

@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,9 +24,16 @@ type AuthStruct struct {
 }
 
 type ErrorResponse struct {
-	Code         int    `json:"code"`
-	ErrorMessage string `json:"error_message"`
-	Err          error  `json:"error"`
+	Code         int                 `json:"code"`
+	ErrorMessage string              `json:"error_message"`
+	APIError     GenericOpenAPIError `json:"api_error"`
+	Err          error               `json:"error"`
+}
+
+type GenericOpenAPIError struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Detail  string `json:"detail"`
 }
 
 func (e *ErrorResponse) Error() string {
@@ -79,7 +87,12 @@ func (c *Client) doRequest(req *http.Request, authToken *string) ([]byte, error)
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, &ErrorResponse{Code: res.StatusCode, ErrorMessage: string(body), Err: nil}
+		apiError := GenericOpenAPIError{}
+		err = json.Unmarshal(body, &apiError)
+		if err != nil {
+			return nil, &ErrorResponse{Code: res.StatusCode, ErrorMessage: "Error unmarshaling response body", Err: err}
+		}
+		return nil, &ErrorResponse{Code: res.StatusCode, APIError: apiError, Err: nil}
 	}
 
 	return body, nil
