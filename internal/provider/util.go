@@ -3,23 +3,10 @@ package provider
 import (
 	"fmt"
 	"terraform-provider-automq/client"
-	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-timetypes/timetypes"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
-
-const (
-	Aliyun = "aliyun"
-	AWS    = "aws"
-)
-
-func getTimeoutFor(cloudProvider string) time.Duration {
-	if cloudProvider == Aliyun {
-		return 20 * time.Minute
-	} else {
-		return 30 * time.Minute
-	}
-}
 
 func isNotFoundError(err error) bool {
 	condition, ok := err.(*client.ErrorResponse)
@@ -52,9 +39,12 @@ func FlattenKafkaInstanceModel(instance *client.KafkaInstanceResponse, resource 
 	resource.Description = types.StringValue(instance.Description)
 	resource.CloudProvider = types.StringValue(instance.Provider)
 	resource.Region = types.StringValue(instance.Region)
-	resource.NetworkType = types.StringValue("VPC")
+
 	resource.Networks = flattenNetworks(instance.Networks)
 	resource.ComputeSpecs = flattenComputeSpecs(instance.Spec)
+
+	resource.CreatedAt = timetypes.NewRFC3339TimePointerValue(&instance.GmtCreate)
+	resource.LastUpdated = timetypes.NewRFC3339TimePointerValue(&instance.GmtModified)
 
 	resource.InstanceStatus = types.StringValue(instance.Status)
 }
