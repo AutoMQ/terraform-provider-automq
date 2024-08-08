@@ -1,0 +1,5 @@
+aws_region      = "cn-northwest-1"
+aws_access_key  = "AKIAUYSDY7YCI3R4SC45"
+aws_secret_key  = "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"
+aws_vpc_id      = "vpc-0ac01fa7ea7c043ae"
+aws_ami_id      = "ami-035193f2cdb529fda"
