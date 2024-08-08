@@ -213,6 +213,22 @@ resource "aws_instance" "web" {
   tags = {
     Name = "cmp-service"
   }
+
+  user_data = <<-EOF
+              #cloud-config
+              bootcmd:
+                - |
+                  if [ ! -f "/home/admin/config.properties" ]; then
+                    touch /home/admin/config.properties
+                    echo "cmp.provider.credential=vm-role://${local.aws_iam_instance_profile_arn_encoded}@aws-cn" >> /home/admin/config.properties
+                    echo 'cmp.provider.databucket=${var.data_bucket_name}' >> /home/admin/config.properties
+                    echo 'cmp.provider.opsBucket=${var.ops_bucket_name}' >> /home/admin/config.properties
+                    echo 'cmp.provider.instanceSecurityGroup=${aws_security_group.allow_all.id}' >> /home/admin/config.properties
+                    echo 'cmp.provider.instanceDNS=${aws_route53_zone.private.zone_id}' >> /home/admin/config.properties
+                    echo 'cmp.provider.instanceProfile=${aws_iam_instance_profile.cmp_instance_profile.arn}' >> /home/admin/config.properties
+                    echo 'cmp.environmentid=example-service-instance-id' >> /home/admin/config.properties
+                  fi
+              EOF
 }
 
 # 创建 Route53 private zone 并绑定到当前 VPC
@@ -226,4 +242,37 @@ resource "aws_route53_zone" "private" {
 
 resource "aws_eip" "web_ip" {
   instance = aws_instance.web.id
+}
+
+locals {
+  arn_step1 = replace(aws_iam_instance_profile.cmp_instance_profile.arn, ":", "%3A")
+  arn_step2 = replace(local.arn_step1, "/", "%2F")
+  arn_step3 = replace(local.arn_step2, "?", "%3F")
+  arn_step4 = replace(local.arn_step3, "#", "%23")
+  arn_step5 = replace(local.arn_step4, "[", "%5B")
+  arn_step6 = replace(local.arn_step5, "]", "%5D")
+  arn_step7 = replace(local.arn_step6, "@", "%40")
+  arn_step8 = replace(local.arn_step7, "!", "%21")
+  arn_step9 = replace(local.arn_step8, "$", "%24")
+  arn_step10 = replace(local.arn_step9, "&", "%26")
+  arn_step11 = replace(local.arn_step10, "'", "%27")
+  arn_step12 = replace(local.arn_step11, "(", "%28")
+  arn_step13 = replace(local.arn_step12, ")", "%29")
+  arn_step14 = replace(local.arn_step13, "*", "%2A")
+  arn_step15 = replace(local.arn_step14, "+", "%2B")
+  arn_step16 = replace(local.arn_step15, ",", "%2C")
+  arn_step17 = replace(local.arn_step16, ";", "%3B")
+  arn_step18 = replace(local.arn_step17, "=", "%3D")
+  arn_step19 = replace(local.arn_step18, "%", "%25")
+  arn_step20 = replace(local.arn_step19, " ", "%20")
+  arn_step21 = replace(local.arn_step20, "<", "%3C")
+  arn_step22 = replace(local.arn_step21, ">", "%3E")
+  arn_step23 = replace(local.arn_step22, "{", "%7B")
+  arn_step24 = replace(local.arn_step23, "}", "%7D")
+  arn_step25 = replace(local.arn_step24, "|", "%7C")
+  arn_step26 = replace(local.arn_step25, "\\", "%5C")
+  arn_step27 = replace(local.arn_step26, "^", "%5E")
+  arn_step28 = replace(local.arn_step27, "~", "%7E")
+
+  aws_iam_instance_profile_arn_encoded = local.arn_step28
 }
