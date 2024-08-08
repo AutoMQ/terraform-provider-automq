@@ -27,3 +27,8 @@ variable "aws_ami_id" {
   description = "The ID of the AMI to use"
   type        = string
 }
+
+variable "subnet_id" {
+  description = "The ID of the VPC Subnet"
+  type        = string
+}

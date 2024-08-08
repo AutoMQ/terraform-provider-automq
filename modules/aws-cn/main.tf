@@ -10,6 +10,7 @@ module "cmp_service" {
   aws_secret_key = var.aws_secret_key
   aws_vpc_id     = var.aws_vpc_id
   aws_ami_id     = var.aws_ami_id
+  subnet_id      = var.subnet_id
 }
 
 output "instance_ip" {

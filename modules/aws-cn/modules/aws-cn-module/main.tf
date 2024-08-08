@@ -17,10 +17,6 @@ data "aws_subnets" "all" {
   }
 }
 
-data "aws_subnet" "first" {
-  id = data.aws_subnets.all.ids[0]
-}
-
 resource "aws_security_group" "allow_all" {
   vpc_id = data.aws_vpc.selected.id
 
@@ -56,7 +52,7 @@ resource "aws_security_group" "allow_all" {
 resource "aws_instance" "web" {
   ami                   = var.aws_ami_id
   instance_type         = "c5.xlarge"
-  subnet_id             = data.aws_subnet.first.id
+  subnet_id              = var.subnet_id
   vpc_security_group_ids = [aws_security_group.allow_all.id]
 
   root_block_device {
