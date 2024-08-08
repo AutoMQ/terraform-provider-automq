@@ -45,37 +45,6 @@ func (c *Client) GetKafkaInstance(instanceId string) (*KafkaInstanceResponse, er
 	return &instance, nil
 }
 
-func (c *Client) GetKafkaInstanceByName(name string) (*KafkaInstanceResponse, error) {
-	req, err := http.NewRequest("GET", c.HostURL+instancePath+"?keyword="+name, nil)
-	if err != nil {
-		return nil, err
-	}
-	body, err := c.doRequest(req, &c.Token)
-	if err != nil {
-		return nil, err
-	}
-	kafka := KafkaInstanceResponse{}
-	err = json.Unmarshal(body, &kafka)
-	if err != nil {
-		return nil, err
-	}
-	klist := KafkaInstanceResponseList{}
-
-	err = json.Unmarshal(body, &klist)
-	if err != nil {
-		return nil, err
-	}
-
-	var result KafkaInstanceResponse
-	for _, instance := range klist.List {
-		if instance.DisplayName == name {
-			result = instance
-			return &result, nil
-		}
-	}
-	return nil, fmt.Errorf("Kafka instance with name %s not found", name)
-}
-
 func (c *Client) DeleteKafkaInstance(instanceId string) error {
 	req, err := http.NewRequest("DELETE", c.HostURL+instancePath+"/"+instanceId, nil)
 	if err != nil {

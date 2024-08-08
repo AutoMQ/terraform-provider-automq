@@ -440,7 +440,7 @@ func (r *KafkaInstanceResource) Delete(ctx context.Context, req resource.DeleteR
 }
 
 func GetKafkaInstance(instance *KafkaInstanceResourceModel, client *client.Client) (*client.KafkaInstanceResponse, error) {
-	kafka, err := client.GetKafkaInstanceByName(instance.Name.ValueString())
+	kafka, err := client.GetKafkaInstance(instance.InstanceID.ValueString())
 	if err != nil {
 		return nil, fmt.Errorf("error getting Kafka instance by name %s: %v", instance.Name.ValueString(), err)
 	}
