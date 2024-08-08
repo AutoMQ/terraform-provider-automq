@@ -101,7 +101,6 @@ resource "automq_kafka_instance" "test" {
   description    = "test"
   cloud_provider = "aliyun"
   region         = "cn-hangzhou"
-  network_type   = "vpc"
   networks = [{
     zone   = "cn-hangzhou-b"
     subnet = "vsw-bp14v5eikr8wrgoqje7hr"
