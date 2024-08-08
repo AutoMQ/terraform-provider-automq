@@ -13,16 +13,15 @@ provider "automq" {
 }
 
 resource "automq_kafka_instance" "example" {
-  name           = "example"
+  name           = "example123"
   description    = "example"
   cloud_provider = "aliyun"
   region         = "cn-hangzhou"
-  network_type   = "vpc"
   networks = [{
     zone   = "cn-hangzhou-b"
     subnet = "vsw-bp14v5eikr8wrgoqje7hr"
   }]
   compute_specs = {
-    aku = "6"
+    aku = "12"
   }
 }

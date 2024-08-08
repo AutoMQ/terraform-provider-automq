@@ -14,7 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -56,7 +55,6 @@ type KafkaInstanceResourceModel struct {
 	Description    types.String       `tfsdk:"description"`
 	CloudProvider  types.String       `tfsdk:"cloud_provider"`
 	Region         types.String       `tfsdk:"region"`
-	NetworkType    types.String       `tfsdk:"network_type"`
 	Networks       []NetworkModel     `tfsdk:"networks"`
 	ComputeSpecs   ComputeSpecsModel  `tfsdk:"compute_specs"`
 	Config         []ConfigModel      `tfsdk:"config"`
@@ -125,10 +123,6 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				MarkdownDescription: "The region of the Kafka instance",
 				Required:            true,
 			},
-			"network_type": schema.StringAttribute{
-				MarkdownDescription: "The network type of the Kafka instance",
-				Required:            true,
-			},
 			"networks": schema.ListNestedAttribute{
 				Required:    true,
 				Description: "The networks of the Kafka instance",
@@ -155,7 +149,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					},
 					"version": schema.StringAttribute{
 						Optional:    true,
-						Default:     stringdefault.StaticString("latest"),
+						Computed:    true,
 						Description: "The version of the compute specs",
 					},
 				},
@@ -213,7 +207,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 			},
 		},
 		Blocks: map[string]schema.Block{
-			"Timeouts": timeouts.Block(ctx, timeouts.Opts{
+			"timeouts": timeouts.Block(ctx, timeouts.Opts{
 				Create: true,
 				Delete: true,
 			}),
@@ -296,6 +290,20 @@ func (r *KafkaInstanceResource) Read(ctx context.Context, req resource.ReadReque
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	instance, err := GetKafkaInstance(&data, r.client)
+	if err != nil {
+		if isNotFoundError(err) {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", data.InstanceID.ValueString(), err))
+			return
+		}
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", data.InstanceID.ValueString(), err))
+		return
+	}
+	if instance == nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Kafka instance %q not found", data.InstanceID.ValueString()))
+		return
+	}
+	FlattenKafkaInstanceModel(instance, &data)
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -332,11 +340,11 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	// Check if the basic info has changed
-	if state.Name != plan.Name || state.Description != plan.Description {
+	if state.Name.ValueString() != plan.Name.ValueString() || state.Description.ValueString() != plan.Description.ValueString() {
 		// Generate API request body from plan
 		basicUpdate := client.InstanceBasicParam{
-			DisplayName: state.Name.ValueString(),
-			Description: state.Description.ValueString(),
+			DisplayName: plan.Name.ValueString(),
+			Description: plan.Description.ValueString(),
 		}
 		_, err = r.client.UpdateKafkaInstanceBasicInfo(instanceId, basicUpdate)
 		if err != nil {
@@ -372,9 +380,9 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		}
 		specUpdate.Values[0] = client.KafkaInstanceRequestValues{
 			Key:   "aku",
-			Value: fmt.Sprintf("%d", state.ComputeSpecs.Aku.ValueInt64()),
+			Value: fmt.Sprintf("%d", planAKU),
 		}
-		_, err = r.client.UpdateKafkaInstanceComputeSpecs(state.InstanceID.ValueString(), specUpdate)
+		_, err = r.client.UpdateKafkaInstanceComputeSpecs(instanceId, specUpdate)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update Kafka instance %q, got error: %s", instanceId, err))
 			return
