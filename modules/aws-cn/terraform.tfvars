@@ -7,8 +7,8 @@ aws_secret_key = "7smvBw1m/7E10mjIBx5GMPXxx9FI/LXSnqOuPB7W"
 aws_ami_id     = "ami-035193f2cdb529fda"
 
 # network    选择已有的 vpc 和你需要部署应用的子网
-aws_vpc_id     = "vpc-0ac01fa7ea7c043ae"
-subnet_id      = "subnet-00a963d37d8a01963"
+aws_vpc_id     = "vpc-0ba8fc6b18222d08a"
+subnet_id      = "subnet-0de9f673e8ca59e74"
 
 # bucket name   如果下方的开关设置为true，这里的设置会失效
 data_bucket_name = ""
