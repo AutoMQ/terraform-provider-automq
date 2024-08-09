@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,26 +12,25 @@ import (
 const HostURL string = ""
 
 type Client struct {
-	HostURL    string
-	HTTPClient *http.Client
-	Token      string
-	Auth       AuthStruct
+	HostURL     string
+	HTTPClient  *http.Client
+	Token       string
+	Credentials AuthCredentials
 }
 
-// AuthStruct -
-type AuthStruct struct {
-	AccessKey string `json:"access_key"`
-	SecretKey string `json:"secret_key"`
+type AuthCredentials struct {
+	AccessKeyID     string
+	SecretAccessKey string
 }
 
 type ErrorResponse struct {
-	Code         int                 `json:"code"`
-	ErrorMessage string              `json:"error_message"`
-	APIError     GenericOpenAPIError `json:"api_error"`
-	Err          error               `json:"error"`
+	Code         int      `json:"code"`
+	ErrorMessage string   `json:"error_message"`
+	APIError     APIError `json:"api_error"`
+	Err          error    `json:"error"`
 }
 
-type GenericOpenAPIError struct {
+type APIError struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
 	Detail  string `json:"detail"`
@@ -40,7 +40,7 @@ func (e *ErrorResponse) Error() string {
 	return fmt.Errorf("code: %d, message: %s, details: %v", e.Code, e.ErrorMessage, e.Err).Error()
 }
 
-func NewClient(host, token *string) (*Client, error) {
+func NewClient(ctx context.Context, host, token *string) (*Client, error) {
 	c := Client{
 		HTTPClient: &http.Client{Timeout: 10 * time.Second},
 		// Default Hashicups URL
@@ -74,6 +74,14 @@ func (c *Client) doRequest(req *http.Request, authToken *string) ([]byte, error)
 
 	req.Header.Set("Authorization", token)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept-Language", "en")
+
+	// signer := signer.NewSigner(signer.Credentials{AccessKeyID: c.Credentials.AccessKeyID, SecretAccessKey: c.Credentials.SecretAccessKey})
+	// var seeker io.ReadSeeker
+	// if sr, ok := req.Body.(io.ReadSeeker); ok {
+	// 	seeker = sr
+	// }
+	// signer.Sign(req, seeker, "cmp", "private", time.Now())
 
 	res, err := c.HTTPClient.Do(req)
 	if err != nil {
@@ -87,7 +95,7 @@ func (c *Client) doRequest(req *http.Request, authToken *string) ([]byte, error)
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		apiError := GenericOpenAPIError{}
+		apiError := APIError{}
 		err = json.Unmarshal(body, &apiError)
 		if err != nil {
 			return nil, &ErrorResponse{Code: res.StatusCode, ErrorMessage: "Error unmarshaling response body", Err: err}

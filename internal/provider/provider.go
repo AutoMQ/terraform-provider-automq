@@ -140,7 +140,7 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 	tflog.Debug(ctx, "Creating AutoMQ client")
 
-	client, err := client.NewClient(&byco_host, &token)
+	client, err := client.NewClient(ctx, &byco_host, &token)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Create AutoMQ API Client",
