@@ -137,7 +137,6 @@ type signingCtx struct {
 	credentialString string
 	stringToSign     string
 	signature        string
-	authorization    string
 }
 
 // Sign signs AWS v4 requests with the provided body, service name, region the
@@ -524,9 +523,12 @@ func makeSha256Reader(reader io.ReadSeeker) (hashBytes []byte, err error) {
 	// smaller than 32KB. Fall back to io.Copy if we fail to determine the size.
 	size, err := SeekerLen(reader)
 	if err != nil {
-		io.Copy(hash, reader)
+		_, err = io.Copy(hash, reader)
 	} else {
-		io.CopyN(hash, reader, size)
+		_, err = io.CopyN(hash, reader, size)
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	return hash.Sum(nil), nil

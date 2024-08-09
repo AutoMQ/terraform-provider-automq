@@ -106,24 +106,14 @@ func buildSigner() Signer {
 	}
 }
 
-func removeWS(text string) string {
-	text = strings.Replace(text, " ", "", -1)
-	text = strings.Replace(text, "\n", "", -1)
-	text = strings.Replace(text, "\t", "", -1)
-	return text
-}
-
-func assertEqual(t *testing.T, expected, given string) {
-	if removeWS(expected) != removeWS(given) {
-		t.Errorf("\nExpected: %s\nGiven:    %s", expected, given)
-	}
-}
-
 func TestPresignRequest(t *testing.T) {
 	req, body := buildRequest("dynamodb", "private", "{}")
 
 	signer := buildSigner()
-	signer.Presign(req, body, "dynamodb", "private", 300*time.Second, epochTime())
+	_, err := signer.Presign(req, body, "dynamodb", "private", 300*time.Second, epochTime())
+	if err != nil {
+		t.Fatalf("expect no error, got %v", err)
+	}
 
 	expectedDate := "19700101T000000Z"
 	expectedHeaders := "content-length;content-type;host;x-automq-meta-other-header;x-automq-meta-other-header_with_underscore"
@@ -157,7 +147,10 @@ func TestPresignBodyWithArrayRequest(t *testing.T) {
 	req.URL.RawQuery = "Foo=z&Foo=o&Foo=m&Foo=a"
 
 	signer := buildSigner()
-	signer.Presign(req, body, "dynamodb", "private", 300*time.Second, epochTime())
+	_, err := signer.Presign(req, body, "dynamodb", "private", 300*time.Second, epochTime())
+	if err != nil {
+		t.Fatalf("expect no error, got %v", err)
+	}
 
 	expectedDate := "19700101T000000Z"
 	expectedHeaders := "content-length;content-type;host;x-automq-meta-other-header;x-automq-meta-other-header_with_underscore"
@@ -189,7 +182,10 @@ func TestPresignBodyWithArrayRequest(t *testing.T) {
 func TestSignRequest(t *testing.T) {
 	req, body := buildRequest("dynamodb", "private", "{}")
 	signer := buildSigner()
-	signer.Sign(req, body, "dynamodb", "private", epochTime())
+	_, err := signer.Sign(req, body, "dynamodb", "private", epochTime())
+	if err != nil {
+		t.Fatalf("expect no error, got %v", err)
+	}
 
 	expectedDate := "19700101T000000Z"
 	expectedSig := "AUTOMQ-HMAC-SHA256 Credential=AKID/19700101/private/dynamodb/cmp_request, SignedHeaders=content-length;content-type;host;x-automq-date;x-automq-meta-other-header;x-automq-meta-other-header_with_underscore;x-automq-target, Signature=b5ab44d63004fb6968f02bc270d1c6a0b90ff4216b70fec8f0cc30364aef8040"
@@ -207,7 +203,10 @@ func TestPresign_UnsignedPayload(t *testing.T) {
 	req, body := buildRequest("service-name", "private", "hello")
 	signer := buildSigner()
 	signer.UnsignedPayload = true
-	signer.Presign(req, body, "service-name", "private", 5*time.Minute, time.Now())
+	_, err := signer.Presign(req, body, "service-name", "private", 5*time.Minute, time.Now())
+	if err != nil {
+		t.Fatalf("expect no error, got %v", err)
+	}
 	hash := req.Header.Get("X-Automq-Content-Sha256")
 	if e, a := "UNSIGNED-PAYLOAD", hash; e != a {
 		t.Errorf("expect %v, got %v", e, a)
@@ -252,7 +251,10 @@ func TestSignPrecomputedBodyChecksum(t *testing.T) {
 	req, body := buildRequest("dynamodb", "private", "hello")
 	req.Header.Set("X-Automq-Content-Sha256", "PRECOMPUTED")
 	signer := buildSigner()
-	signer.Sign(req, body, "dynamodb", "private", time.Now())
+	_, err := signer.Sign(req, body, "dynamodb", "private", time.Now())
+	if err != nil {
+		t.Fatalf("expect no error, got %v", err)
+	}
 	hash := req.Header.Get("X-Automq-Content-Sha256")
 	if e, a := "PRECOMPUTED", hash; e != a {
 		t.Errorf("expect %v, got %v", e, a)
@@ -479,7 +481,10 @@ func BenchmarkSignRequest(b *testing.B) {
 	signer := buildSigner()
 	req, body := buildRequestReaderSeeker("dynamodb", "private", "{}")
 	for i := 0; i < b.N; i++ {
-		signer.Sign(req, body, "dynamodb", "private", time.Now())
+		_, err := signer.Sign(req, body, "dynamodb", "private", time.Now())
+		if err != nil {
+			b.Fatalf("expect no error, got %v", err)
+		}
 	}
 }
 
