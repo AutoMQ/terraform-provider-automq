@@ -3,7 +3,6 @@ package signer
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -306,7 +305,7 @@ func TestSignWithRequestBody_Overwrite(t *testing.T) {
 	var expectBody []byte
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		b, err := ioutil.ReadAll(r.Body)
+		b, err := io.ReadAll(r.Body)
 		r.Body.Close()
 		if err != nil {
 			t.Errorf("expect not no error, got %v", err)
@@ -473,7 +472,10 @@ func BenchmarkPresignRequest(b *testing.B) {
 	signer := buildSigner()
 	req, body := buildRequestReaderSeeker("dynamodb", "private", "{}")
 	for i := 0; i < b.N; i++ {
-		signer.Presign(req, body, "dynamodb", "private", 300*time.Second, time.Now())
+		_, err := signer.Presign(req, body, "dynamodb", "private", 300*time.Second, time.Now())
+		if err != nil {
+			b.Fatalf("expect no error, got %v", err)
+		}
 	}
 }
 
