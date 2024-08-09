@@ -1,5 +1,5 @@
 # service name Specifies the service name. If changed, another set of services will be started. If not filled in, the default is cmp_service.
-service_name = "cmp-service"
+service_name = "example"
 
 # aws info
 aws_region = "cn-northwest-1"
@@ -18,5 +18,5 @@ ops_bucket_name = "ops-bucket"
 # Specify whether a bucket needs to be created by specifying true or false. If you do not fill in the name, automq-data and automq-ops will be created by default.
 create_data_bucket        = true
 create_ops_bucket         = true
-specific_data_bucket_name = "automq-data"
-specific_ops_bucket_name  = "automq-ops"
+specific_data_bucket_name = ""
+specific_ops_bucket_name  = ""

@@ -31,7 +31,7 @@ module "ops_bucket" {
   force_destroy = true
 }
 
-module "cmp_service" {
+module "automq_byoc" {
   source = "./modules/aws-cn-module"
 
   aws_region       = var.aws_region

@@ -77,7 +77,7 @@ resource "aws_security_group" "allow_all" {
 
 # Create an IAM role
 resource "aws_iam_role" "cmp_role" {
-  name = "cmp_service_role_${var.service_name}"
+  name = "automq_byoc_service_role_${var.service_name}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -96,7 +96,7 @@ resource "aws_iam_role" "cmp_role" {
 
 # Create an IAM policy
 resource "aws_iam_policy" "cmp_policy" {
-  name        = "cmp_service_policy_${var.service_name}"
+  name        = "automq_byoc_service_policy_${var.service_name}"
   description = "Custom policy for CMP service"
 
   policy = jsonencode({
@@ -219,7 +219,7 @@ resource "aws_iam_role_policy_attachment" "cmp_role_attachment" {
 
 # Create an instance profile and bind a role
 resource "aws_iam_instance_profile" "cmp_instance_profile" {
-  name = "cmp_instance_profile_${var.service_name}"
+  name = "automq_byoc_instance_profile_${var.service_name}"
   role = aws_iam_role.cmp_role.name
 }
 
@@ -244,7 +244,7 @@ resource "aws_instance" "web" {
   }
 
   tags = {
-    Name = "cmp-ec2_${var.service_name}"
+    Name = "automq_byoc-ec2_${var.service_name}"
   }
 
   user_data = <<-EOF
@@ -266,7 +266,7 @@ resource "aws_instance" "web" {
 
 # Create a Route53 private zone and bind it to the current VPC
 resource "aws_route53_zone" "private" {
-  name = "cmp_route53_zone_${var.service_name}"
+  name = "automq_byoc_route53_zone_${var.service_name}"
 
   vpc {
     vpc_id = var.aws_vpc_id
