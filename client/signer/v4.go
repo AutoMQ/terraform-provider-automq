@@ -267,8 +267,7 @@ func (ctx *signingCtx) build(disableHeaderHoisting bool) error {
 	unsignedHeaders := ctx.Request.Header
 	if ctx.isPresign {
 		if !disableHeaderHoisting {
-			urlValues := url.Values{}
-			urlValues, _ = buildQuery(allowedQueryHoisting, unsignedHeaders) // no depends
+			urlValues, _ := buildQuery(allowedQueryHoisting, unsignedHeaders) // no depends
 			for k := range urlValues {
 				ctx.Query[k] = urlValues[k]
 			}
