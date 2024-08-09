@@ -1,19 +1,13 @@
+variable "service_name" {
+  description = "cmp service postfix"
+  type        = string
+  default     = "cmp_service"
+}
+
 variable "aws_region" {
   description = "The AWS region to deploy in"
   type        = string
   default     = "cn-northwest-1"
-}
-
-variable "aws_access_key" {
-  description = "The AWS access key"
-  type        = string
-  sensitive   = true
-}
-
-variable "aws_secret_key" {
-  description = "The AWS secret key"
-  type        = string
-  sensitive   = true
 }
 
 variable "aws_vpc_id" {

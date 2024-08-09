@@ -1,3 +1,7 @@
+output "current_service_name" {
+  value = module.cmp_service.service_name
+}
+
 output "instance_ip" {
   value = module.cmp_service.instance_ip
 }
@@ -14,8 +18,8 @@ output "security_group_name" {
   value = module.cmp_service.security_group_name
 }
 
-output "access_message" {
-  value = module.cmp_service.access_message
+output "access_address" {
+  value = module.cmp_service.Service_access_address
 }
 
 output "data_bucket_name" {
@@ -43,8 +47,8 @@ output "cmp_policy_arn" {
 }
 
 output "cmp_instance_profile_arn" {
-  description = "实例配置文件 ARN: "
-  value = module.cmp_service.cmp_instance_profile_arn
+  description = "Instance configuration file ARN:"
+  value       = module.cmp_service.cmp_instance_profile_arn
 }
 
 output "route53_zone_id" {

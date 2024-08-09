@@ -1,9 +1,7 @@
 # main.tf
 
 provider "aws" {
-  region     = var.aws_region
-  access_key = var.aws_access_key
-  secret_key = var.aws_secret_key
+  region = var.aws_region
 }
 
 data "aws_vpc" "selected" {
@@ -14,77 +12,72 @@ resource "aws_security_group" "allow_all" {
   vpc_id = data.aws_vpc.selected.id
 
   ingress {
-    from_port   = 8080
-    to_port     = 8080
-    protocol    = "tcp"
+    from_port = 8080
+    to_port   = 8080
+    protocol  = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
+    from_port = 443
+    to_port   = 443
+    protocol  = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
+    from_port = 22
+    to_port   = 22
+    protocol  = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # 新增端口 9090
   ingress {
-    from_port   = 9090
-    to_port     = 9090
-    protocol    = "tcp"
+    from_port = 9090
+    to_port   = 9090
+    protocol  = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # 新增端口 9092
   ingress {
-    from_port   = 9092
-    to_port     = 9092
-    protocol    = "tcp"
+    from_port = 9092
+    to_port   = 9092
+    protocol  = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # 新增端口 9102
   ingress {
-    from_port   = 9102
-    to_port     = 9102
-    protocol    = "tcp"
+    from_port = 9102
+    to_port   = 9102
+    protocol  = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # 新增端口 9093
   ingress {
-    from_port   = 9093
-    to_port     = 9093
-    protocol    = "tcp"
+    from_port = 9093
+    to_port   = 9093
+    protocol  = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # 新增端口 9103
   ingress {
-    from_port   = 9103
-    to_port     = 9103
-    protocol    = "tcp"
+    from_port = 9103
+    to_port   = 9103
+    protocol  = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    from_port = 0
+    to_port   = 0
+    protocol  = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
 
-# 创建 IAM 角色
+# Create an IAM role
 resource "aws_iam_role" "cmp_role" {
-  name = "cmp_service_role"
+  name = "cmp_service_role_${var.service_name}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -101,9 +94,9 @@ resource "aws_iam_role" "cmp_role" {
   })
 }
 
-# 创建 IAM 策略
+# Create an IAM policy
 resource "aws_iam_policy" "cmp_policy" {
-  name        = "cmp_service_policy"
+  name        = "cmp_service_policy_${var.service_name}"
   description = "Custom policy for CMP service"
 
   policy = jsonencode({
@@ -122,7 +115,7 @@ resource "aws_iam_policy" "cmp_policy" {
         }
       },
       {
-        Sid = "EC2InstanceProfileManagement"
+        Sid    = "EC2InstanceProfileManagement"
         Effect = "Allow"
         Action = [
           "iam:PassRole"
@@ -218,23 +211,23 @@ resource "aws_iam_policy" "cmp_policy" {
   })
 }
 
-# 附加策略到角色
+# Attach strategies to roles
 resource "aws_iam_role_policy_attachment" "cmp_role_attachment" {
   role       = aws_iam_role.cmp_role.name
   policy_arn = aws_iam_policy.cmp_policy.arn
 }
 
-# 创建实例配置文件并绑定角色
+# Create an instance profile and bind a role
 resource "aws_iam_instance_profile" "cmp_instance_profile" {
-  name = "cmp_instance_profile"
+  name = "cmp_instance_profile_${var.service_name}"
   role = aws_iam_role.cmp_role.name
 }
 
-# 创建 EC2 实例并绑定实例配置文件
+# Create an EC2 instance and bind an instance profile
 resource "aws_instance" "web" {
-  ami                    = var.aws_ami_id
-  instance_type          = "c5.xlarge"
-  subnet_id              = var.subnet_id
+  ami           = var.aws_ami_id
+  instance_type = "c5.xlarge"
+  subnet_id     = var.subnet_id
   vpc_security_group_ids = [aws_security_group.allow_all.id]
 
   iam_instance_profile = aws_iam_instance_profile.cmp_instance_profile.name
@@ -251,7 +244,7 @@ resource "aws_instance" "web" {
   }
 
   tags = {
-    Name = "cmp-service"
+    Name = "cmp-ec2_${var.service_name}"
   }
 
   user_data = <<-EOF
@@ -266,14 +259,14 @@ resource "aws_instance" "web" {
                     echo 'cmp.provider.instanceSecurityGroup=${aws_security_group.allow_all.id}' >> /home/admin/config.properties
                     echo 'cmp.provider.instanceDNS=${aws_route53_zone.private.zone_id}' >> /home/admin/config.properties
                     echo 'cmp.provider.instanceProfile=${aws_iam_instance_profile.cmp_instance_profile.arn}' >> /home/admin/config.properties
-                    echo 'cmp.environmentid=example-service-instance-id' >> /home/admin/config.properties
+                    echo 'cmp.environmentid=${var.service_name}' >> /home/admin/config.properties
                   fi
               EOF
 }
 
-# 创建 Route53 private zone 并绑定到当前 VPC
+# Create a Route53 private zone and bind it to the current VPC
 resource "aws_route53_zone" "private" {
-  name = "cmp_route53_zone"
+  name = "cmp_route53_zone_${var.service_name}"
 
   vpc {
     vpc_id = var.aws_vpc_id

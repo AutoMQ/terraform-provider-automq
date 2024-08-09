@@ -1,4 +1,7 @@
 # outputs.tf
+output "service_name" {
+  value = var.service_name
+}
 
 output "instance_ip" {
   value = aws_eip.web_ip.public_ip
@@ -34,6 +37,6 @@ output "cmp_instance_profile_arn" {
   value       = aws_iam_instance_profile.cmp_instance_profile.arn
 }
 
-output "access_message" {
+output "Service_access_address" {
   value = "Please wait for the service to initialize, about 1 min. Once ready, you can access the service at http://${aws_eip.web_ip.public_ip}:8080"
 }
