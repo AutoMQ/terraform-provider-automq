@@ -1,7 +1,24 @@
-variable "service_name" {
-  description = "cmp service postfix"
+variable "automq_byoc_env_name" {
+  description = "automq_byoc service postfix"
   type        = string
-  default     = "cmp_service"
+  default     = "automq_byoc"
+
+  # Added name restrictions, only uppercase and lowercase letters, numbers, and underscores can be used. The length is within 32 char
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9-]{1,32}$", var.automq_byoc_env_name)) && !can(regex("_", var.automq_byoc_env_name))
+    error_message = "The environment_id can only contain alphanumeric characters and hyphens, cannot contain underscores, and must be 32 characters or fewer."
+  }
+}
+
+variable "create_vpc" {
+  description = "Whether to create VPC"
+  type        = bool
+  default     = true
+}
+
+variable "automq_byoc_ec2_instance_type" {
+  type    = string
+  default = "c5.xlarge"
 }
 
 variable "aws_region" {
@@ -10,18 +27,18 @@ variable "aws_region" {
   default     = "cn-northwest-1"
 }
 
-variable "aws_vpc_id" {
+variable "automq_byoc_vpc_id" {
   description = "The ID of the VPC"
   type        = string
 }
 
-variable "subnet_id" {
+variable "public_subnet_id" {
   description = "The ID of the subnet"
   type        = string
 }
 
-variable "aws_ami_id" {
-  description = "The ID of the AMI to use"
+variable "automq_byoc_version" {
+  description = "The version of automq_byoc"
   type        = string
 }
 

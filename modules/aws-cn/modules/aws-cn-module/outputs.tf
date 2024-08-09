@@ -1,6 +1,6 @@
 # outputs.tf
 output "service_name" {
-  value = var.service_name
+  value = var.automq_byoc_env_name
 }
 
 output "instance_ip" {
@@ -8,7 +8,11 @@ output "instance_ip" {
 }
 
 output "vpc_id" {
-  value = data.aws_vpc.selected.id
+  value = var.automq_byoc_vpc_id
+}
+
+output "subnet_id" {
+  value = var.public_subnet_id
 }
 
 output "ebs_volume_id" {
@@ -39,4 +43,8 @@ output "cmp_instance_profile_arn" {
 
 output "Service_access_address" {
   value = "Please wait for the service to initialize, about 1 min. Once ready, you can access the service at http://${aws_eip.web_ip.public_ip}:8080"
+}
+
+output "ami_id" {
+  value = var.automq_byoc_version == "latest" ? data.aws_ami.latest_ami.id : data.aws_ami.specific_version_ami[0].id
 }

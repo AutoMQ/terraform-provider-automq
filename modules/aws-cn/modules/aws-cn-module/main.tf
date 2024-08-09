@@ -5,22 +5,81 @@ provider "aws" {
 }
 
 data "aws_vpc" "selected" {
-  id = var.aws_vpc_id
+  id = var.automq_byoc_vpc_id
+}
+
+# Splicing AMI names
+locals {
+  ami_name_pattern = "automq-control-center-*_linux_amd64"
+}
+
+# Get the latest AMI ID
+data "aws_ami" "latest_ami" {
+  most_recent = true
+
+  filter {
+    name = "name"
+    values = [local.ami_name_pattern]
+  }
+
+  filter {
+    name = "virtualization-type"
+    values = ["hvm"]
+  }
+
+  filter {
+    name = "architecture"
+    values = ["x86_64"]
+  }
+
+  filter {
+    name = "root-device-type"
+    values = ["ebs"]
+  }
+
+  owners = [327633403396]
+}
+
+data "aws_ami" "specific_version_ami" {
+  count = var.automq_byoc_version == "latest" ? 0 : 1
+
+  most_recent = true
+
+  filter {
+    name = "name"
+    values = ["automq-control-center-${var.automq_byoc_version}_linux_amd64"]
+  }
+
+  filter {
+    name = "virtualization-type"
+    values = ["hvm"]
+  }
+
+  filter {
+    name = "architecture"
+    values = ["x86_64"]
+  }
+
+  filter {
+    name = "root-device-type"
+    values = ["ebs"]
+  }
+
+  filter {
+    name = "tag:version"
+    values = [var.automq_byoc_version]
+  }
+
+  owners = [327633403396]
 }
 
 resource "aws_security_group" "allow_all" {
   vpc_id = data.aws_vpc.selected.id
 
+  # 上线前只保留8080.并且需要指定CIDR，如果不指定，默认0000
   ingress {
     from_port = 8080
     to_port   = 8080
-    protocol  = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port = 443
-    to_port   = 443
     protocol  = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -77,7 +136,7 @@ resource "aws_security_group" "allow_all" {
 
 # Create an IAM role
 resource "aws_iam_role" "cmp_role" {
-  name = "automq_byoc_service_role_${var.service_name}"
+  name = "automq-byoc-service-role-${var.automq_byoc_env_name}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -96,7 +155,7 @@ resource "aws_iam_role" "cmp_role" {
 
 # Create an IAM policy
 resource "aws_iam_policy" "cmp_policy" {
-  name        = "automq_byoc_service_policy_${var.service_name}"
+  name        = "automq-byoc-service-policy-${var.automq_byoc_env_name}"
   description = "Custom policy for CMP service"
 
   policy = jsonencode({
@@ -219,15 +278,15 @@ resource "aws_iam_role_policy_attachment" "cmp_role_attachment" {
 
 # Create an instance profile and bind a role
 resource "aws_iam_instance_profile" "cmp_instance_profile" {
-  name = "automq_byoc_instance_profile_${var.service_name}"
+  name = "automq-byoc-instance-profile-${var.automq_byoc_env_name}"
   role = aws_iam_role.cmp_role.name
 }
 
 # Create an EC2 instance and bind an instance profile
 resource "aws_instance" "web" {
-  ami           = var.aws_ami_id
-  instance_type = "c5.xlarge"
-  subnet_id     = var.subnet_id
+  ami           = var.automq_byoc_version == "latest" ? data.aws_ami.latest_ami.id : data.aws_ami.specific_version_ami[0].id
+  instance_type = var.automq_byoc_ec2_instance_type
+  subnet_id     = var.public_subnet_id
   vpc_security_group_ids = [aws_security_group.allow_all.id]
 
   iam_instance_profile = aws_iam_instance_profile.cmp_instance_profile.name
@@ -244,7 +303,7 @@ resource "aws_instance" "web" {
   }
 
   tags = {
-    Name = "automq_byoc-ec2_${var.service_name}"
+    Name = "automq-byoc-ec2-${var.automq_byoc_env_name}"
   }
 
   user_data = <<-EOF
@@ -259,17 +318,21 @@ resource "aws_instance" "web" {
                     echo 'cmp.provider.instanceSecurityGroup=${aws_security_group.allow_all.id}' >> /home/admin/config.properties
                     echo 'cmp.provider.instanceDNS=${aws_route53_zone.private.zone_id}' >> /home/admin/config.properties
                     echo 'cmp.provider.instanceProfile=${aws_iam_instance_profile.cmp_instance_profile.arn}' >> /home/admin/config.properties
-                    echo 'cmp.environmentid=${var.service_name}' >> /home/admin/config.properties
+                    echo 'cmp.environmentid=${var.automq_byoc_env_name}' >> /home/admin/config.properties
                   fi
               EOF
 }
 
 # Create a Route53 private zone and bind it to the current VPC
 resource "aws_route53_zone" "private" {
-  name = "automq_byoc_route53_zone_${var.service_name}"
+  name = "${var.automq_byoc_env_name}.automq.private"
 
   vpc {
-    vpc_id = var.aws_vpc_id
+    vpc_id = var.automq_byoc_vpc_id
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
 

@@ -6,8 +6,12 @@ output "instance_ip" {
   value = module.automq_byoc.instance_ip
 }
 
-output "vpc_id" {
+output "automq_byoc_vpc_id" {
   value = module.automq_byoc.vpc_id
+}
+
+output "public_subnet_id" {
+  value = module.automq_byoc.subnet_id
 }
 
 output "ebs_volume_id" {
@@ -53,4 +57,8 @@ output "cmp_instance_profile_arn" {
 
 output "route53_zone_id" {
   value = module.automq_byoc.route53_zone_id
+}
+
+output "ami_id" {
+  value = module.automq_byoc.ami_id
 }
