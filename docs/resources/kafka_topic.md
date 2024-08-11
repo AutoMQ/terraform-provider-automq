@@ -29,4 +29,6 @@ Kafka Topic resource
 
 ### Read-Only
 
+- `created_at` (String)
+- `last_updated` (String)
 - `topic_id` (String) Kafka topic identifier
