@@ -1,21 +1,22 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"terraform-provider-automq/client/signer"
 	"time"
 )
-
-const HostURL string = ""
 
 type Client struct {
 	HostURL     string
 	HTTPClient  *http.Client
 	Token       string
 	Credentials AuthCredentials
+	Signer      *signer.Signer
 }
 
 type AuthCredentials struct {
@@ -27,67 +28,68 @@ type ErrorResponse struct {
 	Code         int      `json:"code"`
 	ErrorMessage string   `json:"error_message"`
 	APIError     APIError `json:"api_error"`
-	Err          error    `json:"error"`
+	Err          error
 }
 
 type APIError struct {
+	ErrorModel ErrorModel `json:"error"`
+}
+
+type ErrorModel struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
 	Detail  string `json:"detail"`
 }
 
 func (e *ErrorResponse) Error() string {
-	return fmt.Errorf("code: %d, message: %s, details: %v", e.Code, e.ErrorMessage, e.Err).Error()
+	if e.APIError.ErrorModel.Code != "" {
+		return fmt.Sprintf("Error %d: %s: %s", e.Code, e.APIError.ErrorModel.Code, e.APIError.ErrorModel.Message)
+	}
+	return fmt.Sprintf("Error %d: %s, detail: %s", e.Code, e.ErrorMessage, e.Err.Error())
 }
 
-func NewClient(ctx context.Context, host, token *string) (*Client, error) {
-	c := Client{
-		HTTPClient: &http.Client{Timeout: 10 * time.Second},
-		// Default Hashicups URL
-		HostURL: HostURL,
+func NewClient(ctx context.Context, host, token string, credentials AuthCredentials) (*Client, error) {
+	c := &Client{
+		HTTPClient:  &http.Client{Timeout: 10 * time.Second},
+		HostURL:     host,
+		Token:       token,
+		Credentials: credentials,
+		Signer: signer.NewSigner(signer.Credentials{
+			AccessKeyID:     credentials.AccessKeyID,
+			SecretAccessKey: credentials.SecretAccessKey,
+		}),
 	}
-
-	if host != nil {
-		c.HostURL = *host
-	}
-
-	if token == nil {
-		return &c, nil
-	}
-
-	c.Token = *token
-
-	err := c.checkAuth()
-	if err != nil {
+	if err := c.checkAuth(); err != nil {
 		return nil, err
 	}
-
-	return &c, nil
+	return c, nil
 }
 
-func (c *Client) doRequest(req *http.Request, authToken *string) ([]byte, error) {
-	token := c.Token
-
-	if authToken != nil {
-		token = *authToken
-	}
-
-	req.Header.Set("Authorization", token)
+func (c *Client) doRequest(req *http.Request) ([]byte, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept-Language", "en")
-
-	// signer := signer.NewSigner(signer.Credentials{AccessKeyID: c.Credentials.AccessKeyID, SecretAccessKey: c.Credentials.SecretAccessKey})
-	// var seeker io.ReadSeeker
-	// if sr, ok := req.Body.(io.ReadSeeker); ok {
-	// 	seeker = sr
-	// }
-	// signer.Sign(req, seeker, "cmp", "private", time.Now())
+	var seeker io.ReadSeeker
+	if sr, ok := req.Body.(io.ReadSeeker); ok {
+		seeker = sr
+	} else if rc, ok := req.Body.(io.ReadCloser); ok {
+		data, err := io.ReadAll(rc)
+		if err != nil {
+			return nil, &ErrorResponse{Code: 0, ErrorMessage: "Error reading request body", Err: err}
+		}
+		seeker = bytes.NewReader(data)
+	}
+	c.Signer.Sign(req, seeker, "cmp", "private", time.Now())
 
 	res, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return nil, &ErrorResponse{Code: 0, ErrorMessage: "Error sending request", Err: err}
 	}
-	defer res.Body.Close()
+	defer func() {
+		closeErr := res.Body.Close()
+		if closeErr != nil {
+			fmt.Printf("Error closing response body: %v", closeErr)
+		}
+	}()
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -98,9 +100,9 @@ func (c *Client) doRequest(req *http.Request, authToken *string) ([]byte, error)
 		apiError := APIError{}
 		err = json.Unmarshal(body, &apiError)
 		if err != nil {
-			return nil, &ErrorResponse{Code: res.StatusCode, ErrorMessage: "Error unmarshaling response body", Err: err}
+			return nil, &ErrorResponse{Code: res.StatusCode, ErrorMessage: string(body), Err: err}
 		}
-		return nil, &ErrorResponse{Code: res.StatusCode, APIError: apiError, Err: nil}
+		return nil, &ErrorResponse{Code: res.StatusCode, APIError: apiError}
 	}
 
 	return body, nil
