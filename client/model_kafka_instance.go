@@ -112,17 +112,3 @@ type Metric struct {
 	DisplayName string `json:"displayName"`
 	Value       int    `json:"value"`
 }
-
-// TopicCreateParam struct for TopicCreateParam
-type TopicCreateParam struct {
-	Name            *string           `json:"name,omitempty" validate:"regexp=^[a-zA-Z0-9][.a-zA-Z0-9_-]*[a-zA-Z0-9]$"`
-	Partition       int32             `json:"partition"`
-	CompactStrategy string            `json:"compactStrategy"`
-	Configs         []ConfigItemParam `json:"configs,omitempty"`
-}
-
-// ConfigItemParam struct for ConfigItemParam
-type ConfigItemParam struct {
-	Key   *string                `json:"key,omitempty"`
-	Value map[string]interface{} `json:"value,omitempty"`
-}
