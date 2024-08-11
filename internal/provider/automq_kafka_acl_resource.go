@@ -5,7 +5,7 @@ package provider
 import (
 	"context"
 	"fmt"
-	"net/http"
+	"terraform-provider-automq/client"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -29,13 +29,13 @@ func NewKafkaAclResource() resource.Resource {
 
 // KafkaAclResource defines the resource implementation.
 type KafkaAclResource struct {
-	client *http.Client
+	client *client.Client
 }
 
 // KafkaAclResourceModel describes the resource data model.
 type KafkaAclResourceModel struct {
 	EnvironmentID  types.String `tfsdk:"environment_id"`
-	KafkaInstance  types.String `tfsdk:"kafka_instance"`
+	KafkaInstance  types.String `tfsdk:"kafka_instance_id"`
 	ID             types.String `tfsdk:"id"`
 	ResourceType   types.String `tfsdk:"resource_type"`
 	ResourceName   types.String `tfsdk:"resource_name"`
@@ -57,14 +57,16 @@ func (r *KafkaAclResource) Schema(ctx context.Context, req resource.SchemaReques
 			"environment_id": schema.StringAttribute{
 				MarkdownDescription: "Target Kafka environment",
 				Required:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			"kafka_instance": schema.StringAttribute{
+			"kafka_instance_id": schema.StringAttribute{
 				MarkdownDescription: "Target Kafka instance ID",
 				Required:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"id": schema.StringAttribute{
 				MarkdownDescription: "Kafka instance ID",
-				Required:            true,
+				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -75,10 +77,12 @@ func (r *KafkaAclResource) Schema(ctx context.Context, req resource.SchemaReques
 				Validators: []validator.String{
 					stringvalidator.OneOf("TOPIC", "CONSUMERGROUP", "CLUSTER", "TRANSACTION_ID"),
 				},
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"resource_name": schema.StringAttribute{
 				MarkdownDescription: "Name of the resource for ACL",
 				Required:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"pattern_type": schema.StringAttribute{
 				MarkdownDescription: "Pattern type for resource",
@@ -86,10 +90,12 @@ func (r *KafkaAclResource) Schema(ctx context.Context, req resource.SchemaReques
 				Validators: []validator.String{
 					stringvalidator.OneOf("LITERAL", "PREFIXED"),
 				},
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"principal": schema.StringAttribute{
 				MarkdownDescription: "Principal for ACL",
 				Required:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"operation_group": schema.StringAttribute{
 				MarkdownDescription: "Operation group for ACL",
@@ -97,6 +103,7 @@ func (r *KafkaAclResource) Schema(ctx context.Context, req resource.SchemaReques
 				Validators: []validator.String{
 					stringvalidator.OneOf("ALL", "PRODUCE", "CONSUME"),
 				},
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"permission": schema.StringAttribute{
 				MarkdownDescription: "Permission type for ACL",
@@ -106,6 +113,7 @@ func (r *KafkaAclResource) Schema(ctx context.Context, req resource.SchemaReques
 				Validators: []validator.String{
 					stringvalidator.OneOf("ALLOW", "DENY"),
 				},
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 		},
 	}
@@ -116,7 +124,7 @@ func (r *KafkaAclResource) Configure(ctx context.Context, req resource.Configure
 		return
 	}
 
-	client, ok := req.ProviderData.(*http.Client)
+	client, ok := req.ProviderData.(*client.Client)
 
 	if !ok {
 		resp.Diagnostics.AddError(
@@ -131,50 +139,53 @@ func (r *KafkaAclResource) Configure(ctx context.Context, req resource.Configure
 }
 
 func (r *KafkaAclResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data KafkaAclResourceModel
+	var plan KafkaAclResourceModel
 
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Here you would typically call an API to create the Kafka ACL.
-	// For the purposes of this example, we'll just generate an ID.
-
-	data.ID = types.StringValue("generated-id")
+	instance := plan.KafkaInstance.ValueString()
+	param := client.KafkaAclBindingParam{}
+	// Expand the Kafka ACL resource
+	ExpandKafkaACLResource(plan, &param)
+	in := client.KafkaAclBindingParams{Params: []client.KafkaAclBindingParam{param}}
+	out, err := r.client.CreateKafkaAcls(instance, in)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to Create Kafka ACL", err.Error())
+		return
+	}
+	// flatten the response and set the ID to the state
+	FlattenKafkaACLResource(out, &plan)
 
 	tflog.Trace(ctx, "created a Kafka ACL resource")
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *KafkaAclResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data KafkaAclResourceModel
+	var state KafkaAclResourceModel
 
-	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	aclId := state.ID.ValueString()
+	instance := state.KafkaInstance.ValueString()
+	out, err := r.client.GetKafkaAcls(instance, aclId)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to read Kafka ACL", err.Error())
+		return
+	}
+	// flatten the response and set the state
+	FlattenKafkaACLResource(out, &state)
 
-	// Here you would typically call an API to read the Kafka ACL details.
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *KafkaAclResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data KafkaAclResourceModel
-
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// Here you would typically call an API to update the Kafka ACL.
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *KafkaAclResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -185,8 +196,15 @@ func (r *KafkaAclResource) Delete(ctx context.Context, req resource.DeleteReques
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	// Here you would typically call an API to delete the Kafka ACL.
+	param := client.KafkaAclBindingParam{}
+	ExpandKafkaACLResource(data, &param)
+	in := client.KafkaAclBindingParams{Params: []client.KafkaAclBindingParam{param}}
+	instance := data.KafkaInstance.ValueString()
+	err := r.client.DeleteKafkaAcls(instance, in)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to delete Kafka ACL", err.Error())
+		return
+	}
 }
 
 func (r *KafkaAclResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
