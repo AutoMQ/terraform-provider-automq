@@ -71,14 +71,17 @@ func (c *Client) doRequest(req *http.Request) ([]byte, error) {
 	var seeker io.ReadSeeker
 	if sr, ok := req.Body.(io.ReadSeeker); ok {
 		seeker = sr
-	} else if rc, ok := req.Body.(io.ReadCloser); ok {
-		data, err := io.ReadAll(rc)
+	} else {
+		data, err := io.ReadAll(req.Body)
 		if err != nil {
 			return nil, &ErrorResponse{Code: 0, ErrorMessage: "Error reading request body", Err: err}
 		}
 		seeker = bytes.NewReader(data)
 	}
-	c.Signer.Sign(req, seeker, "cmp", "private", time.Now())
+	_, err := c.Signer.Sign(req, seeker, "cmp", "private", time.Now())
+	if err != nil {
+		return nil, &ErrorResponse{Code: 0, ErrorMessage: "Error signing request", Err: err}
+	}
 
 	res, err := c.HTTPClient.Do(req)
 	if err != nil {
