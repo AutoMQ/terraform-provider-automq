@@ -71,8 +71,8 @@ func (c *Client) doRequest(req *http.Request) ([]byte, error) {
 	var seeker io.ReadSeeker
 	if sr, ok := req.Body.(io.ReadSeeker); ok {
 		seeker = sr
-	} else {
-		data, err := io.ReadAll(req.Body)
+	} else if rc, ok := req.Body.(io.Reader); ok {
+		data, err := io.ReadAll(rc)
 		if err != nil {
 			return nil, &ErrorResponse{Code: 0, ErrorMessage: "Error reading request body", Err: err}
 		}
