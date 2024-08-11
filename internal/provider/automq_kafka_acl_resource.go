@@ -176,6 +176,9 @@ func (r *KafkaAclResource) Read(ctx context.Context, req resource.ReadRequest, r
 	instance := state.KafkaInstance.ValueString()
 	out, err := r.client.GetKafkaAcls(instance, aclId)
 	if err != nil {
+		if isNotFoundError(err) {
+			resp.State.RemoveResource(ctx)
+		}
 		resp.Diagnostics.AddError("Failed to read Kafka ACL", err.Error())
 		return
 	}

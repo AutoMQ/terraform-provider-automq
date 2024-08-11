@@ -174,8 +174,17 @@ func (r *KafkaTopicResource) Read(ctx context.Context, req resource.ReadRequest,
 
 	topicId := data.TopicID.ValueString()
 	instanceId := data.KafkaInstance.ValueString()
-
-	resp.Diagnostics.Append(ReadKafkaTopic(r, instanceId, topicId, &data)...)
+	out, err := r.client.GetKafkaTopic(instanceId, topicId)
+	if err != nil {
+		if isNotFoundError(err) {
+			resp.State.RemoveResource(ctx)
+		}
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka topic %q, got error: %s", topicId, err))
+	}
+	if out == nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka topic %q, got nil response", topicId))
+	}
+	resp.Diagnostics.Append(FlattenKafkaTopic(out, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}

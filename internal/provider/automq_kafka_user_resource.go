@@ -143,6 +143,10 @@ func (r *KafkaUserResource) Read(ctx context.Context, req resource.ReadRequest, 
 
 	out, err := r.client.GetKafkaUser(instanceId, userName)
 	if err != nil {
+		if isNotFoundError(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError("Failed to read Kafka user", err.Error())
 		return
 	}
