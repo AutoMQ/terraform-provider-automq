@@ -3,12 +3,14 @@ package client
 import "time"
 
 type KafkaInstanceRequest struct {
-	DisplayName string                        `json:"displayName"`
-	Description string                        `json:"description"`
-	Provider    string                        `json:"provider"`
-	Region      string                        `json:"region"`
-	Spec        KafkaInstanceRequestSpec      `json:"spec"`
-	Networks    []KafkaInstanceRequestNetwork `json:"networks"`
+	DisplayName  string                        `json:"displayName"`
+	Description  string                        `json:"description"`
+	Provider     string                        `json:"provider"`
+	Region       string                        `json:"region"`
+	Spec         KafkaInstanceRequestSpec      `json:"spec"`
+	Networks     []KafkaInstanceRequestNetwork `json:"networks"`
+	AclEnabled   bool                          `json:"aclEnabled"`
+	Integrations []string                      `json:"integrations"`
 }
 
 type InstanceBasicParam struct {

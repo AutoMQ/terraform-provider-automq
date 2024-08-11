@@ -52,6 +52,10 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 			Subnet: network.Subnet.ValueString(),
 		}
 	}
+	request.Integrations = make([]string, len(instance.Integrations))
+	for i, integration := range instance.Integrations {
+		request.Integrations[i] = integration.IntegrationID.String()
+	}
 }
 
 func FlattenKafkaInstanceModel(instance *client.KafkaInstanceResponse, resource *KafkaInstanceResourceModel) {
@@ -60,6 +64,7 @@ func FlattenKafkaInstanceModel(instance *client.KafkaInstanceResponse, resource 
 	resource.Description = types.StringValue(instance.Description)
 	resource.CloudProvider = types.StringValue(instance.Provider)
 	resource.Region = types.StringValue(instance.Region)
+	resource.ACL = types.BoolValue(instance.AclEnabled)
 
 	resource.Networks = flattenNetworks(instance.Networks)
 	resource.ComputeSpecs = flattenComputeSpecs(instance.Spec)
