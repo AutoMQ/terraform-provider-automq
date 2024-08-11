@@ -81,12 +81,20 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		)
 	}
 
-	if data.Token.IsUnknown() {
+	if data.BYOCAccessKey.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("token"),
-			"Unknown AutoMQ API Token",
-			"The provider cannot create the AutoMQ API client as there is an unknown configuration value for the AutoMQ API token. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the AUTOMQ_TOKEN environment variable.",
+			path.Root("byoc_access_key"),
+			"Unknown AutoMQ API BYOCAccessKey",
+			"The provider cannot create the AutoMQ API client as there is an unknown configuration value for the AutoMQ API byoc_access_key. "+
+				"Either target apply the source of the value first, set the value statically in the configuration, or use the AUTOMQ_BYOC_ACCESS_KEY environment variable.",
+		)
+	}
+	if data.BYOCSecretKey.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("byoc_secret_key"),
+			"Unknown AutoMQ API BYOCSecretKey",
+			"The provider cannot create the AutoMQ API client as there is an unknown configuration value for the AutoMQ API byoc_secret_key. "+
+				"Either target apply the source of the value first, set the value statically in the configuration, or use the AUTOMQ_BYOC_SECRET_KEY environment variable.",
 		)
 	}
 
@@ -99,12 +107,20 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 	byco_host := os.Getenv("AUTOMQ_BYOC_HOST")
 	token := os.Getenv("AUTOMQ_TOKEN")
+	byoc_access_key := os.Getenv("AUTOMQ_BYOC_ACCESS_KEY")
+	byoc_secret_key := os.Getenv("AUTOMQ_BYOC_SECRET_KEY")
 
 	if !data.BYOCHost.IsNull() {
 		byco_host = data.BYOCHost.ValueString()
 	}
 	if !data.Token.IsNull() {
 		token = data.Token.ValueString()
+	}
+	if !data.BYOCAccessKey.IsNull() {
+		byoc_access_key = data.BYOCAccessKey.ValueString()
+	}
+	if !data.BYOCSecretKey.IsNull() {
+		byoc_secret_key = data.BYOCSecretKey.ValueString()
 	}
 
 	// If any of the expected configurations are missing, return
@@ -120,12 +136,21 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		)
 	}
 
-	if token == "" {
+	if byoc_access_key == "" {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("token"),
-			"Missing AutoMQ API Token",
-			"The provider cannot create the AutoMQ API client as there is a missing or empty value for the AutoMQ API token. "+
-				"Set the token value in the configuration or use the AUTOMQ_TOKEN environment variable. "+
+			path.Root("byoc_access_key"),
+			"Missing AutoMQ API BYOCAccessKey",
+			"The provider cannot create the AutoMQ API client as there is a missing or empty value for the AutoMQ API byoc_access_key. "+
+				"Set the byoc_access_key value in the configuration or use the AUTOMQ_BYOC_ACCESS_KEY environment variable. "+
+				"If either is already set, ensure the value is not empty.",
+		)
+	}
+	if byoc_secret_key == "" {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("byoc_secret_key"),
+			"Missing AutoMQ API BYOCSecretKey",
+			"The provider cannot create the AutoMQ API client as there is a missing or empty value for the AutoMQ API byoc_secret_key. "+
+				"Set the byoc_secret_key value in the configuration or use the AUTOMQ_BYOC_SECRET_KEY environment variable. "+
 				"If either is already set, ensure the value is not empty.",
 		)
 	}
@@ -140,7 +165,12 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 	tflog.Debug(ctx, "Creating AutoMQ client")
 
-	client, err := client.NewClient(ctx, &byco_host, &token)
+	credential := client.AuthCredentials{
+		AccessKeyID:     data.BYOCAccessKey.ValueString(),
+		SecretAccessKey: data.BYOCSecretKey.ValueString(),
+	}
+
+	client, err := client.NewClient(ctx, byco_host, token, credential)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Create AutoMQ API Client",
