@@ -9,6 +9,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-timetypes/timetypes"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -16,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -33,6 +35,7 @@ const (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &KafkaInstanceResource{}
+var _ resource.ResourceWithConfigure = &KafkaInstanceResource{}
 var _ resource.ResourceWithImportState = &KafkaInstanceResource{}
 
 func NewKafkaInstanceResource() resource.Resource {
@@ -119,10 +122,12 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 			"cloud_provider": schema.StringAttribute{
 				MarkdownDescription: "The cloud provider of the Kafka instance",
 				Required:            true,
+				Validators:          []validator.String{stringvalidator.OneOf("aws", "aws-cn", "aliyun")},
 			},
 			"region": schema.StringAttribute{
 				MarkdownDescription: "The region of the Kafka instance",
 				Required:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"networks": schema.ListNestedAttribute{
 				Required:    true,
@@ -130,12 +135,14 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"zone": schema.StringAttribute{
-							Required:    true,
-							Description: "The zone of the network",
+							Required:      true,
+							Description:   "The zone of the network",
+							PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 						},
 						"subnet": schema.StringAttribute{
-							Required:    true,
-							Description: "The subnetId of the network",
+							Required:      true,
+							Description:   "The subnetId of the network",
+							PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 						},
 					},
 				},
@@ -290,8 +297,17 @@ func (r *KafkaInstanceResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 	instanceId := state.InstanceID.ValueString()
+	instance, err := r.client.GetKafkaInstance(instanceId)
+	if err != nil {
+		if isNotFoundError(err) {
+			// Treat HTTP 404 Not Found status as a signal to recreate resource and return early
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", state.InstanceID.ValueString(), err))
+	}
+	FlattenKafkaInstanceModel(instance, &state)
 
-	resp.Diagnostics.Append(ReadKafkaInstance(r, instanceId, &state))
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -310,8 +326,8 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	// check if the instance exists
-	instance, err := GetKafkaInstance(&state, r.client)
-	instanceId := instance.InstanceID
+	instanceId := plan.InstanceID.ValueString()
+	instance, err := r.client.GetKafkaInstance(instanceId)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", instanceId, err))
 		return
@@ -388,10 +404,10 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 }
 
 func ReadKafkaInstance(r *KafkaInstanceResource, instanceId string, plan *KafkaInstanceResourceModel) diag.Diagnostic {
-	instance, err := GetKafkaInstance(plan, r.client)
+	instance, err := r.client.GetKafkaInstance(instanceId)
 	if err != nil {
 		if isNotFoundError(err) {
-			return diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", plan.InstanceID.ValueString(), err))
+			return nil
 		}
 		return diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", plan.InstanceID.ValueString(), err))
 	}
@@ -412,7 +428,7 @@ func (r *KafkaInstanceResource) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 	instanceId := state.InstanceID.ValueString()
-	instance, err := GetKafkaInstance(&state, r.client)
+	instance, err := r.client.GetKafkaInstance(instanceId)
 	if err != nil {
 		if isNotFoundError(err) {
 			return
@@ -439,14 +455,6 @@ func (r *KafkaInstanceResource) Delete(ctx context.Context, req resource.DeleteR
 	}
 }
 
-func GetKafkaInstance(instance *KafkaInstanceResourceModel, client *client.Client) (*client.KafkaInstanceResponse, error) {
-	kafka, err := client.GetKafkaInstance(instance.InstanceID.ValueString())
-	if err != nil {
-		return nil, fmt.Errorf("error getting Kafka instance by name %s: %v", instance.Name.ValueString(), err)
-	}
-	return kafka, nil
-}
-
 func (r *KafkaInstanceResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resource.ImportStatePassthroughID(ctx, path.Root("instance_id"), req, resp)
 }
