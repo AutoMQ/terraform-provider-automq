@@ -178,6 +178,7 @@ func (r *KafkaTopicResource) Read(ctx context.Context, req resource.ReadRequest,
 	if err != nil {
 		if isNotFoundError(err) {
 			resp.State.RemoveResource(ctx)
+			return
 		}
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka topic %q, got error: %s", topicId, err))
 	}
@@ -222,12 +223,25 @@ func (r *KafkaTopicResource) Update(ctx context.Context, req resource.UpdateRequ
 	planPartition := plan.Partition.ValueInt64()
 	statePartition := state.Partition.ValueInt64()
 	if planPartition != statePartition {
+		if planPartition < statePartition {
+			resp.Diagnostics.AddError("Partition Update Error", fmt.Sprintf("Error occurred while updating Kafka TopicId %q. "+
+				" At present, we don't support reducing the number of partitions for a topic. ", topicId))
+			return
+		}
 		in := client.TopicPartitionParam{}
 		in.Partition = planPartition
 		_, err := r.client.UpdateKafkaTopicPartition(instanceId, topicId, in)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update Kafka topic %q, got error: %s", topicId, err))
 		}
+		resp.Diagnostics.Append(ReadKafkaTopic(r, instanceId, topicId, &plan)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		now := time.Now()
+		plan.LastUpdated = timetypes.NewRFC3339TimePointerValue(&now)
+		plan.CreatedAt = state.CreatedAt
+		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	}
 	planConfig := plan.Configs
 	stateConfig := state.Configs
@@ -243,6 +257,7 @@ func (r *KafkaTopicResource) Update(ctx context.Context, req resource.UpdateRequ
 				return
 			}
 		}
+
 		in := client.TopicConfigParam{}
 		in.Configs = make([]client.ConfigItemParam, len(planConfig.Elements()))
 		i := 0
@@ -258,16 +273,15 @@ func (r *KafkaTopicResource) Update(ctx context.Context, req resource.UpdateRequ
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update Kafka topic %q, got error: %s", topicId, err))
 		}
+		resp.Diagnostics.Append(ReadKafkaTopic(r, instanceId, topicId, &plan)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		now := time.Now()
+		plan.LastUpdated = timetypes.NewRFC3339TimePointerValue(&now)
+		plan.CreatedAt = state.CreatedAt
+		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	}
-	resp.Diagnostics.Append(ReadKafkaTopic(r, instanceId, topicId, &plan)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	now := time.Now()
-	plan.LastUpdated = timetypes.NewRFC3339TimePointerValue(&now)
-	plan.CreatedAt = state.CreatedAt
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *KafkaTopicResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

@@ -354,6 +354,10 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update Kafka instance %q, got error: %s", instanceId, err))
 			return
 		}
+		// get latest info
+		resp.Diagnostics.Append(ReadKafkaInstance(r, instanceId, &plan))
+		// Save updated data into Terraform state
+		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	}
 
 	updateTimeout := r.UpdateTimeout(ctx, state.Timeouts)
@@ -372,6 +376,10 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error waiting for Kafka Cluster %q to provision: %s", instanceId, err))
 			return
 		}
+		// get latest info
+		resp.Diagnostics.Append(ReadKafkaInstance(r, instanceId, &plan))
+		// Save updated data into Terraform state
+		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	}
 
 	stateAKU := state.ComputeSpecs.Aku.ValueInt64()
@@ -395,12 +403,11 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error waiting for Kafka Cluster %q to provision: %s", instanceId, err))
 			return
 		}
+		// get latest info
+		resp.Diagnostics.Append(ReadKafkaInstance(r, instanceId, &plan))
+		// Save updated data into Terraform state
+		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	}
-
-	// get latest info
-	resp.Diagnostics.Append(ReadKafkaInstance(r, instanceId, &plan))
-	// Save updated data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func ReadKafkaInstance(r *KafkaInstanceResource, instanceId string, plan *KafkaInstanceResourceModel) diag.Diagnostic {

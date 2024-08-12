@@ -2,7 +2,6 @@ package client
 
 // TopicVO struct for TopicVO
 type TopicVO struct {
-	System    bool                   `json:"system,omitempty"`
 	TopicId   string                 `json:"topicId,omitempty"`
 	Name      string                 `json:"name,omitempty"`
 	Partition int64                  `json:"partition,omitempty"`
