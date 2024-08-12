@@ -80,7 +80,7 @@ func buildRequestWithBodyReader(serviceName, region string, body io.Reader) (*ht
 		bodyLen = lr.Len()
 	}
 
-	endpoint := "https://" + serviceName + "." + region + ".amazonaws.com"
+	endpoint := "https://" + serviceName + "." + region + ".test.com"
 	req, _ := http.NewRequest("POST", endpoint, body)
 	req.URL.Opaque = "//example.org/bucket/key-._~,!@#$%^&*()"
 	req.Header.Set("X-Automq-Target", "prefix.Operation")
@@ -427,7 +427,7 @@ func TestRequestHost(t *testing.T) {
 func TestSign_buildCanonicalHeaders(t *testing.T) {
 	serviceName := "mockAPI"
 	region := "mock-region"
-	endpoint := "https://" + serviceName + "." + region + ".amazonaws.com"
+	endpoint := "https://" + serviceName + "." + region + ".test.com"
 
 	req, err := http.NewRequest("POST", endpoint, nil)
 	if err != nil {
@@ -464,7 +464,7 @@ func TestSign_buildCanonicalHeaders(t *testing.T) {
 		`footabspace:tab-space`,
 		`footrailingspace:trailing-space`,
 		`foowrappedspace:wrapped-space`,
-		`host:mockAPI.mock-region.amazonaws.com`,
+		`host:mockAPI.mock-region.test.com`,
 	}, "\n")
 	if e, a := expectCanonicalHeaders, ctx.canonicalHeaders; e != a {
 		t.Errorf("expect:\n%s\n\nactual:\n%s", e, a)
