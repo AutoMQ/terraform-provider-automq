@@ -1,3 +1,6 @@
+// Copyright 2024 Amazon.com, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build go1.5
 // +build go1.5
 

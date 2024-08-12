@@ -1,3 +1,6 @@
+// Copyright 2024 Amazon.com, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 package signer
 
 import (
@@ -32,6 +35,14 @@ const (
 	// emptyStringSHA256 is a SHA256 of an empty string
 	emptyStringSHA256 = `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
 )
+
+const (
+	SeekStart   = 0 // seek relative to the origin of the file
+	SeekCurrent = 1 // seek relative to the current offset
+	SeekEnd     = 2 // seek relative to the end
+)
+
+const doubleSpace = "  "
 
 var ignoredHeaders = rules{
 	excludeList{
@@ -70,8 +81,8 @@ var allowedQueryHoisting = inclusiveRules{
 	patterns{"X-Automq-"},
 }
 
-// Signer applies AWS v4 signing to given request. Use this to sign requests
-// that need to be signed with AWS V4 Signatures.
+// Signer applies AutoMQ v4 signing to given request. Use this to sign requests
+// that need to be signed with AutoMQ V4 Signatures.
 type Signer struct {
 	Credential Credentials
 
@@ -139,7 +150,7 @@ type signingCtx struct {
 	signature        string
 }
 
-// Sign signs AWS v4 requests with the provided body, service name, region the
+// Sign signs AutoMQ v4 requests with the provided body, service name, region the
 // request is made to, and time the request is signed at. The signTime allows
 // you to specify that a request is signed for the future, and cannot be
 // used until then.
@@ -162,13 +173,13 @@ type signingCtx struct {
 //
 // The requests body is an io.ReadSeeker so the SHA256 of the body can be
 // generated. To bypass the signer computing the hash you can set the
-// "X-Amz-Content-Sha256" header with a precomputed value. The signer will
+// "X-Automq-Content-Sha256" header with a precomputed value. The signer will
 // only compute the hash if the request header value is empty.
 func (v4 Signer) Sign(r *http.Request, body io.ReadSeeker, service, region string, signTime time.Time) (http.Header, error) {
 	return v4.signWithBody(r, body, service, region, 0, false, signTime)
 }
 
-// Presign signs AWS v4 requests with the provided body, service name, region
+// Presign signs AutoMQ v4 requests with the provided body, service name, region
 // the request is made to, and time the request is signed at. The signTime
 // allows you to specify that a request is signed for the future, and cannot
 // be used until then.
@@ -190,14 +201,8 @@ func (v4 Signer) Sign(r *http.Request, body io.ReadSeeker, service, region strin
 //
 // The requests body is an io.ReadSeeker so the SHA256 of the body can be
 // generated. To bypass the signer computing the hash you can set the
-// "X-Amz-Content-Sha256" header with a precomputed value. The signer will
+// "X-Automq-Content-Sha256" header with a precomputed value. The signer will
 // only compute the hash if the request header value is empty.
-//
-// Presigning a S3 request will not compute the body's SHA256 hash by default.
-// This is done due to the general use case for S3 presigned URLs is to share
-// PUT/GET capabilities. If you would like to include the body's SHA256 in the
-// presigned request's signature you can set the "X-Amz-Content-Sha256"
-// HTTP header and that will be included in the request's signature.
 func (v4 Signer) Presign(r *http.Request, body io.ReadSeeker, service, region string, exp time.Duration, signTime time.Time) (http.Header, error) {
 	return v4.signWithBody(r, body, service, region, exp, true, signTime)
 }
@@ -454,9 +459,6 @@ func (ctx *signingCtx) buildBodyDigest() error {
 		} else if ctx.Body == nil {
 			hash = emptyStringSHA256
 		} else {
-			if !IsReaderSeekable(ctx.Body) {
-				return fmt.Errorf("cannot use unseekable request body %T, for signed request with body", ctx.Body)
-			}
 			hashBytes, err := makeSha256Reader(ctx.Body)
 			if err != nil {
 				return err
@@ -520,7 +522,7 @@ func makeSha256Reader(reader io.ReadSeeker) (hashBytes []byte, err error) {
 
 	// Use CopyN to avoid allocating the 32KB buffer in io.Copy for bodies
 	// smaller than 32KB. Fall back to io.Copy if we fail to determine the size.
-	size, err := SeekerLen(reader)
+	size, err := seekerLen(reader)
 	if err != nil {
 		_, err = io.Copy(hash, reader)
 	} else {
@@ -533,7 +535,24 @@ func makeSha256Reader(reader io.ReadSeeker) (hashBytes []byte, err error) {
 	return hash.Sum(nil), nil
 }
 
-const doubleSpace = "  "
+func seekerLen(s io.Seeker) (int64, error) {
+	curOffset, err := s.Seek(0, SeekCurrent)
+	if err != nil {
+		return 0, err
+	}
+
+	endOffset, err := s.Seek(0, SeekEnd)
+	if err != nil {
+		return 0, err
+	}
+
+	_, err = s.Seek(curOffset, SeekStart)
+	if err != nil {
+		return 0, err
+	}
+
+	return endOffset - curOffset, nil
+}
 
 // stripExcessSpaces will rewrite the passed in slice's string values to not
 // contain multiple side-by-side spaces.

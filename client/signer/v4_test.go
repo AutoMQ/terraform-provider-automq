@@ -1,3 +1,6 @@
+// Copyright 2024 Amazon.com, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 package signer
 
 import (
@@ -115,8 +118,8 @@ func TestPresignRequest(t *testing.T) {
 	}
 
 	expectedDate := "19700101T000000Z"
-	expectedHeaders := "content-length;content-type;host;x-automq-meta-other-header;x-automq-meta-other-header_with_underscore"
-	expectedSig := "6760ea122b83b0589a2d3e9fc8b9e56786dc69397cac7fbd6a8c4d6930040745"
+	expectedHeaders := "content-length;content-type;host;x-automq-meta-other-header;x-automq-meta-other-header_with_underscore;x-automq-target"
+	expectedSig := "3ee3989c67f00339fc4e5571df43e2eb426efe5047eda751aac601c07f9d82f6"
 	expectedCred := "AKID/19700101/private/dynamodb/cmp_request"
 	expectedTarget := "prefix.Operation"
 
@@ -152,8 +155,8 @@ func TestPresignBodyWithArrayRequest(t *testing.T) {
 	}
 
 	expectedDate := "19700101T000000Z"
-	expectedHeaders := "content-length;content-type;host;x-automq-meta-other-header;x-automq-meta-other-header_with_underscore"
-	expectedSig := "0835dd81aaea2bf9d8d2d6b57552beef4afdf3b20d7f46e7ed3ebc946884be94"
+	expectedHeaders := "content-length;content-type;host;x-automq-meta-other-header;x-automq-meta-other-header_with_underscore;x-automq-target"
+	expectedSig := "87e7b28557a3ff961cf09e25d99eeadd3990a972d613433eae0f32d4b4cd8daf"
 	expectedCred := "AKID/19700101/private/dynamodb/cmp_request"
 	expectedTarget := "prefix.Operation"
 
