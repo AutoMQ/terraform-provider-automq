@@ -179,3 +179,127 @@ func FlattenKafkaACLResource(acl *client.KafkaAclBindingVO, resource *KafkaAclRe
 	resource.OperationGroup = types.StringValue(acl.AccessControl.OperationGroup.Name)
 	resource.Permission = types.StringValue(acl.AccessControl.PermissionType)
 }
+
+func ExpandIntergationResource(in *client.IntegrationParam, integration IntegrationResourceModel) diag.Diagnostic {
+	integrationType := integration.Type.ValueString()
+	in.Name = integration.Name.ValueString()
+	in.Type = &integrationType
+	if integrationType == "cloudWatch" {
+		in.Name = integration.Name.ValueString()
+		if integration.EndPoint.IsNull() || integration.EndPoint.IsUnknown() {
+			return diag.NewErrorDiagnostic("Missing required field", "endpoint is required for CloudWatch integration")
+		}
+		in.EndPoint = integration.EndPoint.ValueString()
+		if integration.CloudWatchConfig == nil {
+			return diag.NewErrorDiagnostic("Missing required field", "cloud_watch_config is required for CloudWatch integration")
+		}
+		if integration.CloudWatchConfig.NameSpace.ValueString() == "" {
+			return diag.NewErrorDiagnostic("Missing required field", "namespace is required for CloudWatch integration")
+		}
+		in.Config = []client.ConfigItemParam{
+			{
+				Key:   "namespace",
+				Value: integration.CloudWatchConfig.NameSpace.ValueString(),
+			},
+		}
+	} else if integrationType == "kafka" {
+		in.Name = integration.Name.ValueString()
+		if integration.EndPoint.IsNull() || integration.EndPoint.IsUnknown() {
+			return diag.NewErrorDiagnostic("Missing required field", "endpoint is required for Kafka integration")
+		}
+		in.EndPoint = integration.EndPoint.ValueString()
+		if integration.KafkaConfig == nil {
+			return diag.NewErrorDiagnostic("Missing required field", "kafka_config is required for Kafka integration")
+		}
+		if integration.KafkaConfig.SecurityProtocol.ValueString() == "" {
+			return diag.NewErrorDiagnostic("Missing required field", "security_protocol is required for Kafka integration")
+		}
+		if integration.KafkaConfig.SecurityProtocol.ValueString() == "SASL_PLAINTEXT" {
+			if integration.KafkaConfig.SaslMechanism.ValueString() == "" {
+				return diag.NewErrorDiagnostic("Missing required field", "sasl_mechanism is required for Kafka integration")
+			}
+			if integration.KafkaConfig.SaslUsername.ValueString() == "" {
+				return diag.NewErrorDiagnostic("Missing required field", "sasl_username is required for Kafka integration")
+			}
+			if integration.KafkaConfig.SaslPassword.ValueString() == "" {
+				return diag.NewErrorDiagnostic("Missing required field", "sasl_password is required for Kafka integration")
+			}
+			in.Config = []client.ConfigItemParam{
+				{
+					Key:   "security_protocol",
+					Value: integration.KafkaConfig.SecurityProtocol.ValueString(),
+				},
+				{
+					Key:   "sasl_mechanism",
+					Value: integration.KafkaConfig.SaslMechanism.ValueString(),
+				},
+				{
+					Key:   "sasl_username",
+					Value: integration.KafkaConfig.SaslUsername.ValueString(),
+				},
+				{
+					Key:   "sasl_password",
+					Value: integration.KafkaConfig.SaslPassword.ValueString(),
+				},
+			}
+		} else if integration.KafkaConfig.SecurityProtocol.ValueString() == "PLAINTEXT" {
+			in.Config = []client.ConfigItemParam{
+				{
+					Key:   "security_protocol",
+					Value: integration.KafkaConfig.SecurityProtocol.ValueString(),
+				},
+			}
+		}
+	} else if integrationType == "prometheus" {
+		in.Name = integration.Name.ValueString()
+		if integration.EndPoint.IsNull() || integration.EndPoint.IsUnknown() {
+			return diag.NewErrorDiagnostic("Missing required field", "endpoint is required for Prometheus integration")
+		}
+		in.EndPoint = integration.EndPoint.ValueString()
+	}
+	return nil
+}
+
+func FlattenIntergrationResource(integration *client.IntegrationVO, resource *IntegrationResourceModel) {
+	resource.ID = types.StringValue(integration.Code)
+	resource.Name = types.StringValue(integration.Name)
+	resource.Type = types.StringValue(integration.Type)
+	resource.CreatedAt = timetypes.NewRFC3339TimePointerValue(&integration.GmtCreate)
+	resource.LastUpdated = timetypes.NewRFC3339TimePointerValue(&integration.GmtModified)
+	flattenIntergrationTypeConfig(integration.Type, integration.Config, resource)
+}
+
+func flattenIntergrationTypeConfig(iType string, config map[string]interface{}, resource *IntegrationResourceModel) {
+	if iType == "Kafka" {
+		flattenKafkaConfig(config, resource)
+		return
+	} else if iType == "CloudWatch" {
+		flattenCloudWatchConfig(config, resource)
+		return
+	} else if iType == "Prometheus" {
+		return
+	}
+}
+
+func flattenKafkaConfig(config map[string]interface{}, resource *IntegrationResourceModel) {
+	resource.KafkaConfig = &KafkaIntegrationConfig{}
+	if v, ok := config["securityProtocol"]; ok {
+		resource.KafkaConfig.SaslMechanism = types.StringValue(v.(string))
+	}
+	if v, ok := config["saslMechanism"]; ok {
+		resource.KafkaConfig.SaslMechanism = types.StringValue(v.(string))
+	}
+	if v, ok := config["saslUsername"]; ok {
+		resource.KafkaConfig.SaslUsername = types.StringValue(v.(string))
+	}
+	if v, ok := config["saslPassword"]; ok {
+		resource.KafkaConfig.SaslPassword = types.StringValue(v.(string))
+	}
+}
+
+func flattenCloudWatchConfig(config map[string]interface{}, resource *IntegrationResourceModel) {
+	resource.CloudWatchConfig = &CloudWatchIntegrationConfig{}
+	if v, ok := config["namespece"]; ok {
+		resource.CloudWatchConfig.NameSpace = types.StringValue(v.(string))
+	}
+}

@@ -5,8 +5,9 @@ package provider
 import (
 	"context"
 	"fmt"
-	"net/http"
+	"terraform-provider-automq/client"
 
+	"github.com/hashicorp/terraform-plugin-framework-timetypes/timetypes"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -28,31 +29,38 @@ func NewIntegrationResource() resource.Resource {
 
 // IntegrationResource defines the resource implementation.
 type IntegrationResource struct {
-	client *http.Client
+	client *client.Client
 }
 
 // IntegrationResourceModel describes the resource data model.
 type IntegrationResourceModel struct {
-	EnvironmentID    types.String                `tfsdk:"environment_id"`
-	Name             types.String                `tfsdk:"name"`
-	Type             types.String                `tfsdk:"type"`
-	EndPoint         types.String                `tfsdk:"endpoint"`
-	ID               types.String                `tfsdk:"id"`
-	KafkaConfig      KafkaIntegrationConfig      `tfsdk:"kafka_config"`
-	PrometheusConfig PrometheusIntegrationConfig `tfsdk:"prometheus_config"`
+	EnvironmentID    types.String                 `tfsdk:"environment_id"`
+	Name             types.String                 `tfsdk:"name"`
+	Type             types.String                 `tfsdk:"type"`
+	EndPoint         types.String                 `tfsdk:"endpoint"`
+	ID               types.String                 `tfsdk:"id"`
+	KafkaConfig      *KafkaIntegrationConfig      `tfsdk:"kafka_config"`
+	PrometheusConfig *PrometheusIntegrationConfig `tfsdk:"prometheus_config"`
+	CloudWatchConfig *CloudWatchIntegrationConfig `tfsdk:"cloudwatch_config"`
+	CreatedAt        timetypes.RFC3339            `tfsdk:"created_at"`
+	LastUpdated      timetypes.RFC3339            `tfsdk:"last_updated"`
 }
 
 type KafkaIntegrationConfig struct {
-	SecurityProtocol string `json:"security_protocol"`
-	SaslMechanism    string `json:"sasl_mechanism"`
-	SaslUsername     string `json:"sasl_username"`
-	SaslPassword     string `json:"sasl_password"`
+	SecurityProtocol types.String `tfsdk:"security_protocol"`
+	SaslMechanism    types.String `tfsdk:"sasl_mechanism"`
+	SaslUsername     types.String `tfsdk:"sasl_username"`
+	SaslPassword     types.String `tfsdk:"sasl_password"`
 }
 
 type PrometheusIntegrationConfig struct {
-	Username    string `json:"username"`
-	Password    string `json:"password"`
-	BearerToken string `json:"bearer_token"`
+	Username    types.String `tfsdk:"username"`
+	Password    types.String `tfsdk:"password"`
+	BearerToken types.String `tfsdk:"bearer_token"`
+}
+
+type CloudWatchIntegrationConfig struct {
+	NameSpace types.String `tfsdk:"namespace"`
 }
 
 func (r *IntegrationResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -67,6 +75,7 @@ func (r *IntegrationResource) Schema(ctx context.Context, req resource.SchemaReq
 			"environment_id": schema.StringAttribute{
 				MarkdownDescription: "Target environment ID",
 				Required:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"name": schema.StringAttribute{
 				MarkdownDescription: "Name of the integration",
@@ -77,12 +86,13 @@ func (r *IntegrationResource) Schema(ctx context.Context, req resource.SchemaReq
 				MarkdownDescription: "Type of the integration",
 				Required:            true,
 				Validators: []validator.String{
-					stringvalidator.OneOf("Prometheus", "Kafka", "CloudWatch"),
+					stringvalidator.OneOf("prometheus", "kafka", "cloudWatch"),
 				},
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"endpoint": schema.StringAttribute{
 				MarkdownDescription: "Endpoint of the integration",
-				Required:            true,
+				Optional:            true,
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(1, 256),
 				},
@@ -95,7 +105,7 @@ func (r *IntegrationResource) Schema(ctx context.Context, req resource.SchemaReq
 						MarkdownDescription: "Security protocol for Kafka",
 						Required:            true,
 						Validators: []validator.String{
-							stringvalidator.OneOf("PLAINTEXT", "SSL", "SASL_PLAINTEXT", "SASL_SSL"),
+							stringvalidator.OneOf("PLAINTEXT", "SASL_PLAINTEXT"),
 						},
 					},
 					"sasl_mechanism": schema.StringAttribute{
@@ -133,12 +143,30 @@ func (r *IntegrationResource) Schema(ctx context.Context, req resource.SchemaReq
 					},
 				},
 			},
+			"cloudwatch_config": schema.SingleNestedAttribute{
+				MarkdownDescription: "CloudWatch",
+				Optional:            true,
+				Attributes: map[string]schema.Attribute{
+					"namespace": schema.StringAttribute{
+						MarkdownDescription: "Namespace",
+						Optional:            true,
+					},
+				},
+			},
 			"id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Integration identifier",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
+			},
+			"created_at": schema.StringAttribute{
+				CustomType: timetypes.RFC3339Type{},
+				Computed:   true,
+			},
+			"last_updated": schema.StringAttribute{
+				CustomType: timetypes.RFC3339Type{},
+				Computed:   true,
 			},
 		},
 	}
@@ -149,7 +177,7 @@ func (r *IntegrationResource) Configure(ctx context.Context, req resource.Config
 		return
 	}
 
-	client, ok := req.ProviderData.(*http.Client)
+	client, ok := req.ProviderData.(*client.Client)
 
 	if !ok {
 		resp.Diagnostics.AddError(
@@ -164,22 +192,31 @@ func (r *IntegrationResource) Configure(ctx context.Context, req resource.Config
 }
 
 func (r *IntegrationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data IntegrationResourceModel
+	var integration IntegrationResourceModel
 
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &integration)...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Here you would typically call an API to create the integration.
-	// For the purposes of this example, we'll just generate an ID.
+	// Generate API request to create the integration.
+	in := client.IntegrationParam{}
+	resp.Diagnostics.Append(ExpandIntergationResource(&in, integration))
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
-	data.ID = types.StringValue("generated-id")
+	out, err := r.client.CreateIntergration(in)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create integration", err.Error())
+		return
+	}
+
+	FlattenIntergrationResource(out, &integration)
 
 	tflog.Trace(ctx, "created an integration resource")
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &integration)...)
 }
 
 func (r *IntegrationResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -190,24 +227,43 @@ func (r *IntegrationResource) Read(ctx context.Context, req resource.ReadRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	// Here you would typically call an API to read the integration details.
-
+	intergationId := data.ID.ValueString()
+	out, err := r.client.GetIntergration(intergationId)
+	if err != nil {
+		if isNotFoundError(err) {
+			resp.State.RemoveResource(ctx)
+		}
+		resp.Diagnostics.AddError("Failed to read integration", err.Error())
+		return
+	}
+	FlattenIntergrationResource(out, &data)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *IntegrationResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data IntegrationResourceModel
+	var state, plan IntegrationResourceModel
 
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	// Generate API request to update the integration.
+	intergationId := state.ID.ValueString()
+	in := client.IntegrationParam{}
+	resp.Diagnostics.Append(ExpandIntergationResource(&in, plan))
+	in.Type = nil
+	out, err := r.client.UpdateIntergration(intergationId, &in)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to update integration", err.Error())
+		return
+	}
+	FlattenIntergrationResource(out, &plan)
 
-	// Here you would typically call an API to update the integration.
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *IntegrationResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -218,8 +274,12 @@ func (r *IntegrationResource) Delete(ctx context.Context, req resource.DeleteReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	// Here you would typically call an API to delete the integration.
+	IntegrationId := data.ID.ValueString()
+	err := r.client.DeleteIntergration(IntegrationId)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to delete integration", err.Error())
+		return
+	}
 }
 
 func (r *IntegrationResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
