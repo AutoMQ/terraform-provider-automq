@@ -123,18 +123,7 @@ func FlattenKafkaTopic(topic *client.TopicVO, resource *KafkaTopicResourceModel)
 	resource.TopicID = types.StringValue(topic.TopicId)
 	resource.Name = types.StringValue(topic.Name)
 	resource.Partition = types.Int64Value(int64(topic.Partition))
-	// config, diags := flattenTopicConfigs(topic.Configs, resource)
-	// resource.Configs = config
 	return nil
-}
-
-func flattenTopicConfigs(configs map[string]interface{}, resource *KafkaTopicResourceModel) (types.Map, diag.Diagnostics) {
-	attrs := make(map[string]attr.Value, len(configs))
-
-	for k, v := range configs {
-		attrs[k] = types.StringValue(fmt.Sprintf("%v", v))
-	}
-	return types.MapValue(types.StringType, attrs)
 }
 
 func FlattenKafkaUserResource(user client.KafkaUserVO, resource *KafkaUserResourceModel) {
