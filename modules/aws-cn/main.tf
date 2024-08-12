@@ -1,32 +1,32 @@
 provider "aws" {
-  region = var.aws_region
+  region = var.cloud_provider_region
 }
 
 # Conditional creation of data bucket
-module "data_bucket" {
+module "automq_byoc_data_bucket_name" {
   source = "terraform-aws-modules/s3-bucket/aws"
   version = "4.1.2"
 
   # Switch whether to create a bucket. If it is true, it will be created. If it is false, it will use the name entered by the user. If the name is empty, it will default to automq-data.
-  create_bucket = var.create_data_bucket
-  bucket        = var.create_data_bucket ? (
+  create_bucket = var.create_automq_byoc_data_bucket
+  bucket        = var.create_automq_byoc_data_bucket ? (
     var.specific_data_bucket_name == "" ? "automq-data-${var.automq_byoc_env_name}" : var.specific_data_bucket_name
   ) : (
-    var.data_bucket_name == "" ? "automq-data-${var.automq_byoc_env_name}" : var.data_bucket_name
+    var.automq_byoc_data_bucket_name == "" ? "automq-data-${var.automq_byoc_env_name}" : var.automq_byoc_data_bucket_name
   )
   force_destroy = true
 }
 
 # Conditional creation of ops bucket
-module "ops_bucket" {
+module "automq_byoc_ops_bucket_name" {
   source  = "terraform-aws-modules/s3-bucket/aws"
   version = "4.1.2"
 
-  create_bucket = var.create_ops_bucket
-  bucket        = var.create_ops_bucket ? (
+  create_bucket = var.create_automq_byoc_ops_bucket
+  bucket        = var.create_automq_byoc_ops_bucket ? (
     var.specific_ops_bucket_name == "" ? "automq-ops-${var.automq_byoc_env_name}" : var.specific_ops_bucket_name
   ) : (
-    var.ops_bucket_name == "" ? "automq-ops-${var.automq_byoc_env_name}" : var.ops_bucket_name
+    var.automq_byoc_ops_bucket_name == "" ? "automq-ops-${var.automq_byoc_env_name}" : var.automq_byoc_ops_bucket_name
   )
   force_destroy = true
 }
@@ -37,7 +37,7 @@ module "automq_byoc_vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "5.0.0"
 
-  count = var.create_vpc ? 1 : 0
+  count = var.create_new_vpc ? 1 : 0
 
   name = "automq-byoc-vpc-${var.automq_byoc_env_name}"
   cidr = "10.0.0.0/16"
@@ -62,7 +62,7 @@ resource "aws_eip" "nat" {
 }
 
 resource "aws_security_group" "endpoint_sg" {
-  count = var.create_vpc ? 1 : 0
+  count = var.create_new_vpc ? 1 : 0
 
   name        = "automq-byoc-endpoint-sg-${var.automq_byoc_env_name}"
   description = "Security group for VPC endpoint"
@@ -88,10 +88,10 @@ resource "aws_security_group" "endpoint_sg" {
 }
 
 resource "aws_vpc_endpoint" "ec2" {
-  count = var.create_vpc ? 1 : 0
+  count = var.create_new_vpc ? 1 : 0
 
   vpc_id            = module.automq_byoc_vpc[0].vpc_id
-  service_name      = "cn.com.amazonaws.${var.aws_region}.ec2"
+  service_name      = "cn.com.amazonaws.${var.cloud_provider_region}.ec2"
   vpc_endpoint_type = "Interface"
   security_group_ids = [aws_security_group.endpoint_sg[0].id]
   subnet_ids        = module.automq_byoc_vpc[0].private_subnets
@@ -104,10 +104,10 @@ resource "aws_vpc_endpoint" "ec2" {
 }
 
 resource "aws_vpc_endpoint" "s3" {
-  count = var.create_vpc ? 1 : 0
+  count = var.create_new_vpc ? 1 : 0
 
   vpc_id            = module.automq_byoc_vpc[0].vpc_id
-  service_name      = "com.amazonaws.${var.aws_region}.s3"
+  service_name      = "com.amazonaws.${var.cloud_provider_region}.s3"
   vpc_endpoint_type = "Gateway"
 
   route_table_ids = concat(
@@ -122,19 +122,19 @@ resource "aws_vpc_endpoint" "s3" {
 
 # Determine the vpc and subnet id, mainly related to the set variables of whether to create a VPC
 locals {
-  automq_byoc_vpc_id = var.create_vpc ? module.automq_byoc_vpc[0].vpc_id : var.automq_byoc_vpc_id
-  public_subnet_id   = var.create_vpc ? element(module.automq_byoc_vpc[0].public_subnets, 0) : var.automq_byoc_vpc_id
+  automq_byoc_vpc_id                       = var.create_new_vpc ? module.automq_byoc_vpc[0].vpc_id : var.automq_byoc_vpc_id
+  automq_byoc_env_console_public_subnet_id = var.create_new_vpc ? element(module.automq_byoc_vpc[0].public_subnets, 0) : var.automq_byoc_env_console_public_subnet_id
 }
 
 module "automq_byoc" {
   source = "./modules/aws-cn-module"
 
-  aws_region                    = var.aws_region
-  automq_byoc_vpc_id            = local.automq_byoc_vpc_id
-  public_subnet_id              = local.public_subnet_id
-  data_bucket_name              = module.data_bucket.s3_bucket_id
-  ops_bucket_name               = module.ops_bucket.s3_bucket_id
-  automq_byoc_env_name          = var.automq_byoc_env_name
-  automq_byoc_ec2_instance_type = var.automq_byoc_ec2_instance_type
-  automq_byoc_version           = var.automq_byoc_version
+  cloud_provider_region                    = var.cloud_provider_region
+  automq_byoc_vpc_id                       = local.automq_byoc_vpc_id
+  automq_byoc_env_console_public_subnet_id = local.automq_byoc_env_console_public_subnet_id
+  automq_byoc_data_bucket_name             = module.automq_byoc_data_bucket_name.s3_bucket_id
+  automq_byoc_ops_bucket_name              = module.automq_byoc_ops_bucket_name.s3_bucket_id
+  automq_byoc_env_name                     = var.automq_byoc_env_name
+  automq_byoc_ec2_instance_type            = var.automq_byoc_ec2_instance_type
+  automq_byoc_env_version                  = var.automq_byoc_env_version
 }

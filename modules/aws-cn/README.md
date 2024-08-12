@@ -1,14 +1,17 @@
-## Quickly start the cmp service through terraform
+## Quickly start the AutoMQ BYOC service through terraform
 
-### Environmental preparation
+### Preparing a VPC
 
-#### Create a VPC that meets the conditions
+#### Pre-configured VPC
+For production environments, it is recommended to prepare a VPC in advance. Follow the documentation to ensure all configurations meet the necessary requirements. This approach provides better control over network settings, security, and compliance.
 
-Reference
-documentation:[VPC Create](https://docs.automq.com/zh/automq-cloud/getting-started/create-byoc-environment/aws/step-1-installing-env-with-ami)
+#### Automatically Created VPC
+For proof of concept (POC), an automatically created VPC is sufficient. This method simplifies the setup process and allows for quick deployment, but it may not meet all the stringent requirements of a production enviro
+
+Ref: [VPC Create](https://docs.automq.com/zh/automq-cloud/getting-started/create-byoc-environment/aws/step-1-installing-env-with-ami)
 You need to get the vpc_id and subnet_id
 
-#### Parameter configuration
+### Parameter configuration
 
 You need to prepare an aws user. **Please ensure that the user has the following permissions**:
 
@@ -51,12 +54,7 @@ After successful deployment, some prompt information will be output, such as:
 **Please wait for the service to initialize, about 1 min. Once ready, you can access the service at http:
 //${aws_eip.web_ip.public_ip}:8080**
 
-Later, you can access the successfully deployed cmp service through this address
-
-### cmp initialization
-
-Here you can refer to the official website documentation to complete the
-initialization:[Init CMP](https://docs.automq.com/zh/automq-cloud/getting-started/create-byoc-environment/aws/step-2-initializing-the-environment)
+Later, you can access the successfully deployed AutoMQ BYOC service through this address !
 
 ### Release resources
 

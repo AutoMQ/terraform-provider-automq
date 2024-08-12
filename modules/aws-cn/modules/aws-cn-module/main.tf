@@ -1,7 +1,7 @@
 # main.tf
 
 provider "aws" {
-  region = var.aws_region
+  region = var.cloud_provider_region
 }
 
 data "aws_vpc" "selected" {
@@ -41,13 +41,13 @@ data "aws_ami" "latest_ami" {
 }
 
 data "aws_ami" "specific_version_ami" {
-  count = var.automq_byoc_version == "latest" ? 0 : 1
+  count = var.automq_byoc_env_version == "latest" ? 0 : 1
 
   most_recent = true
 
   filter {
     name = "name"
-    values = ["automq-control-center-${var.automq_byoc_version}_linux_amd64"]
+    values = ["automq-control-center-${var.automq_byoc_env_version}_linux_amd64"]
   }
 
   filter {
@@ -67,7 +67,7 @@ data "aws_ami" "specific_version_ami" {
 
   filter {
     name = "tag:version"
-    values = [var.automq_byoc_version]
+    values = [var.automq_byoc_env_version]
   }
 
   owners = [327633403396]
@@ -248,8 +248,8 @@ resource "aws_iam_policy" "cmp_policy" {
           "s3:ListBucket"
         ]
         Resource = [
-          "arn:aws-cn:s3:::${var.data_bucket_name}",
-          "arn:aws-cn:s3:::${var.ops_bucket_name}"
+          "arn:aws-cn:s3:::${var.automq_byoc_data_bucket_name}",
+          "arn:aws-cn:s3:::${var.automq_byoc_ops_bucket_name}"
         ]
       },
       {
@@ -262,8 +262,8 @@ resource "aws_iam_policy" "cmp_policy" {
           "s3:DeleteObject"
         ]
         Resource = [
-          "arn:aws-cn:s3:::${var.data_bucket_name}/*",
-          "arn:aws-cn:s3:::${var.ops_bucket_name}/*"
+          "arn:aws-cn:s3:::${var.automq_byoc_data_bucket_name}/*",
+          "arn:aws-cn:s3:::${var.automq_byoc_ops_bucket_name}/*"
         ]
       }
     ]
@@ -284,9 +284,9 @@ resource "aws_iam_instance_profile" "cmp_instance_profile" {
 
 # Create an EC2 instance and bind an instance profile
 resource "aws_instance" "web" {
-  ami           = var.automq_byoc_version == "latest" ? data.aws_ami.latest_ami.id : data.aws_ami.specific_version_ami[0].id
+  ami           = var.automq_byoc_env_version == "latest" ? data.aws_ami.latest_ami.id : data.aws_ami.specific_version_ami[0].id
   instance_type = var.automq_byoc_ec2_instance_type
-  subnet_id     = var.public_subnet_id
+  subnet_id     = var.automq_byoc_env_console_public_subnet_id
   vpc_security_group_ids = [aws_security_group.allow_all.id]
 
   iam_instance_profile = aws_iam_instance_profile.cmp_instance_profile.name
@@ -313,8 +313,8 @@ resource "aws_instance" "web" {
                   if [ ! -f "/home/admin/config.properties" ]; then
                     touch /home/admin/config.properties
                     echo "cmp.provider.credential=vm-role://${local.aws_iam_instance_profile_arn_encoded}@aws-cn" >> /home/admin/config.properties
-                    echo 'cmp.provider.databucket=${var.data_bucket_name}' >> /home/admin/config.properties
-                    echo 'cmp.provider.opsBucket=${var.ops_bucket_name}' >> /home/admin/config.properties
+                    echo 'cmp.provider.databucket=${var.automq_byoc_data_bucket_name}' >> /home/admin/config.properties
+                    echo 'cmp.provider.opsBucket=${var.automq_byoc_ops_bucket_name}' >> /home/admin/config.properties
                     echo 'cmp.provider.instanceSecurityGroup=${aws_security_group.allow_all.id}' >> /home/admin/config.properties
                     echo 'cmp.provider.instanceDNS=${aws_route53_zone.private.zone_id}' >> /home/admin/config.properties
                     echo 'cmp.provider.instanceProfile=${aws_iam_instance_profile.cmp_instance_profile.arn}' >> /home/admin/config.properties
