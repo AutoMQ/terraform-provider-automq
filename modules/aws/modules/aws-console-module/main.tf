@@ -45,7 +45,7 @@ resource "aws_security_group" "allow_all" {
 }
 
 # Create an IAM role
-resource "aws_iam_role" "cmp_role" {
+resource "aws_iam_role" "automq_byoc_role" {
   name = "automq-byoc-service-role-${var.automq_byoc_env_name}"
 
   assume_role_policy = jsonencode({
@@ -64,9 +64,9 @@ resource "aws_iam_role" "cmp_role" {
 }
 
 # Create an IAM policy
-resource "aws_iam_policy" "cmp_policy" {
+resource "aws_iam_policy" "automq_byoc_policy" {
   name        = "automq-byoc-service-policy-${var.automq_byoc_env_name}"
-  description = "Custom policy for CMP service"
+  description = "Custom policy for automq_byoc service"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -193,15 +193,15 @@ resource "aws_iam_policy" "cmp_policy" {
 }
 
 # Attach strategies to roles
-resource "aws_iam_role_policy_attachment" "cmp_role_attachment" {
-  role       = aws_iam_role.cmp_role.name
-  policy_arn = aws_iam_policy.cmp_policy.arn
+resource "aws_iam_role_policy_attachment" "automq_byoc_role_attachment" {
+  role       = aws_iam_role.automq_byoc_role.name
+  policy_arn = aws_iam_policy.automq_byoc_policy.arn
 }
 
 # Create an instance profile and bind a role
-resource "aws_iam_instance_profile" "cmp_instance_profile" {
+resource "aws_iam_instance_profile" "automq_byoc_instance_profile" {
   name = "automq-byoc-instance-profile-${var.automq_byoc_env_name}"
-  role = aws_iam_role.cmp_role.name
+  role = aws_iam_role.automq_byoc_role.name
 }
 
 # Create an EC2 instance and bind an instance profile
@@ -211,7 +211,7 @@ resource "aws_instance" "web" {
   subnet_id     = var.automq_byoc_env_console_public_subnet_id
   vpc_security_group_ids = [aws_security_group.allow_all.id]
 
-  iam_instance_profile = aws_iam_instance_profile.cmp_instance_profile.name
+  iam_instance_profile = aws_iam_instance_profile.automq_byoc_instance_profile.name
 
   root_block_device {
     volume_size = 20
@@ -239,7 +239,7 @@ resource "aws_instance" "web" {
                     echo 'cmp.provider.opsBucket=${var.automq_byoc_ops_bucket_name}' >> /home/admin/config.properties
                     echo 'cmp.provider.instanceSecurityGroup=${aws_security_group.allow_all.id}' >> /home/admin/config.properties
                     echo 'cmp.provider.instanceDNS=${aws_route53_zone.private.zone_id}' >> /home/admin/config.properties
-                    echo 'cmp.provider.instanceProfile=${aws_iam_instance_profile.cmp_instance_profile.arn}' >> /home/admin/config.properties
+                    echo 'cmp.provider.instanceProfile=${aws_iam_instance_profile.automq_byoc_instance_profile.arn}' >> /home/admin/config.properties
                     echo 'cmp.environmentid=${var.automq_byoc_env_name}' >> /home/admin/config.properties
                   fi
               EOF
@@ -264,7 +264,7 @@ resource "aws_eip" "web_ip" {
 
 # URL encoding instance_profile
 locals {
-  arn_step1 = replace(aws_iam_instance_profile.cmp_instance_profile.arn, ":", "%3A")
+  arn_step1 = replace(aws_iam_instance_profile.automq_byoc_instance_profile.arn, ":", "%3A")
   arn_step2 = replace(local.arn_step1, "/", "%2F")
   arn_step3 = replace(local.arn_step2, "?", "%3F")
   arn_step4 = replace(local.arn_step3, "#", "%23")

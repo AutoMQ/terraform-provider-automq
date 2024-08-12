@@ -24,11 +24,11 @@ output "automq_byoc_security_group_name" {
 }
 
 output "automq_byoc_role_arn" {
-  value = aws_iam_role.cmp_role.arn
+  value = aws_iam_role.automq_byoc_role.arn
 }
 
 output "automq_byoc_policy_arn" {
-  value = aws_iam_policy.cmp_policy.arn
+  value = aws_iam_policy.automq_byoc_policy.arn
 }
 
 output "automq_byoc_vpc_route53_zone_id" {
@@ -38,11 +38,11 @@ output "automq_byoc_vpc_route53_zone_id" {
 
 output "automq_byoc_instance_profile_arn" {
   description = "The ARN of the instance profile for automq_byoc_service_role"
-  value       = aws_iam_instance_profile.cmp_instance_profile.arn
+  value       = aws_iam_instance_profile.automq_byoc_instance_profile.arn
 }
 
-output "AutoMQ_BYOC_Environment_WebUI_Address" {
-  value = "Please wait for the service to initialize, about 1 min. Once ready, you can access the service at http://${aws_eip.web_ip.public_ip}:8080"
+output "automq_byoc_environment_webui_address" {
+  value = "http://${aws_eip.web_ip.public_ip}:8080"
 }
 
 output "automq_byoc_ami_id" {

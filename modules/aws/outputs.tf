@@ -23,9 +23,9 @@ output "automq_byoc_security_group_name" {
   value = module.automq_byoc.automq_byoc_security_group_name
 }
 
-output "AutoMQ_BYOC_Environment_WebUI_Address" {
+output "automq_byoc_environment_webui_address" {
   description = "Address accessed by AutoMQ BYOC service"
-  value = module.automq_byoc.AutoMQ_BYOC_Environment_WebUI_Address
+  value = module.automq_byoc.automq_byoc_environment_webui_address
 }
 
 output "automq_byoc_data_bucket_name" {
@@ -58,7 +58,7 @@ output "automq_byoc_policy_arn" {
   value = module.automq_byoc.automq_byoc_policy_arn
 }
 
-output "automq_byoc_cmp_instance_profile_arn" {
+output "automq_byoc_instance_profile_arn" {
   description = "Instance configuration file ARN"
   value       = module.automq_byoc.automq_byoc_instance_profile_arn
 }
@@ -73,7 +73,7 @@ output "automq_byoc_console_ami_id" {
   value = module.automq_byoc.automq_byoc_ami_id
 }
 
-output "Automq_byoc_instance_id" {
+output "automq_byoc_instance_id" {
   description = "AutoMQ BYOC Console instance ID."
   value = module.automq_byoc.automq_byoc_instance_id
 }
