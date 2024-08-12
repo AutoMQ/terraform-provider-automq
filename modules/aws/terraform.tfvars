@@ -1,10 +1,14 @@
 
 automq_byoc_env_name = "example"
 cloud_provider_region         = "ap-southeast-1"
-automq_byoc_ec2_instance_type = "c5.xlarge"
+automq_byoc_ec2_instance_type = "m5d.large"
 
-# ami  Defaults to latest cmp image
+# ami  Defaults to latest image
 automq_byoc_env_version = "latest"
+
+# Source of ami: true by aws marketplace, false by the parameter automq_byoc_ami_id.
+specified_by_the_marketplace = true
+automq_byoc_ami_id = "ami-051f2fd935227f042"
 
 # VPC create switch
 create_new_vpc = true

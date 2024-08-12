@@ -45,6 +45,11 @@ output "AutoMQ_BYOC_Environment_WebUI_Address" {
   value = "Please wait for the service to initialize, about 1 min. Once ready, you can access the service at http://${aws_eip.web_ip.public_ip}:8080"
 }
 
-output "ami_id" {
-  value = var.automq_byoc_env_version == "latest" ? data.aws_ami.latest_international_ami.id : data.aws_ami.specific_version_international_ami[0].id
+output "automq_byoc_ami_id" {
+  value = var.specified_by_the_marketplace ? data.aws_ami.marketplace_ami_details.id : var.automq_byoc_ami_id
+}
+
+output "automq_byoc_instance_id" {
+  description = "AutoMQ BYOC Console instance ID."
+  value = aws_instance.web.id
 }

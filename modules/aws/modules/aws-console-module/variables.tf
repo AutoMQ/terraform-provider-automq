@@ -42,3 +42,14 @@ variable "automq_byoc_ops_bucket_name" {
   description = "Set the existed object storage bucket for that used to store AutoMQ system logs and metrics data for system monitoring and alerts. This Bucket does not contain any application business data. The Ops Bucket must be separate from the message data Bucket."
   type        = string
 }
+
+variable "specified_by_the_marketplace" {
+  description = "Specifies the switch to obtain ami id from the cloud market. If true, it means to obtain the specified version of ami id through the cloud market. Otherwise, it needs to be specified manually."
+  type = bool
+  default = true
+}
+
+variable "automq_byoc_ami_id" {
+  description = "When obtaining ami id from non-cloud market, manually specify ami id."
+  type = string
+}

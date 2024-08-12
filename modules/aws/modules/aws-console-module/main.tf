@@ -8,120 +8,30 @@ data "aws_vpc" "selected" {
   id = var.automq_byoc_vpc_id
 }
 
+# Obtain the specified version of ami id through the cloud market
 locals {
-  ami_name_pattern = "automq-control-center-*_linux_amd64"
+  ssm_parameter_path = "/aws/service/marketplace/prod-nl2cyzygb46fw/${var.automq_byoc_env_version}"
 }
 
-# Get the latest AMI ID
-data "aws_ami" "latest_international_ami" {
+data "aws_ssm_parameter" "marketplace_ami" {
+  name = local.ssm_parameter_path
+}
+
+data "aws_ami" "marketplace_ami_details" {
   most_recent = true
 
   filter {
-    name = "name"
-    values = [local.ami_name_pattern]
+    name = "image-id"
+    values = [data.aws_ssm_parameter.marketplace_ami.value]
   }
-
-  filter {
-    name = "virtualization-type"
-    values = ["hvm"]
-  }
-
-  filter {
-    name = "architecture"
-    values = ["x86_64"]
-  }
-
-  filter {
-    name = "root-device-type"
-    values = ["ebs"]
-  }
-
-  owners = ["716469478206"]
-}
-
-# Get a specific version of AMI
-data "aws_ami" "specific_version_international_ami" {
-  count = var.automq_byoc_env_version == "latest" ? 0 : 1
-
-  most_recent = true
-
-  filter {
-    name = "name"
-    values = ["automq-control-center-${var.automq_byoc_env_version}_linux_amd64"]
-  }
-
-  filter {
-    name = "virtualization-type"
-    values = ["hvm"]
-  }
-
-  filter {
-    name = "architecture"
-    values = ["x86_64"]
-  }
-
-  filter {
-    name = "root-device-type"
-    values = ["ebs"]
-  }
-
-  filter {
-    name = "tag:version"
-    values = [var.automq_byoc_env_version]
-  }
-
-  owners = ["716469478206"]  # 设置为国际AMI的拥有者ID
 }
 
 resource "aws_security_group" "allow_all" {
   vpc_id = data.aws_vpc.selected.id
 
-  # 上线前只保留8080.并且需要指定CIDR，如果不指定，默认0000
   ingress {
     from_port = 8080
     to_port   = 8080
-    protocol  = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port = 22
-    to_port   = 22
-    protocol  = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port = 9090
-    to_port   = 9090
-    protocol  = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port = 9092
-    to_port   = 9092
-    protocol  = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port = 9102
-    to_port   = 9102
-    protocol  = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port = 9093
-    to_port   = 9093
-    protocol  = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port = 9103
-    to_port   = 9103
     protocol  = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -188,11 +98,14 @@ resource "aws_iam_policy" "cmp_policy" {
       },
       {
         Effect = "Allow"
-        Action = [
+        "Action": [
           "ssm:GetParameters",
           "pricing:GetProducts",
+          "cloudwatch:PutMetricData",
           "ec2:DescribeImages",
           "ec2:CreateLaunchTemplate",
+          "ec2:CreateLaunchTemplateVersion",
+          "ec2:ModifyLaunchTemplate",
           "ec2:RebootInstances",
           "ec2:RunInstances",
           "ec2:StopInstances",
@@ -214,6 +127,11 @@ resource "aws_iam_policy" "cmp_policy" {
           "ec2:DeleteVolume",
           "ec2:DeleteLaunchTemplate",
           "ec2:DescribeInstanceTypeOfferings",
+          "ec2:DescribeSecurityGroups",
+          "ec2:CreateSecurityGroup",
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:AuthorizeSecurityGroupEgress",
+          "ec2:DeleteSecurityGroup",
           "autoscaling:CreateAutoScalingGroup",
           "autoscaling:DescribeAutoScalingGroups",
           "autoscaling:UpdateAutoScalingGroup",
@@ -227,8 +145,12 @@ resource "aws_iam_policy" "cmp_policy" {
           "route53:ChangeResourceRecordSets",
           "route53:ListHostedZonesByName",
           "route53:ListResourceRecordSets",
-          "route53:DeleteHostedZone"
-        ]
+          "route53:DeleteHostedZone",
+          "elasticloadbalancing:DescribeTargetGroups",
+          "elasticloadbalancing:DescribeTags",
+          "elasticloadbalancing:DeleteTargetGroup",
+          "elasticloadbalancing:DeleteLoadBalancer"
+        ],
         Resource = "*"
       },
       {
@@ -284,7 +206,7 @@ resource "aws_iam_instance_profile" "cmp_instance_profile" {
 
 # Create an EC2 instance and bind an instance profile
 resource "aws_instance" "web" {
-  ami           = var.automq_byoc_env_version == "latest" ? data.aws_ami.latest_international_ami.id : data.aws_ami.specific_version_international_ami[0].id
+  ami           = var.specified_by_the_marketplace ? data.aws_ami.marketplace_ami_details.id : var.automq_byoc_ami_id
   instance_type = var.automq_byoc_ec2_instance_type
   subnet_id     = var.automq_byoc_env_console_public_subnet_id
   vpc_security_group_ids = [aws_security_group.allow_all.id]

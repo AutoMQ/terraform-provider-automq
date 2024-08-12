@@ -70,5 +70,10 @@ output "automq_byoc_vpc_route53_zone_id" {
 
 output "automq_byoc_console_ami_id" {
   description = "Mirror ami id of AutoMQ BYOC Console."
-  value = module.automq_byoc.ami_id
+  value = module.automq_byoc.automq_byoc_ami_id
+}
+
+output "Automq_byoc_instance_id" {
+  description = "AutoMQ BYOC Console instance ID."
+  value = module.automq_byoc.automq_byoc_instance_id
 }

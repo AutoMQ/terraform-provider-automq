@@ -137,4 +137,6 @@ module "automq_byoc" {
   automq_byoc_env_name                     = var.automq_byoc_env_name
   automq_byoc_ec2_instance_type            = var.automq_byoc_ec2_instance_type
   automq_byoc_env_version                  = var.automq_byoc_env_version
+  specified_by_the_marketplace             = var.specified_by_the_marketplace
+  automq_byoc_ami_id                       = var.automq_byoc_ami_id
 }
