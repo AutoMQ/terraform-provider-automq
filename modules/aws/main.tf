@@ -91,7 +91,7 @@ resource "aws_vpc_endpoint" "ec2" {
   count = var.create_new_vpc ? 1 : 0
 
   vpc_id            = module.automq_byoc_vpc[0].vpc_id
-  service_name      = "cn.com.amazonaws.${var.cloud_provider_region}.ec2"
+  service_name      = "com.amazonaws.${var.cloud_provider_region}.ec2"
   vpc_endpoint_type = "Interface"
   security_group_ids = [aws_security_group.endpoint_sg[0].id]
   subnet_ids        = module.automq_byoc_vpc[0].private_subnets
@@ -127,7 +127,7 @@ locals {
 }
 
 module "automq_byoc" {
-  source = "./modules/aws-cn-console-module"
+  source = "./modules/aws-console-module"
 
   cloud_provider_region                    = var.cloud_provider_region
   automq_byoc_vpc_id                       = local.automq_byoc_vpc_id

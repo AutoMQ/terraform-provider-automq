@@ -312,7 +312,7 @@ resource "aws_instance" "web" {
                 - |
                   if [ ! -f "/home/admin/config.properties" ]; then
                     touch /home/admin/config.properties
-                    echo "cmp.provider.credential=vm-role://${local.aws_iam_instance_profile_arn_encoded}@aws-cn" >> /home/admin/config.properties
+                    echo "cmp.provider.credential=vm-role://${local.aws_iam_instance_profile_arn_encoded}@aws" >> /home/admin/config.properties
                     echo 'cmp.provider.databucket=${var.automq_byoc_data_bucket_name}' >> /home/admin/config.properties
                     echo 'cmp.provider.opsBucket=${var.automq_byoc_ops_bucket_name}' >> /home/admin/config.properties
                     echo 'cmp.provider.instanceSecurityGroup=${aws_security_group.allow_all.id}' >> /home/admin/config.properties
@@ -340,6 +340,7 @@ resource "aws_eip" "web_ip" {
   instance = aws_instance.web.id
 }
 
+# URL encoding instance_profile
 locals {
   arn_step1 = replace(aws_iam_instance_profile.cmp_instance_profile.arn, ":", "%3A")
   arn_step2 = replace(local.arn_step1, "/", "%2F")

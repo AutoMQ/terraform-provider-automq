@@ -13,10 +13,10 @@ No requirements.
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_automq_byoc"></a> [automq\_byoc](#module\_automq\_byoc) | ./modules/aws-cn-console-module | latest  |
-| <a name="module_automq_byoc_data_bucket_name"></a> [automq\_byoc\_data\_bucket\_name](#module\_automq\_byoc\_data\_bucket\_name) | terraform-aws-modules/s3-bucket/aws | 4.1.2   |
-| <a name="module_automq_byoc_ops_bucket_name"></a> [automq\_byoc\_ops\_bucket\_name](#module\_automq\_byoc\_ops\_bucket\_name) | terraform-aws-modules/s3-bucket/aws | 4.1.2   |
-| <a name="module_automq_byoc_vpc"></a> [automq\_byoc\_vpc](#module\_automq\_byoc\_vpc) | terraform-aws-modules/vpc/aws | 5.0.0   |
+| <a name="module_automq_byoc"></a> [automq\_byoc](#module\_automq\_byoc) | ./modules/aws-console-module | latest |
+| <a name="module_automq_byoc_data_bucket_name"></a> [automq\_byoc\_data\_bucket\_name](#module\_automq\_byoc\_data\_bucket\_name) | terraform-aws-modules/s3-bucket/aws | 4.1.2 |
+| <a name="module_automq_byoc_ops_bucket_name"></a> [automq\_byoc\_ops\_bucket\_name](#module\_automq\_byoc\_ops\_bucket\_name) | terraform-aws-modules/s3-bucket/aws | 4.1.2 |
+| <a name="module_automq_byoc_vpc"></a> [automq\_byoc\_vpc](#module\_automq\_byoc\_vpc) | terraform-aws-modules/vpc/aws | 5.0.0 |
 
 ## Resources
 
