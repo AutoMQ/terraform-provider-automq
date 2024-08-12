@@ -17,7 +17,7 @@ variable "create_new_vpc" {
 variable "automq_byoc_ec2_instance_type" {
   description = "Can be specified, But you need to ensure that 2 cores are 8g or above"
   type        = string
-  default     = "c5.xlarge"
+  default     = "m5d.large"
 }
 
 variable "cloud_provider_region" {
