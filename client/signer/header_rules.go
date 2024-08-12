@@ -1,5 +1,6 @@
 // Copyright 2024 Amazon.com, Inc.
 // SPDX-License-Identifier: Apache-2.0
+// Modifications Copyright 2024 AutoMQ HK Limited.
 
 package signer
 
