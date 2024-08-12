@@ -8,13 +8,12 @@ data "aws_vpc" "selected" {
   id = var.automq_byoc_vpc_id
 }
 
-# Splicing AMI names
 locals {
   ami_name_pattern = "automq-control-center-*_linux_amd64"
 }
 
 # Get the latest AMI ID
-data "aws_ami" "latest_ami" {
+data "aws_ami" "latest_international_ami" {
   most_recent = true
 
   filter {
@@ -37,10 +36,11 @@ data "aws_ami" "latest_ami" {
     values = ["ebs"]
   }
 
-  owners = [327633403396]
+  owners = ["716469478206"]
 }
 
-data "aws_ami" "specific_version_ami" {
+# Get a specific version of AMI
+data "aws_ami" "specific_version_international_ami" {
   count = var.automq_byoc_env_version == "latest" ? 0 : 1
 
   most_recent = true
@@ -70,7 +70,7 @@ data "aws_ami" "specific_version_ami" {
     values = [var.automq_byoc_env_version]
   }
 
-  owners = [327633403396]
+  owners = ["716469478206"]  # 设置为国际AMI的拥有者ID
 }
 
 resource "aws_security_group" "allow_all" {
@@ -248,8 +248,8 @@ resource "aws_iam_policy" "cmp_policy" {
           "s3:ListBucket"
         ]
         Resource = [
-          "arn:aws-cn:s3:::${var.automq_byoc_data_bucket_name}",
-          "arn:aws-cn:s3:::${var.automq_byoc_ops_bucket_name}"
+          "arn:aws:s3:::${var.automq_byoc_data_bucket_name}",
+          "arn:aws:s3:::${var.automq_byoc_ops_bucket_name}"
         ]
       },
       {
@@ -262,8 +262,8 @@ resource "aws_iam_policy" "cmp_policy" {
           "s3:DeleteObject"
         ]
         Resource = [
-          "arn:aws-cn:s3:::${var.automq_byoc_data_bucket_name}/*",
-          "arn:aws-cn:s3:::${var.automq_byoc_ops_bucket_name}/*"
+          "arn:aws:s3:::${var.automq_byoc_data_bucket_name}/*",
+          "arn:aws:s3:::${var.automq_byoc_ops_bucket_name}/*"
         ]
       }
     ]
@@ -284,7 +284,7 @@ resource "aws_iam_instance_profile" "cmp_instance_profile" {
 
 # Create an EC2 instance and bind an instance profile
 resource "aws_instance" "web" {
-  ami           = var.automq_byoc_env_version == "latest" ? data.aws_ami.latest_ami.id : data.aws_ami.specific_version_ami[0].id
+  ami           = var.automq_byoc_env_version == "latest" ? data.aws_ami.latest_international_ami.id : data.aws_ami.specific_version_international_ami[0].id
   instance_type = var.automq_byoc_ec2_instance_type
   subnet_id     = var.automq_byoc_env_console_public_subnet_id
   vpc_security_group_ids = [aws_security_group.allow_all.id]
@@ -303,7 +303,7 @@ resource "aws_instance" "web" {
   }
 
   tags = {
-    Name = "automq-byoc-ec2-${var.automq_byoc_env_name}"
+    Name = "automq-byoc-console-${var.automq_byoc_env_name}"
   }
 
   user_data = <<-EOF

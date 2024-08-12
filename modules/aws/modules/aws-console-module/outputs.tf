@@ -46,5 +46,5 @@ output "AutoMQ_BYOC_Environment_WebUI_Address" {
 }
 
 output "ami_id" {
-  value = var.automq_byoc_env_version == "latest" ? data.aws_ami.latest_ami.id : data.aws_ami.specific_version_ami[0].id
+  value = var.automq_byoc_env_version == "latest" ? data.aws_ami.latest_international_ami.id : data.aws_ami.specific_version_international_ami[0].id
 }
