@@ -240,7 +240,7 @@ resource "aws_instance" "web" {
                     echo 'cmp.provider.instanceSecurityGroup=${aws_security_group.allow_all.id}' >> /home/admin/config.properties
                     echo 'cmp.provider.instanceDNS=${aws_route53_zone.private.zone_id}' >> /home/admin/config.properties
                     echo 'cmp.provider.instanceProfile=${aws_iam_instance_profile.automq_byoc_instance_profile.arn}' >> /home/admin/config.properties
-                    echo 'cmp.environmentid=${var.automq_byoc_env_name}' >> /home/admin/config.properties
+                    echo 'cmp.environmentId=${var.automq_byoc_env_name}' >> /home/admin/config.properties
                   fi
               EOF
 }
