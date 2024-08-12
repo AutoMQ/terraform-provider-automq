@@ -16,7 +16,7 @@ func (c *Client) CreateKafkaInstance(kafka KafkaInstanceRequest) (*KafkaInstance
 	if err != nil {
 		return nil, err
 	}
-	body, err := c.doRequest(req, &c.Token)
+	body, err := c.doRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +33,7 @@ func (c *Client) GetKafkaInstance(instanceId string) (*KafkaInstanceResponse, er
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %v", err)
 	}
-	body, err := c.doRequest(req, &c.Token)
+	body, err := c.doRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func (c *Client) DeleteKafkaInstance(instanceId string) error {
 	if err != nil {
 		return err
 	}
-	_, err = c.doRequest(req, &c.Token)
+	_, err = c.doRequest(req)
 	if err != nil {
 		return err
 	}
@@ -83,7 +83,7 @@ func (c *Client) updateInstance(instanceId string, updateParam interface{}, path
 	if err != nil {
 		return nil, err
 	}
-	body, err := c.doRequest(req, &c.Token)
+	body, err := c.doRequest(req)
 	if err != nil {
 		return nil, err
 	}

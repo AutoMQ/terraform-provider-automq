@@ -96,6 +96,8 @@ func testAccKafkaInstanceResourceConfig(mockServerUrl string) string {
 provider "automq" {
   byoc_host  = "%s"
   token = "123456"
+  byoc_access_key = "VLaUIeNYndeOAXjaol32o4UAHvX8A7VE"
+  byoc_secret_key = "CHlRi0hOIA8pAnzW"
 }
 resource "automq_kafka_instance" "test" {
   name   = "test"
