@@ -1,9 +1,9 @@
-variable "automq_byoc_env_name" {
+variable "automq_byoc_env_id" {
   description = "This parameter is used to create resources within the environment. Additionally, all cloud resource names will incorporate this parameter as part of their names.This parameter supports only numbers, uppercase and lowercase English letters, and hyphens. It must start with a letter and is limited to a length of 32 characters."
   type        = string
 
   validation {
-    condition     = can(regex("^[a-zA-Z][a-zA-Z0-9-]{0,31}$", var.automq_byoc_env_name)) && !can(regex("_", var.automq_byoc_env_name))
+    condition     = can(regex("^[a-zA-Z][a-zA-Z0-9-]{0,31}$", var.automq_byoc_env_id)) && !can(regex("_", var.automq_byoc_env_id))
     error_message = "The environment_id must start with a letter, can only contain alphanumeric characters and hyphens, cannot contain underscores, and must be 32 characters or fewer."
   }
 }
@@ -43,13 +43,13 @@ variable "automq_byoc_ops_bucket_name" {
   type        = string
 }
 
-variable "specified_by_the_marketplace" {
+variable "specified_ami_by_marketplace" {
   description = "Specifies the switch to obtain ami id from the cloud market. If true, it means to obtain the specified version of ami id through the cloud market. Otherwise, it needs to be specified manually."
   type = bool
   default = true
 }
 
-variable "automq_byoc_ami_id" {
+variable "automq_byoc_env_console_ami" {
   description = "When obtaining ami id from non-cloud market, manually specify ami id."
   type = string
 }

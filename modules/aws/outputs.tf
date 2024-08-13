@@ -1,6 +1,6 @@
-output "automq_byoc_env_name" {
+output "automq_byoc_env_id" {
   description = "This parameter is used to create resources within the environment. Additionally, all cloud resource names will incorporate this parameter as part of their names.This parameter supports only numbers, uppercase and lowercase English letters, and hyphens. It must start with a letter and is limited to a length of 32 characters."
-  value = module.automq_byoc.automq_byoc_env_name
+  value = module.automq_byoc.automq_byoc_env_id
 }
 
 output "automq_byoc_env_console_ec2_instance_ip" {
@@ -23,9 +23,9 @@ output "automq_byoc_security_group_name" {
   value = module.automq_byoc.automq_byoc_security_group_name
 }
 
-output "automq_byoc_environment_webui_address" {
+output "automq_byoc_env_webui_address" {
   description = "Address accessed by AutoMQ BYOC service"
-  value = module.automq_byoc.automq_byoc_environment_webui_address
+  value = module.automq_byoc.automq_byoc_env_webui_address
 }
 
 output "automq_byoc_data_bucket_name" {
@@ -68,9 +68,9 @@ output "automq_byoc_vpc_route53_zone_id" {
   value = module.automq_byoc.automq_byoc_vpc_route53_zone_id
 }
 
-output "automq_byoc_console_ami_id" {
+output "automq_byoc_env_console_ami" {
   description = "Mirror ami id of AutoMQ BYOC Console."
-  value = module.automq_byoc.automq_byoc_ami_id
+  value = module.automq_byoc.automq_byoc_env_console_ami
 }
 
 output "automq_byoc_instance_id" {

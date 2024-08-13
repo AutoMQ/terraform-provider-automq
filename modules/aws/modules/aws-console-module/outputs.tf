@@ -1,6 +1,6 @@
 # outputs.tf
-output "automq_byoc_env_name" {
-  value = var.automq_byoc_env_name
+output "automq_byoc_env_id" {
+  value = var.automq_byoc_env_id
 }
 
 output "automq_byoc_env_console_ec2_instance_ip" {
@@ -41,12 +41,12 @@ output "automq_byoc_instance_profile_arn" {
   value       = aws_iam_instance_profile.automq_byoc_instance_profile.arn
 }
 
-output "automq_byoc_environment_webui_address" {
+output "automq_byoc_env_webui_address" {
   value = "http://${aws_eip.web_ip.public_ip}:8080"
 }
 
-output "automq_byoc_ami_id" {
-  value = var.specified_by_the_marketplace ? data.aws_ami.marketplace_ami_details.id : var.automq_byoc_ami_id
+output "automq_byoc_env_console_ami" {
+  value = var.specified_ami_by_marketplace ? data.aws_ami.marketplace_ami_details.id : var.automq_byoc_env_console_ami
 }
 
 output "automq_byoc_instance_id" {
