@@ -10,9 +10,9 @@ module "automq_byoc_data_bucket_name" {
   # Switch whether to create a bucket. If it is true, it will be created. If it is false, it will use the name entered by the user. If the name is empty, it will default to automq-data.
   create_bucket = var.create_automq_byoc_data_bucket
   bucket        = var.create_automq_byoc_data_bucket ? (
-    var.specific_data_bucket_name == "" ? "automq-data-${var.automq_byoc_env_name}" : var.specific_data_bucket_name
+    var.specific_data_bucket_name == "" ? "automq-data-${var.automq_byoc_env_id}" : var.specific_data_bucket_name
   ) : (
-    var.automq_byoc_data_bucket_name == "" ? "automq-data-${var.automq_byoc_env_name}" : var.automq_byoc_data_bucket_name
+    var.automq_byoc_data_bucket_name == "" ? "automq-data-${var.automq_byoc_env_id}" : var.automq_byoc_data_bucket_name
   )
   force_destroy = true
 }
@@ -24,9 +24,9 @@ module "automq_byoc_ops_bucket_name" {
 
   create_bucket = var.create_automq_byoc_ops_bucket
   bucket        = var.create_automq_byoc_ops_bucket ? (
-    var.specific_ops_bucket_name == "" ? "automq-ops-${var.automq_byoc_env_name}" : var.specific_ops_bucket_name
+    var.specific_ops_bucket_name == "" ? "automq-ops-${var.automq_byoc_env_id}" : var.specific_ops_bucket_name
   ) : (
-    var.automq_byoc_ops_bucket_name == "" ? "automq-ops-${var.automq_byoc_env_name}" : var.automq_byoc_ops_bucket_name
+    var.automq_byoc_ops_bucket_name == "" ? "automq-ops-${var.automq_byoc_env_id}" : var.automq_byoc_ops_bucket_name
   )
   force_destroy = true
 }
@@ -39,7 +39,7 @@ module "automq_byoc_vpc" {
 
   count = var.create_new_vpc ? 1 : 0
 
-  name = "automq-byoc-vpc-${var.automq_byoc_env_name}"
+  name = "automq-byoc-vpc-${var.automq_byoc_env_id}"
   cidr = "10.0.0.0/16"
 
   azs = slice(data.aws_availability_zones.available.names, 0, 3)
@@ -64,7 +64,7 @@ resource "aws_eip" "nat" {
 resource "aws_security_group" "endpoint_sg" {
   count = var.create_new_vpc ? 1 : 0
 
-  name        = "automq-byoc-endpoint-sg-${var.automq_byoc_env_name}"
+  name        = "automq-byoc-endpoint-sg-${var.automq_byoc_env_id}"
   description = "Security group for VPC endpoint"
   vpc_id      = module.automq_byoc_vpc[0].vpc_id
 
@@ -83,7 +83,7 @@ resource "aws_security_group" "endpoint_sg" {
   }
 
   tags = {
-    Name = "automq-byoc-endpoint-sg-${var.automq_byoc_env_name}"
+    Name = "automq-byoc-endpoint-sg-${var.automq_byoc_env_id}"
   }
 }
 
@@ -99,7 +99,7 @@ resource "aws_vpc_endpoint" "ec2" {
   private_dns_enabled = true
 
   tags = {
-    Name = "automq-byoc-ec2-endpoint-${var.automq_byoc_env_name}"
+    Name = "automq-byoc-ec2-endpoint-${var.automq_byoc_env_id}"
   }
 }
 
@@ -116,7 +116,7 @@ resource "aws_vpc_endpoint" "s3" {
   )
 
   tags = {
-    Name = "automq-byoc-s3-endpoint-${var.automq_byoc_env_name}"
+    Name = "automq-byoc-s3-endpoint-${var.automq_byoc_env_id}"
   }
 }
 
@@ -134,9 +134,9 @@ module "automq_byoc" {
   automq_byoc_env_console_public_subnet_id = local.automq_byoc_env_console_public_subnet_id
   automq_byoc_data_bucket_name             = module.automq_byoc_data_bucket_name.s3_bucket_id
   automq_byoc_ops_bucket_name              = module.automq_byoc_ops_bucket_name.s3_bucket_id
-  automq_byoc_env_name                     = var.automq_byoc_env_name
+  automq_byoc_env_id                       = var.automq_byoc_env_id
   automq_byoc_ec2_instance_type            = var.automq_byoc_ec2_instance_type
   automq_byoc_env_version                  = var.automq_byoc_env_version
-  specified_by_the_marketplace             = var.specified_by_the_marketplace
-  automq_byoc_ami_id                       = var.automq_byoc_ami_id
+  specified_ami_by_marketplace             = var.specified_ami_by_marketplace
+  automq_byoc_env_console_ami              = var.automq_byoc_env_console_ami
 }
