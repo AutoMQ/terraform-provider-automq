@@ -29,9 +29,9 @@ type AutoMQProvider struct {
 
 // autoMQProviderModel describes the provider data model.
 type autoMQProviderModel struct {
-	BYOCAccessKey types.String `tfsdk:"byoc_access_key"`
-	BYOCSecretKey types.String `tfsdk:"byoc_secret_key"`
-	BYOCHost      types.String `tfsdk:"byoc_host"`
+	BYOCAccessKey types.String `tfsdk:"automq_byoc_access_key_id"`
+	BYOCSecretKey types.String `tfsdk:"automq_byoc_secret_key"`
+	BYOCHost      types.String `tfsdk:"automq_byoc_host"`
 }
 
 func (p *AutoMQProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {

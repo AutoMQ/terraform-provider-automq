@@ -148,7 +148,7 @@ func ExpandKafkaTopicResource(topic KafkaTopicResourceModel, request *client.Top
 		i += 1
 	}
 	if request.CompactStrategy == "" {
-		request.CompactStrategy = "delete"
+		request.CompactStrategy = "DELETE"
 	}
 }
 
@@ -208,10 +208,6 @@ func ExpandIntergationResource(in *client.IntegrationParam, integration Integrat
 	in.Type = &integrationType
 	if integrationType == "cloudWatch" {
 		in.Name = integration.Name.ValueString()
-		if integration.EndPoint.IsNull() || integration.EndPoint.IsUnknown() {
-			return diag.NewErrorDiagnostic("Missing required field", "endpoint is required for CloudWatch integration")
-		}
-		in.EndPoint = integration.EndPoint.ValueString()
 		if integration.CloudWatchConfig == nil {
 			return diag.NewErrorDiagnostic("Missing required field", "cloud_watch_config is required for CloudWatch integration")
 		}

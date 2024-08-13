@@ -2,9 +2,9 @@ package client
 
 // TopicVO struct for TopicVO
 type TopicVO struct {
-	TopicId   string                 `json:"topicId,omitempty"`
-	Name      string                 `json:"name,omitempty"`
-	Partition int64                  `json:"partition,omitempty"`
+	TopicId   string                 `json:"topicId"`
+	Name      string                 `json:"name"`
+	Partition int64                  `json:"partition"`
 	Configs   map[string]interface{} `json:"configs,omitempty"`
 }
 

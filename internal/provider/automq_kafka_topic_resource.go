@@ -143,6 +143,9 @@ func (r *KafkaTopicResource) Create(ctx context.Context, req resource.CreateRequ
 	if out == nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka topic %q, got nil response", topic))
 	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	resp.Diagnostics.Append(FlattenKafkaTopic(out, &topic)...)
 	if resp.Diagnostics.HasError() {
 		return
