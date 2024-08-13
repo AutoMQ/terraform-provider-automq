@@ -46,7 +46,7 @@ resource "aws_security_group" "allow_all" {
 
 # Create an IAM role
 resource "aws_iam_role" "automq_byoc_role" {
-  name = "automq-byoc-service-role-${var.automq_byoc_env_name}"
+  name = "automq-byoc-service-role-${var.automq_byoc_env_id}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -65,7 +65,7 @@ resource "aws_iam_role" "automq_byoc_role" {
 
 # Create an IAM policy
 resource "aws_iam_policy" "automq_byoc_policy" {
-  name        = "automq-byoc-service-policy-${var.automq_byoc_env_name}"
+  name        = "automq-byoc-service-policy-${var.automq_byoc_env_id}"
   description = "Custom policy for automq_byoc service"
 
   policy = jsonencode({
@@ -200,13 +200,13 @@ resource "aws_iam_role_policy_attachment" "automq_byoc_role_attachment" {
 
 # Create an instance profile and bind a role
 resource "aws_iam_instance_profile" "automq_byoc_instance_profile" {
-  name = "automq-byoc-instance-profile-${var.automq_byoc_env_name}"
+  name = "automq-byoc-instance-profile-${var.automq_byoc_env_id}"
   role = aws_iam_role.automq_byoc_role.name
 }
 
 # Create an EC2 instance and bind an instance profile
 resource "aws_instance" "web" {
-  ami           = var.specified_by_the_marketplace ? data.aws_ami.marketplace_ami_details.id : var.automq_byoc_ami_id
+  ami           = var.specified_ami_by_marketplace ? data.aws_ami.marketplace_ami_details.id : var.automq_byoc_env_console_ami
   instance_type = var.automq_byoc_ec2_instance_type
   subnet_id     = var.automq_byoc_env_console_public_subnet_id
   vpc_security_group_ids = [aws_security_group.allow_all.id]
@@ -225,7 +225,7 @@ resource "aws_instance" "web" {
   }
 
   tags = {
-    Name = "automq-byoc-console-${var.automq_byoc_env_name}"
+    Name = "automq-byoc-console-${var.automq_byoc_env_id}"
   }
 
   user_data = <<-EOF
@@ -240,14 +240,14 @@ resource "aws_instance" "web" {
                     echo 'cmp.provider.instanceSecurityGroup=${aws_security_group.allow_all.id}' >> /home/admin/config.properties
                     echo 'cmp.provider.instanceDNS=${aws_route53_zone.private.zone_id}' >> /home/admin/config.properties
                     echo 'cmp.provider.instanceProfile=${aws_iam_instance_profile.automq_byoc_instance_profile.arn}' >> /home/admin/config.properties
-                    echo 'cmp.environmentId=${var.automq_byoc_env_name}' >> /home/admin/config.properties
+                    echo 'cmp.environmentId=${var.automq_byoc_env_id}' >> /home/admin/config.properties
                   fi
               EOF
 }
 
 # Create a Route53 private zone and bind it to the current VPC
 resource "aws_route53_zone" "private" {
-  name = "${var.automq_byoc_env_name}.automq.private"
+  name = "${var.automq_byoc_env_id}.automq.private"
 
   vpc {
     vpc_id = var.automq_byoc_vpc_id
