@@ -51,5 +51,10 @@ output "automq_byoc_env_console_ami" {
 
 output "automq_byoc_instance_id" {
   description = "AutoMQ BYOC Console instance ID."
-  value = aws_instance.web.id
+  value       = aws_instance.web.id
+}
+
+output "automq_byoc_env_console_cidr" {
+  description = "CIDR block to restrict the source IP address range for accessing the AutoMQ environment console."
+  value       = var.automq_byoc_env_console_cidr
 }

@@ -89,3 +89,9 @@ variable "automq_byoc_env_console_ami" {
   type = string
   default = "ami-067ff8136e9b22196"
 }
+
+variable "automq_byoc_env_console_cidr" {
+  description = "Set CIDR block to restrict the source IP address range for accessing the AutoMQ environment console. If not set, the default is 0.0.0.0/0."
+  type = string
+  default = "0.0.0.0/0"
+}
