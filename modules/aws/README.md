@@ -9,7 +9,6 @@ module "automq_byoc" {
 
   automq_byoc_env_id                       = "example"
   cloud_provider_region                    = "ap-southeast-1"
-  create_new_vpc                           = true
 }
 ```
 
