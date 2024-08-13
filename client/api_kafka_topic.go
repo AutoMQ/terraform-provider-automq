@@ -66,27 +66,22 @@ func (c *Client) UpdateKafkaTopicConfig(instanceId string, topicId string, topic
 	return &newtopic, nil
 }
 
-func (c *Client) UpdateKafkaTopicPartition(instanceId string, topicId string, partition TopicPartitionParam) (*TopicVO, error) {
+func (c *Client) UpdateKafkaTopicPartition(instanceId string, topicId string, partition TopicPartitionParam) error {
 	partitionRequest, err := json.Marshal(partition)
 	if err != nil {
-		return nil, err
+		return nil
 	}
 	localVarPath := c.HostURL + "/api/v1/instances/" + instanceId + "/topics/" + topicId + "/partition-counts"
 
 	req, err := http.NewRequest("PATCH", localVarPath, strings.NewReader(string(partitionRequest)))
 	if err != nil {
-		return nil, err
+		return nil
 	}
-	body, err := c.doRequest(req)
+	_, err = c.doRequest(req)
 	if err != nil {
-		return nil, err
+		return nil
 	}
-	newtopic := TopicVO{}
-	err = json.Unmarshal(body, &newtopic)
-	if err != nil {
-		return nil, err
-	}
-	return &newtopic, nil
+	return nil
 }
 
 func (c *Client) GetKafkaTopic(instanceId string, topicId string) (*TopicVO, error) {

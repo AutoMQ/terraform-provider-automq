@@ -114,3 +114,17 @@ type Metric struct {
 	DisplayName string `json:"displayName"`
 	Value       int    `json:"value"`
 }
+
+// PageNumResultInstanceAccessInfoVO struct for PageNumResultInstanceAccessInfoVO
+type PageNumResultInstanceAccessInfoVO struct {
+	List []InstanceAccessInfoVO `json:"list,omitempty"`
+}
+
+// InstanceAccessInfoVO struct for InstanceAccessInfoVO
+type InstanceAccessInfoVO struct {
+	DisplayName      string `json:"displayName"`
+	NetworkType      string `json:"networkType"`
+	Protocol         string `json:"protocol"`
+	Mechanisms       string `json:"mechanisms"`
+	BootstrapServers string `json:"bootstrapServers"`
+}

@@ -8,14 +8,14 @@ terraform {
 }
 
 provider "automq" {
-  byoc_host = "http://localhost:8081"
+  byoc_host       = "http://localhost:8081"
   byoc_access_key = "VLaUIeNYndeOAXjaol32o4UAHvX8A7VE"
   byoc_secret_key = "CHlRi0hOIA8pAnzW"
-  token     = "123456"
+  token           = "123456"
 }
 
 resource "automq_kafka_acl" "example" {
-  environment_id = "example123"
+  environment_id    = "example123"
   kafka_instance_id = "kf-gm4q8tk1wqlavkg2"
 
   resource_type   = "TOPIC"

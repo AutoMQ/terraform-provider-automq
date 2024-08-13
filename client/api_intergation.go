@@ -80,3 +80,21 @@ func (c *Client) DeleteIntergration(integrationId string) error {
 	}
 	return nil
 }
+
+func (c *Client) ListInstanceIntegrations(instanceId string) ([]IntegrationVO, error) {
+	localVarPath := c.HostURL + "/api/v1/instances/" + instanceId + "/integrations"
+	req, err := http.NewRequest("GET", localVarPath, nil)
+	if err != nil {
+		return nil, err
+	}
+	body, err := c.doRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	var integrations PageNumResultIntegrationVO
+	err = json.Unmarshal(body, &integrations)
+	if err != nil {
+		return nil, err
+	}
+	return integrations.List, nil
+}

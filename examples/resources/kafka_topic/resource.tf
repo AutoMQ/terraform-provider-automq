@@ -15,11 +15,11 @@ provider "automq" {
 }
 
 resource "automq_kafka_topic" "example" {
-  environment_id   = "example123"
-  kafka_instance   = "kf-gm4q8tk1wqlavkg2"
-  name             = "example"
-  partition        = 72
-  compact_strategy = "DELETE"
+  environment_id    = "example123"
+  kafka_instance_id = "kf-gm4q8tk1wqlavkg2"
+  name              = "example"
+  partition         = 72
+  compact_strategy  = "DELETE"
   configs = {
     "delete.retention.ms" = "86400"
     "retention.ms"        = "3600000"

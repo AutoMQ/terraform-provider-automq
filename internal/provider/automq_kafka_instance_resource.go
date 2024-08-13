@@ -54,25 +54,35 @@ type KafkaInstanceResource struct {
 
 // KafkaInstanceResourceModel describes the resource data model.
 type KafkaInstanceResourceModel struct {
-	InstanceID     types.String       `tfsdk:"instance_id"`
-	Name           types.String       `tfsdk:"name"`
-	Description    types.String       `tfsdk:"description"`
-	CloudProvider  types.String       `tfsdk:"cloud_provider"`
-	Region         types.String       `tfsdk:"region"`
-	Networks       []NetworkModel     `tfsdk:"networks"`
-	ComputeSpecs   ComputeSpecsModel  `tfsdk:"compute_specs"`
-	Config         []ConfigModel      `tfsdk:"config"`
-	ACL            types.Bool         `tfsdk:"acl"`
-	Integrations   []IntegrationModel `tfsdk:"integrations"`
-	CreatedAt      timetypes.RFC3339  `tfsdk:"created_at"`
-	LastUpdated    timetypes.RFC3339  `tfsdk:"last_updated"`
-	InstanceStatus types.String       `tfsdk:"instance_status"`
-	Timeouts       timeouts.Value     `tfsdk:"timeouts"`
+	EnvironmentID types.String       `tfsdk:"environment_id"`
+	InstanceID    types.String       `tfsdk:"id"`
+	Name          types.String       `tfsdk:"name"`
+	Description   types.String       `tfsdk:"description"`
+	CloudProvider types.String       `tfsdk:"cloud_provider"`
+	Region        types.String       `tfsdk:"region"`
+	Networks      []NetworkModel     `tfsdk:"networks"`
+	ComputeSpecs  ComputeSpecsModel  `tfsdk:"compute_specs"`
+	Config        []ConfigModel      `tfsdk:"config"`
+	ACL           types.Bool         `tfsdk:"acl"`
+	Integrations  []IntegrationModel `tfsdk:"integrations"`
+	// Endpoints      []InstanceAccessInfo `tfsdk:"endpoints"`
+	CreatedAt      timetypes.RFC3339 `tfsdk:"created_at"`
+	LastUpdated    timetypes.RFC3339 `tfsdk:"last_updated"`
+	InstanceStatus types.String      `tfsdk:"instance_status"`
+	Timeouts       timeouts.Value    `tfsdk:"timeouts"`
+}
+
+type InstanceAccessInfo struct {
+	DisplayName      types.String `tfsdk:"displayName"`
+	NetworkType      types.String `tfsdk:"networkType"`
+	Protocol         types.String `tfsdk:"protocol"`
+	Mechanisms       types.String `tfsdk:"mechanisms"`
+	BootstrapServers types.String `tfsdk:"bootstrapServers"`
 }
 
 type NetworkModel struct {
-	Zone   types.String `tfsdk:"zone"`
-	Subnet types.String `tfsdk:"subnet"`
+	Zone    types.String `tfsdk:"zone"`
+	Subnets types.List   `tfsdk:"subnets"`
 }
 
 type ComputeSpecsModel struct {
@@ -104,7 +114,11 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 		MarkdownDescription: "AutoMQ Kafka instance resource",
 
 		Attributes: map[string]schema.Attribute{
-			"instance_id": schema.StringAttribute{
+			"environment_id": schema.StringAttribute{
+				MarkdownDescription: "Target Kafka environment",
+				Required:            true,
+			},
+			"id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "The ID of the Kafka instance",
 				PlanModifiers: []planmodifier.String{
@@ -139,10 +153,10 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							Description:   "The zone of the network",
 							PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 						},
-						"subnet": schema.StringAttribute{
-							Required:      true,
-							Description:   "The subnetId of the network",
-							PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+						"subnets": schema.ListAttribute{
+							Required:    true,
+							Description: "The subnets of the network",
+							ElementType: types.StringType,
 						},
 					},
 				},
@@ -193,7 +207,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				},
 			},
 			"acl": schema.BoolAttribute{
-				Required:    false,
+				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
 				Description: "The ACL of the Kafka instance",
@@ -272,7 +286,10 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 	}
 
 	// Flatten API response into Terraform state
-	FlattenKafkaInstanceModel(out, &instance)
+	resp.Diagnostics.Append(FlattenKafkaInstanceModel(out, &instance, nil, nil)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	instanceId := instance.InstanceID.ValueString()
 
@@ -282,7 +299,10 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	resp.Diagnostics.Append(ReadKafkaInstance(r, instanceId, &instance))
+	resp.Diagnostics.Append(ReadKafkaInstance(r, instanceId, &instance)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &instance)...)
 }
@@ -306,8 +326,20 @@ func (r *KafkaInstanceResource) Read(ctx context.Context, req resource.ReadReque
 		}
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", state.InstanceID.ValueString(), err))
 	}
-	FlattenKafkaInstanceModel(instance, &state)
-
+	integrations, err := r.client.ListInstanceIntegrations(instanceId)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to list integrations for Kafka instance %q, got error: %s", state.InstanceID.ValueString(), err))
+		return
+	}
+	endpoints, err := r.client.GetInstanceEndpoints(instanceId)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get endpoints for Kafka instance %q, got error: %s", state.InstanceID.ValueString(), err))
+		return
+	}
+	resp.Diagnostics.Append(FlattenKafkaInstanceModel(instance, &state, integrations, endpoints)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -355,9 +387,47 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 			return
 		}
 		// get latest info
-		resp.Diagnostics.Append(ReadKafkaInstance(r, instanceId, &plan))
+		resp.Diagnostics.Append(ReadKafkaInstance(r, instanceId, &plan)...)
 		// Save updated data into Terraform state
 		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	}
+	if state.ACL.ValueBool() != plan.ACL.ValueBool() {
+		if !state.ACL.ValueBool() && plan.ACL.ValueBool() {
+			err = r.client.TurnOnInstanceAcl(instanceId)
+			if err != nil {
+				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to turn on ACL for Kafka instance %q, got error: %s", instanceId, err))
+				return
+			}
+			// get latest info
+			resp.Diagnostics.Append(ReadKafkaInstance(r, instanceId, &plan)...)
+			// Save updated data into Terraform state
+			resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+		} else {
+			resp.Diagnostics.AddError("Unsupported Operation", "Turning off ACL is not supported")
+		}
+	}
+
+	if len(state.Integrations) != len(plan.Integrations) {
+		needAdd := findDiffIntegration(plan.Integrations, state.Integrations)
+		// Generate API request body from plan
+		param := client.IntegrationInstanceAddParam{}
+		for _, i := range needAdd {
+			param.Codes = append(param.Codes, i.IntegrationID.ValueString())
+		}
+		err = r.client.AddInstanceIntegration(instanceId, param)
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to add integrations to Kafka instance %q, got error: %s", instanceId, err))
+			return
+		}
+
+		needRemove := findDiffIntegration(state.Integrations, plan.Integrations)
+		for _, i := range needRemove {
+			err = r.client.RemoveInstanceIntegration(instanceId, i.IntegrationID.ValueString())
+			if err != nil {
+				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to remove integrations from Kafka instance %q, got error: %s", instanceId, err))
+				return
+			}
+		}
 	}
 
 	updateTimeout := r.UpdateTimeout(ctx, state.Timeouts)
@@ -377,7 +447,7 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 			return
 		}
 		// get latest info
-		resp.Diagnostics.Append(ReadKafkaInstance(r, instanceId, &plan))
+		resp.Diagnostics.Append(ReadKafkaInstance(r, instanceId, &plan)...)
 		// Save updated data into Terraform state
 		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	}
@@ -404,25 +474,52 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 			return
 		}
 		// get latest info
-		resp.Diagnostics.Append(ReadKafkaInstance(r, instanceId, &plan))
+		resp.Diagnostics.Append(ReadKafkaInstance(r, instanceId, &plan)...)
 		// Save updated data into Terraform state
 		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	}
 }
 
-func ReadKafkaInstance(r *KafkaInstanceResource, instanceId string, plan *KafkaInstanceResourceModel) diag.Diagnostic {
+func findDiffIntegration(plan []IntegrationModel, state []IntegrationModel) []IntegrationModel {
+	diff := []IntegrationModel{}
+	for _, p := range plan {
+		found := false
+		for _, s := range state {
+			if p.IntegrationID.ValueString() == s.IntegrationID.ValueString() {
+				found = true
+				break
+			}
+		}
+		if !found {
+			diff = append(diff, p)
+		}
+	}
+	return diff
+}
+
+func ReadKafkaInstance(r *KafkaInstanceResource, instanceId string, plan *KafkaInstanceResourceModel) diag.Diagnostics {
 	instance, err := r.client.GetKafkaInstance(instanceId)
 	if err != nil {
 		if isNotFoundError(err) {
 			return nil
 		}
-		return diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", plan.InstanceID.ValueString(), err))
+		return diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", plan.InstanceID.ValueString(), err))}
 	}
 	if instance == nil {
-		return diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Kafka instance %q not found", plan.InstanceID.ValueString()))
+		return diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Kafka instance %q not found", plan.InstanceID.ValueString()))}
 	}
-	FlattenKafkaInstanceModel(instance, plan)
-	return nil
+
+	integrations, err := r.client.ListInstanceIntegrations(instanceId)
+	if err != nil {
+		return diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to list integrations for Kafka instance %q, got error: %s", plan.InstanceID.ValueString(), err))}
+	}
+
+	endpoints, err := r.client.GetInstanceEndpoints(instanceId)
+	if err != nil {
+		return diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get endpoints for Kafka instance %q, got error: %s", plan.InstanceID.ValueString(), err))}
+	}
+
+	return FlattenKafkaInstanceModel(instance, plan, integrations, endpoints)
 }
 
 func (r *KafkaInstanceResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -463,5 +560,5 @@ func (r *KafkaInstanceResource) Delete(ctx context.Context, req resource.DeleteR
 }
 
 func (r *KafkaInstanceResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("instance_id"), req, resp)
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }

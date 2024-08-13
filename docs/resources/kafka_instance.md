@@ -19,12 +19,14 @@ AutoMQ Kafka instance resource
 
 - `cloud_provider` (String) The cloud provider of the Kafka instance
 - `compute_specs` (Attributes) The compute specs of the Kafka instance (see [below for nested schema](#nestedatt--compute_specs))
+- `environment_id` (String) Target Kafka environment
 - `name` (String) The name of the Kafka instance
 - `networks` (Attributes List) The networks of the Kafka instance (see [below for nested schema](#nestedatt--networks))
 - `region` (String) The region of the Kafka instance
 
 ### Optional
 
+- `acl` (Boolean) The ACL of the Kafka instance
 - `config` (Attributes) The config of the Kafka instance (see [below for nested schema](#nestedatt--config))
 - `description` (String) The description of the Kafka instance
 - `integrations` (Attributes List) The integrations of the Kafka instance (see [below for nested schema](#nestedatt--integrations))
@@ -32,9 +34,8 @@ AutoMQ Kafka instance resource
 
 ### Read-Only
 
-- `acl` (Boolean) The ACL of the Kafka instance
 - `created_at` (String)
-- `instance_id` (String) The ID of the Kafka instance
+- `id` (String) The ID of the Kafka instance
 - `instance_status` (String) The status of the Kafka instance
 - `last_updated` (String)
 
@@ -55,7 +56,7 @@ Optional:
 
 Required:
 
-- `subnet` (String) The subnetId of the network
+- `subnets` (List of String) The subnets of the network
 - `zone` (String) The zone of the network
 
 

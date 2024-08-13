@@ -23,7 +23,6 @@ provider "scaffolding" {
 
 ### Optional
 
-- `byoc_access_key` (String) Example provider attribute
-- `byoc_host` (String) Example provider attribute
-- `byoc_secret_key` (String) Example provider attribute
-- `token` (String) Example provider attribute
+- `automq_byoc_access_key_id` (String) Example provider attribute
+- `automq_byoc_host` (String) Example provider attribute
+- `automq_byoc_secret_key` (String) Example provider attribute

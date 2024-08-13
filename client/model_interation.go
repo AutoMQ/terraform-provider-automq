@@ -44,3 +44,8 @@ type ConfigItemParam struct {
 	Key   string `json:"key,omitempty"`
 	Value string `json:"value,omitempty"`
 }
+
+// PageNumResultIntegrationVO struct for PageNumResultIntegrationVO
+type PageNumResultIntegrationVO struct {
+	List []IntegrationVO `json:"list,omitempty"`
+}

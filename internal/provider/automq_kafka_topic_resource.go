@@ -36,15 +36,14 @@ type KafkaTopicResource struct {
 
 // KafkaTopicResourceModel describes the resource data model.
 type KafkaTopicResourceModel struct {
-	EnvironmentID   types.String      `tfsdk:"environment_id"`
-	KafkaInstance   types.String      `tfsdk:"kafka_instance"`
-	Name            types.String      `tfsdk:"name"`
-	Partition       types.Int64       `tfsdk:"partition"`
-	CompactStrategy types.String      `tfsdk:"compact_strategy"`
-	Configs         types.Map         `tfsdk:"configs"`
-	TopicID         types.String      `tfsdk:"topic_id"`
-	CreatedAt       timetypes.RFC3339 `tfsdk:"created_at"`
-	LastUpdated     timetypes.RFC3339 `tfsdk:"last_updated"`
+	EnvironmentID types.String      `tfsdk:"environment_id"`
+	KafkaInstance types.String      `tfsdk:"kafka_instance_id"`
+	Name          types.String      `tfsdk:"name"`
+	Partition     types.Int64       `tfsdk:"partition"`
+	Configs       types.Map         `tfsdk:"configs"`
+	TopicID       types.String      `tfsdk:"topic_id"`
+	CreatedAt     timetypes.RFC3339 `tfsdk:"created_at"`
+	LastUpdated   timetypes.RFC3339 `tfsdk:"last_updated"`
 }
 
 func (r *KafkaTopicResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -60,7 +59,7 @@ func (r *KafkaTopicResource) Schema(ctx context.Context, req resource.SchemaRequ
 				MarkdownDescription: "Target Kafka environment",
 				Required:            true,
 			},
-			"kafka_instance": schema.StringAttribute{
+			"kafka_instance_id": schema.StringAttribute{
 				MarkdownDescription: "Target Kafka instance ID",
 				Required:            true,
 			},
@@ -75,11 +74,6 @@ func (r *KafkaTopicResource) Schema(ctx context.Context, req resource.SchemaRequ
 				Computed:            true,
 				Default:             int64default.StaticInt64(16),
 				Validators:          []validator.Int64{int64validator.Between(1, 1024)},
-			},
-			"compact_strategy": schema.StringAttribute{
-				MarkdownDescription: "Compaction strategy for the Kafka topic",
-				Required:            true,
-				Validators:          []validator.String{stringvalidator.OneOf("DELETE", "COMPACT")},
 			},
 			"configs": schema.MapAttribute{
 				ElementType:         types.StringType,
@@ -230,7 +224,7 @@ func (r *KafkaTopicResource) Update(ctx context.Context, req resource.UpdateRequ
 		}
 		in := client.TopicPartitionParam{}
 		in.Partition = planPartition
-		_, err := r.client.UpdateKafkaTopicPartition(instanceId, topicId, in)
+		err := r.client.UpdateKafkaTopicPartition(instanceId, topicId, in)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update Kafka topic %q, got error: %s", topicId, err))
 		}

@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 func isNotFoundError(err error) bool {
@@ -34,6 +35,18 @@ func mapsEqual(a, b types.Map) bool {
 	return true
 }
 
+func ExpandFrameworkStringValueList(v basetypes.ListValuable) []string {
+	var output []string
+	if listValue, ok := v.(basetypes.ListValue); ok {
+		for _, value := range listValue.Elements() {
+			if stringValue, ok := value.(types.String); ok {
+				output = append(output, stringValue.ValueString())
+			}
+		}
+	}
+	return output
+}
+
 func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *client.KafkaInstanceRequest) {
 	request.DisplayName = instance.Name.ValueString()
 	request.Description = instance.Description.ValueString()
@@ -47,46 +60,60 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 	}
 	request.Spec.Version = instance.ComputeSpecs.Version.ValueString()
 	for i, network := range instance.Networks {
-		request.Networks[i] = client.KafkaInstanceRequestNetwork{
-			Zone:   network.Zone.ValueString(),
-			Subnet: network.Subnet.ValueString(),
+		subnetList := ExpandFrameworkStringValueList(network.Subnets)
+		for _, subnet := range subnetList {
+			request.Networks[i] = client.KafkaInstanceRequestNetwork{
+				Zone:   network.Zone.ValueString(),
+				Subnet: subnet,
+			}
 		}
 	}
 	request.Integrations = make([]string, len(instance.Integrations))
 	for i, integration := range instance.Integrations {
 		request.Integrations[i] = integration.IntegrationID.String()
 	}
+	request.AclEnabled = instance.ACL.ValueBool()
 }
 
-func FlattenKafkaInstanceModel(instance *client.KafkaInstanceResponse, resource *KafkaInstanceResourceModel) {
+func FlattenKafkaInstanceModel(instance *client.KafkaInstanceResponse, resource *KafkaInstanceResourceModel, integrations []client.IntegrationVO, endpoints []client.InstanceAccessInfoVO) diag.Diagnostics {
 	resource.InstanceID = types.StringValue(instance.InstanceID)
 	resource.Name = types.StringValue(instance.DisplayName)
 	resource.Description = types.StringValue(instance.Description)
 	resource.CloudProvider = types.StringValue(instance.Provider)
 	resource.Region = types.StringValue(instance.Region)
 	resource.ACL = types.BoolValue(instance.AclEnabled)
-
-	resource.Networks = flattenNetworks(instance.Networks)
+	networks, diag := flattenNetworks(instance.Networks)
+	if diag.HasError() {
+		return diag
+	}
+	resource.Networks = networks
 	resource.ComputeSpecs = flattenComputeSpecs(instance.Spec)
 
 	resource.CreatedAt = timetypes.NewRFC3339TimePointerValue(&instance.GmtCreate)
 	resource.LastUpdated = timetypes.NewRFC3339TimePointerValue(&instance.GmtModified)
 
 	resource.InstanceStatus = types.StringValue(instance.Status)
+	return nil
 }
 
-func flattenNetworks(networks []client.Network) []NetworkModel {
+func flattenNetworks(networks []client.Network) ([]NetworkModel, diag.Diagnostics) {
 	networksModel := make([]NetworkModel, 0, len(networks))
 	for _, network := range networks {
 		zone := types.StringValue(network.Zone)
+		subnets := make([]attr.Value, 0, len(network.Subnets))
 		for _, subnet := range network.Subnets {
-			networksModel = append(networksModel, NetworkModel{
-				Zone:   zone,
-				Subnet: types.StringValue(subnet.Subnet),
-			})
+			subnets = append(subnets, types.StringValue(subnet.Subnet))
 		}
+		subnetList, diag := types.ListValue(types.StringType, subnets)
+		if diag.HasError() {
+			return nil, diag
+		}
+		networksModel = append(networksModel, NetworkModel{
+			Zone:    zone,
+			Subnets: subnetList,
+		})
 	}
-	return networksModel
+	return networksModel, nil
 }
 
 func flattenComputeSpecs(spec client.Spec) ComputeSpecsModel {
@@ -106,7 +133,7 @@ func flattenComputeSpecs(spec client.Spec) ComputeSpecsModel {
 func ExpandKafkaTopicResource(topic KafkaTopicResourceModel, request *client.TopicCreateParam) {
 	request.Name = topic.Name.ValueString()
 	request.Partition = topic.Partition.ValueInt64()
-	request.CompactStrategy = topic.CompactStrategy.ValueString()
+
 	request.Configs = make([]client.ConfigItemParam, len(topic.Configs.Elements()))
 	i := 0
 	for name, value := range topic.Configs.Elements() {
@@ -115,7 +142,13 @@ func ExpandKafkaTopicResource(topic KafkaTopicResourceModel, request *client.Top
 			Key:   name,
 			Value: config.ValueString(),
 		}
+		if name == "cleanup.policy" {
+			request.CompactStrategy = config.ValueString()
+		}
 		i += 1
+	}
+	if request.CompactStrategy == "" {
+		request.CompactStrategy = "delete"
 	}
 }
 
