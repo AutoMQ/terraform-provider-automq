@@ -17,19 +17,30 @@ Integration resource
 
 ### Required
 
-- `endpoint` (String) Endpoint of the integration
 - `environment_id` (String) Target environment ID
 - `name` (String) Name of the integration
 - `type` (String) Type of the integration
 
 ### Optional
 
+- `cloudwatch_config` (Attributes) CloudWatch (see [below for nested schema](#nestedatt--cloudwatch_config))
+- `endpoint` (String) Endpoint of the integration
 - `kafka_config` (Attributes) Kafka configuration (see [below for nested schema](#nestedatt--kafka_config))
 - `prometheus_config` (Attributes) Prometheus (see [below for nested schema](#nestedatt--prometheus_config))
 
 ### Read-Only
 
+- `created_at` (String)
 - `id` (String) Integration identifier
+- `last_updated` (String)
+
+<a id="nestedatt--cloudwatch_config"></a>
+### Nested Schema for `cloudwatch_config`
+
+Optional:
+
+- `namespace` (String) Namespace
+
 
 <a id="nestedatt--kafka_config"></a>
 ### Nested Schema for `kafka_config`

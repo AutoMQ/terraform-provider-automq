@@ -57,6 +57,51 @@ func (c *Client) DeleteKafkaInstance(instanceId string) error {
 	return nil
 }
 
+func (c *Client) ReplaceInstanceIntergation(instanceId string, param IntegrationInstanceParam) error {
+	integrationRequest, err := json.Marshal(param)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest("PUT", c.HostURL+instancePath+"/"+instanceId+"/integrations", strings.NewReader(string(integrationRequest)))
+	if err != nil {
+		return err
+	}
+	_, err = c.doRequest(req)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Client) TurnOnInstanceAcl(instanceId string) error {
+	req, err := http.NewRequest("POST", c.HostURL+instancePath+"/"+instanceId+"/acls:enable", nil)
+	if err != nil {
+		return err
+	}
+	_, err = c.doRequest(req)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Client) GetInstanceEndpoints(instanceId string) ([]InstanceAccessInfoVO, error) {
+	req, err := http.NewRequest("GET", c.HostURL+instancePath+"/"+instanceId+"/endpoints", nil)
+	if err != nil {
+		return nil, err
+	}
+	body, err := c.doRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	endpoints := PageNumResultInstanceAccessInfoVO{}
+	err = json.Unmarshal(body, &endpoints)
+	if err != nil {
+		return nil, err
+	}
+	return endpoints.List, nil
+}
+
 func (c *Client) UpdateKafkaInstanceBasicInfo(instanceId string, updateParam InstanceBasicParam) (*KafkaInstanceResponse, error) {
 	return c.updateInstance(instanceId, updateParam, "/basic")
 }

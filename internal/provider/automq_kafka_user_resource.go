@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
-	"net/http"
+	"terraform-provider-automq/client"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -26,7 +26,7 @@ func NewKafkaUserResource() resource.Resource {
 
 // KafkaUserResource defines the resource implementation.
 type KafkaUserResource struct {
-	client *http.Client
+	client *client.Client
 }
 
 // KafkaUserResourceModel describes the resource data model.
@@ -50,10 +50,12 @@ func (r *KafkaUserResource) Schema(ctx context.Context, req resource.SchemaReque
 			"environment_id": schema.StringAttribute{
 				MarkdownDescription: "Target environment ID",
 				Required:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"kafka_instance_id": schema.StringAttribute{
 				MarkdownDescription: "Target Kafka instance ID",
 				Required:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"username": schema.StringAttribute{
 				MarkdownDescription: "Username for the Kafka user",
@@ -61,6 +63,7 @@ func (r *KafkaUserResource) Schema(ctx context.Context, req resource.SchemaReque
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(4, 64),
 				},
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"password": schema.StringAttribute{
 				MarkdownDescription: "Password for the Kafka user",
@@ -68,6 +71,7 @@ func (r *KafkaUserResource) Schema(ctx context.Context, req resource.SchemaReque
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(8, 24),
 				},
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -85,7 +89,7 @@ func (r *KafkaUserResource) Configure(ctx context.Context, req resource.Configur
 		return
 	}
 
-	client, ok := req.ProviderData.(*http.Client)
+	client, ok := req.ProviderData.(*client.Client)
 
 	if !ok {
 		resp.Diagnostics.AddError(
@@ -100,22 +104,30 @@ func (r *KafkaUserResource) Configure(ctx context.Context, req resource.Configur
 }
 
 func (r *KafkaUserResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data KafkaUserResourceModel
+	var plan KafkaUserResourceModel
 
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Here you would typically call an API to create the Kafka user.
-	// For the purposes of this example, we'll just generate an ID.
+	// Generate API request body from plan
+	instanceId := plan.KafkaInstanceID.ValueString()
+	in := client.InstanceUserCreateParam{
+		Name:     plan.Username.ValueString(),
+		Password: plan.Password.ValueString(),
+	}
 
-	data.ID = types.StringValue("generated-id")
+	out, err := r.client.CreateKafkaUser(instanceId, in)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create Kafka user", err.Error())
+		return
+	}
 
+	FlattenKafkaUserResource(*out, &plan)
 	tflog.Trace(ctx, "created a Kafka user resource")
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *KafkaUserResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -126,24 +138,26 @@ func (r *KafkaUserResource) Read(ctx context.Context, req resource.ReadRequest, 
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	instanceId := data.KafkaInstanceID.ValueString()
+	userName := data.Username.ValueString()
 
-	// Here you would typically call an API to read the Kafka user details.
+	out, err := r.client.GetKafkaUser(instanceId, userName)
+	if err != nil {
+		if isNotFoundError(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError("Failed to read Kafka user", err.Error())
+		return
+	}
+
+	FlattenKafkaUserResource(*out, &data)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *KafkaUserResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data KafkaUserResourceModel
 
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// Here you would typically call an API to update the Kafka user.
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *KafkaUserResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -154,8 +168,11 @@ func (r *KafkaUserResource) Delete(ctx context.Context, req resource.DeleteReque
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	// Here you would typically call an API to delete the Kafka user.
+	err := r.client.DeleteKafkaUser(data.KafkaInstanceID.ValueString(), data.Username.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to delete Kafka user", err.Error())
+		return
+	}
 }
 
 func (r *KafkaUserResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

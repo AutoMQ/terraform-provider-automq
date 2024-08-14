@@ -48,11 +48,10 @@ func (e *ErrorResponse) Error() string {
 	return fmt.Sprintf("Error %d: %s, detail: %s", e.Code, e.ErrorMessage, e.Err.Error())
 }
 
-func NewClient(ctx context.Context, host, token string, credentials AuthCredentials) (*Client, error) {
+func NewClient(ctx context.Context, host string, credentials AuthCredentials) (*Client, error) {
 	c := &Client{
-		HTTPClient:  &http.Client{Timeout: 10 * time.Second},
+		HTTPClient:  &http.Client{Timeout: 0 * time.Second},
 		HostURL:     host,
-		Token:       token,
 		Credentials: credentials,
 		Signer: signer.NewSigner(signer.Credentials{
 			AccessKeyID:     credentials.AccessKeyID,

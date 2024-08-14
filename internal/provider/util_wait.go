@@ -16,7 +16,7 @@ const (
 )
 
 func waitForKafkaClusterState(ctx context.Context, c *client.Client, clusterId, pendingState, targetState string, timeout time.Duration, refreshFunc retry.StateRefreshFunc) error {
-	delay, pollInterval := getDelayAndPollInterval(5*time.Second, 1*time.Minute, false)
+	delay, pollInterval := getDelayAndPollInterval(5*time.Second, 20*time.Second, false)
 	stateConf := &retry.StateChangeConf{
 		Pending:      []string{pendingState},
 		Target:       []string{targetState},

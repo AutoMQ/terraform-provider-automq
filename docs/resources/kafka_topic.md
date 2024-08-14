@@ -17,9 +17,8 @@ Kafka Topic resource
 
 ### Required
 
-- `compact_strategy` (String) Compaction strategy for the Kafka topic
 - `environment_id` (String) Target Kafka environment
-- `kafka_instance` (String) Target Kafka instance ID
+- `kafka_instance_id` (String) Target Kafka instance ID
 - `name` (String) Name of the Kafka topic
 
 ### Optional
@@ -29,4 +28,6 @@ Kafka Topic resource
 
 ### Read-Only
 
+- `created_at` (String)
+- `last_updated` (String)
 - `topic_id` (String) Kafka topic identifier

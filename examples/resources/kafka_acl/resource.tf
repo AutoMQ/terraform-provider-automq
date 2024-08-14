@@ -8,17 +8,20 @@ terraform {
 }
 
 provider "automq" {
-  byoc_host = "http://localhost:8081"
-  token     = "123456"
+  byoc_host       = "http://localhost:8081"
+  byoc_access_key = "VLaUIeNYndeOAXjaol32o4UAHvX8A7VE"
+  byoc_secret_key = "CHlRi0hOIA8pAnzW"
+  token           = "123456"
 }
 
 resource "automq_kafka_acl" "example" {
-  environment_id  = "example123"
-  kafka_instance  = "kf-rrn5s50fzpr23urd"
+  environment_id    = "example123"
+  kafka_instance_id = "kf-gm4q8tk1wqlavkg2"
+
   resource_type   = "TOPIC"
   resource_name   = "example-"
   pattern_type    = "PREFIXED"
-  principal       = "automq_kafka_user"
+  principal       = "User:automq_kafka_user"
   operation_group = "ALL"
   permission      = "ALLOW"
 }

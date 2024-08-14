@@ -87,5 +87,5 @@ variable "specified_ami_by_marketplace" {
 variable "automq_byoc_env_console_ami" {
   description = "When obtaining ami id from non-cloud market, manually specify ami id."
   type = string
-  default = "ami-067ff8136e9b22196"
+  default = "ami-0abd5122c337075b6"
 }

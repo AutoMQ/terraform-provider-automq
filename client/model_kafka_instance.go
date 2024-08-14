@@ -3,12 +3,15 @@ package client
 import "time"
 
 type KafkaInstanceRequest struct {
-	DisplayName string                        `json:"displayName"`
-	Description string                        `json:"description"`
-	Provider    string                        `json:"provider"`
-	Region      string                        `json:"region"`
-	Spec        KafkaInstanceRequestSpec      `json:"spec"`
-	Networks    []KafkaInstanceRequestNetwork `json:"networks"`
+	DisplayName    string                        `json:"displayName"`
+	Description    string                        `json:"description"`
+	Provider       string                        `json:"provider"`
+	Region         string                        `json:"region"`
+	Spec           KafkaInstanceRequestSpec      `json:"spec"`
+	Networks       []KafkaInstanceRequestNetwork `json:"networks"`
+	AclEnabled     bool                          `json:"aclEnabled"`
+	Integrations   []string                      `json:"integrations"`
+	InstanceConfig InstanceConfigParam           `json:"instanceConfig"`
 }
 
 type InstanceBasicParam struct {
@@ -21,29 +24,24 @@ type InstanceVersionUpgradeParam struct {
 }
 
 type InstanceConfigParam struct {
-	Configs []KafkaInstanceRequestValues `json:"configs"`
+	Configs []ConfigItemParam `json:"configs"`
 }
 
 type SpecificationUpdateParam struct {
-	Values []KafkaInstanceRequestValues `json:"values"`
+	Values []ConfigItemParam `json:"values"`
 }
 
 type KafkaInstanceRequestSpec struct {
 	Version     string                          `json:"version"`
 	Template    string                          `json:"template"`
 	PaymentPlan KafkaInstanceRequestPaymentPlan `json:"paymentPlan"`
-	Values      []KafkaInstanceRequestValues    `json:"values"`
+	Values      []ConfigItemParam               `json:"values"`
 }
 
 type KafkaInstanceRequestPaymentPlan struct {
 	PaymentType string `json:"paymentType"`
 	Period      int    `json:"period"`
 	Unit        string `json:"unit"`
-}
-
-type KafkaInstanceRequestValues struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
 }
 
 type KafkaInstanceRequestNetwork struct {
@@ -113,16 +111,16 @@ type Metric struct {
 	Value       int    `json:"value"`
 }
 
-// TopicCreateParam struct for TopicCreateParam
-type TopicCreateParam struct {
-	Name            *string           `json:"name,omitempty" validate:"regexp=^[a-zA-Z0-9][.a-zA-Z0-9_-]*[a-zA-Z0-9]$"`
-	Partition       int32             `json:"partition"`
-	CompactStrategy string            `json:"compactStrategy"`
-	Configs         []ConfigItemParam `json:"configs,omitempty"`
+// PageNumResultInstanceAccessInfoVO struct for PageNumResultInstanceAccessInfoVO
+type PageNumResultInstanceAccessInfoVO struct {
+	List []InstanceAccessInfoVO `json:"list,omitempty"`
 }
 
-// ConfigItemParam struct for ConfigItemParam
-type ConfigItemParam struct {
-	Key   *string                `json:"key,omitempty"`
-	Value map[string]interface{} `json:"value,omitempty"`
+// InstanceAccessInfoVO struct for InstanceAccessInfoVO
+type InstanceAccessInfoVO struct {
+	DisplayName      string `json:"displayName"`
+	NetworkType      string `json:"networkType"`
+	Protocol         string `json:"protocol"`
+	Mechanisms       string `json:"mechanisms"`
+	BootstrapServers string `json:"bootstrapServers"`
 }

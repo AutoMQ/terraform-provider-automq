@@ -29,10 +29,9 @@ type AutoMQProvider struct {
 
 // autoMQProviderModel describes the provider data model.
 type autoMQProviderModel struct {
-	BYOCAccessKey types.String `tfsdk:"byoc_access_key"`
-	BYOCSecretKey types.String `tfsdk:"byoc_secret_key"`
-	BYOCHost      types.String `tfsdk:"byoc_host"`
-	Token         types.String `tfsdk:"token"`
+	BYOCAccessKey types.String `tfsdk:"automq_byoc_access_key_id"`
+	BYOCSecretKey types.String `tfsdk:"automq_byoc_secret_key"`
+	BYOCHost      types.String `tfsdk:"automq_byoc_host"`
 }
 
 func (p *AutoMQProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -43,19 +42,15 @@ func (p *AutoMQProvider) Metadata(ctx context.Context, req provider.MetadataRequ
 func (p *AutoMQProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"byoc_access_key": schema.StringAttribute{
+			"automq_byoc_access_key_id": schema.StringAttribute{
 				MarkdownDescription: "Example provider attribute",
 				Optional:            true,
 			},
-			"byoc_secret_key": schema.StringAttribute{
+			"automq_byoc_secret_key": schema.StringAttribute{
 				MarkdownDescription: "Example provider attribute",
 				Optional:            true,
 			},
-			"byoc_host": schema.StringAttribute{
-				MarkdownDescription: "Example provider attribute",
-				Optional:            true,
-			},
-			"token": schema.StringAttribute{
+			"automq_byoc_host": schema.StringAttribute{
 				MarkdownDescription: "Example provider attribute",
 				Optional:            true,
 			},
@@ -74,7 +69,7 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	// Configuration values are now available.
 	if data.BYOCHost.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("byoc_host"),
+			path.Root("automq_byoc_host"),
 			"Unknown AutoMQ API Host",
 			"The provider cannot create the AutoMQ API client as there is an unknown configuration value for the AutoMQ API host. "+
 				"Either target apply the source of the value first, set the value statically in the configuration, or use the AUTOMQ_HOST environment variable.",
@@ -83,7 +78,7 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 	if data.BYOCAccessKey.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("byoc_access_key"),
+			path.Root("automq_byoc_access_key_id"),
 			"Unknown AutoMQ API BYOCAccessKey",
 			"The provider cannot create the AutoMQ API client as there is an unknown configuration value for the AutoMQ API byoc_access_key. "+
 				"Either target apply the source of the value first, set the value statically in the configuration, or use the AUTOMQ_BYOC_ACCESS_KEY environment variable.",
@@ -91,7 +86,7 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	}
 	if data.BYOCSecretKey.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("byoc_secret_key"),
+			path.Root("automq_byoc_secret_key"),
 			"Unknown AutoMQ API BYOCSecretKey",
 			"The provider cannot create the AutoMQ API client as there is an unknown configuration value for the AutoMQ API byoc_secret_key. "+
 				"Either target apply the source of the value first, set the value statically in the configuration, or use the AUTOMQ_BYOC_SECRET_KEY environment variable.",
@@ -106,15 +101,11 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	// with Terraform configuration value if set.
 
 	byco_host := os.Getenv("AUTOMQ_BYOC_HOST")
-	token := os.Getenv("AUTOMQ_TOKEN")
 	byoc_access_key := os.Getenv("AUTOMQ_BYOC_ACCESS_KEY")
 	byoc_secret_key := os.Getenv("AUTOMQ_BYOC_SECRET_KEY")
 
 	if !data.BYOCHost.IsNull() {
 		byco_host = data.BYOCHost.ValueString()
-	}
-	if !data.Token.IsNull() {
-		token = data.Token.ValueString()
 	}
 	if !data.BYOCAccessKey.IsNull() {
 		byoc_access_key = data.BYOCAccessKey.ValueString()
@@ -128,7 +119,7 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 	if byco_host == "" {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("byoc_host"),
+			path.Root("automq_byoc_host"),
 			"Missing AutoMQ API Host",
 			"The provider cannot create the AutoMQ API client as there is a missing or empty value for the AutoMQ API host. "+
 				"Set the host value in the configuration or use the AUTOMQ_HOST environment variable. "+
@@ -138,7 +129,7 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 	if byoc_access_key == "" {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("byoc_access_key"),
+			path.Root("automq_byoc_access_key_id"),
 			"Missing AutoMQ API BYOCAccessKey",
 			"The provider cannot create the AutoMQ API client as there is a missing or empty value for the AutoMQ API byoc_access_key. "+
 				"Set the byoc_access_key value in the configuration or use the AUTOMQ_BYOC_ACCESS_KEY environment variable. "+
@@ -147,7 +138,7 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	}
 	if byoc_secret_key == "" {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("byoc_secret_key"),
+			path.Root("automq_byoc_secret_key"),
 			"Missing AutoMQ API BYOCSecretKey",
 			"The provider cannot create the AutoMQ API client as there is a missing or empty value for the AutoMQ API byoc_secret_key. "+
 				"Set the byoc_secret_key value in the configuration or use the AUTOMQ_BYOC_SECRET_KEY environment variable. "+
@@ -160,7 +151,6 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	}
 
 	ctx = tflog.SetField(ctx, "automq_env_byoc_host", byco_host)
-	ctx = tflog.SetField(ctx, "automq_env_token", token)
 	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "automq_env_token")
 
 	tflog.Debug(ctx, "Creating AutoMQ client")
@@ -170,7 +160,7 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		SecretAccessKey: data.BYOCSecretKey.ValueString(),
 	}
 
-	client, err := client.NewClient(ctx, byco_host, token, credential)
+	client, err := client.NewClient(ctx, byco_host, credential)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Create AutoMQ API Client",

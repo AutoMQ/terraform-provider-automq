@@ -20,6 +20,8 @@ const (
 
 var createKafkaInstancePath = "/api/v1/instances"
 var getKafkaInstancePath = "/api/v1/instances/%s"
+var getKafkaInstanceEndpointPath = "/api/v1/instances/%s/endpoints"
+var getKafkaIntegrationPath = "/api/v1/instances/%s/integrations"
 
 func TestAccKafkaInstanceResource(t *testing.T) {
 	ctx := context.Background()
@@ -50,6 +52,17 @@ func TestAccKafkaInstanceResource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	IntegrationResponse := newInstanceIntegrationResponse()
+	IntegrationResponseJson, err := json.Marshal(IntegrationResponse)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	EndpointsResponse := newInstanceEndpointsResponse()
+	EndpointsResponseJson, err := json.Marshal(EndpointsResponse)
+	if err != nil {
+		t.Fatal(err)
+	}
 	createInstanceStub := wiremock.Post(wiremock.
 		URLPathEqualTo(createKafkaInstancePath)).
 		WillReturnResponse(wiremock.NewResponse().WithBody(string(creatingResponseJson)).WithStatus(http.StatusOK))
@@ -60,6 +73,16 @@ func TestAccKafkaInstanceResource(t *testing.T) {
 		WillReturnResponse(wiremock.NewResponse().WithBody(string(availableResponseJson)).WithStatus(http.StatusOK)).
 		InScenario("KafkaInstanceState").WhenScenarioStateIs(wiremock.ScenarioStateStarted)
 	_ = wiremockClient.StubFor(getInstanceStubWhenStarted)
+
+	getKafkaInstanceEndpointStub := wiremock.Get(wiremock.
+		URLPathEqualTo(fmt.Sprintf(getKafkaInstanceEndpointPath, creatingResponse.InstanceID))).
+		WillReturnResponse(wiremock.NewResponse().WithBody(string(EndpointsResponseJson)).WithStatus(http.StatusOK))
+	_ = wiremockClient.StubFor(getKafkaInstanceEndpointStub)
+
+	getInstanceIntegrationStubWhenStarted := wiremock.Get(wiremock.
+		URLPathEqualTo(fmt.Sprintf(getKafkaIntegrationPath, creatingResponse.InstanceID))).
+		WillReturnResponse(wiremock.NewResponse().WithBody(string(IntegrationResponseJson)).WithStatus(http.StatusOK))
+	_ = wiremockClient.StubFor(getInstanceIntegrationStubWhenStarted)
 
 	deleteInstanceStub := wiremock.Delete(wiremock.
 		URLPathEqualTo(fmt.Sprintf(getKafkaInstancePath, creatingResponse.InstanceID))).
@@ -94,23 +117,24 @@ func TestAccKafkaInstanceResource(t *testing.T) {
 func testAccKafkaInstanceResourceConfig(mockServerUrl string) string {
 	return fmt.Sprintf(`
 provider "automq" {
-  byoc_host  = "%s"
-  token = "123456"
-  byoc_access_key = "VLaUIeNYndeOAXjaol32o4UAHvX8A7VE"
-  byoc_secret_key = "CHlRi0hOIA8pAnzW"
+  automq_byoc_host  = "%s"
+  automq_byoc_access_key_id = "VLaUIeNYndeOAXjaol32o4UAHvX8A7VE"
+  automq_byoc_secret_key = "CHlRi0hOIA8pAnzW"
 }
 resource "automq_kafka_instance" "test" {
+  environment_id = "env-1"
   name   = "test"
   description    = "test"
   cloud_provider = "aliyun"
   region         = "cn-hangzhou"
   networks = [{
     zone   = "cn-hangzhou-b"
-    subnet = "vsw-bp14v5eikr8wrgoqje7hr"
+    subnets = ["vsw-bp14v5eikr8wrgoqje7hr"]
   }]
   compute_specs = {
     aku = "6"
   }
+  integrations = ["integration-1"]
 }
 `, mockServerUrl)
 }
@@ -157,4 +181,36 @@ func newInstanceResponse() client.KafkaInstanceResponse {
 	instanceResponse.Spec.Values = []client.Value{{Key: "aku", Value: 6}}
 	instanceResponse.Networks = []client.Network{{Zone: "cn-hangzhou-b", Subnets: []client.Subnet{{Subnet: "vsw-bp14v5eikr8wrgoqje7hr"}}}}
 	return instanceResponse
+}
+
+func newInstanceIntegrationResponse() client.PageNumResultIntegrationVO {
+	return client.PageNumResultIntegrationVO{
+		List: []client.IntegrationVO{
+			{
+				Type:     "cloudwatch",
+				Code:     "integration-1",
+				Name:     "cloudwatch",
+				EndPoint: nil,
+				Config: map[string]interface{}{
+					"namespace": "example",
+				},
+				GmtCreate:   time.Now(),
+				GmtModified: time.Now(),
+			},
+		},
+	}
+}
+
+func newInstanceEndpointsResponse() client.PageNumResultInstanceAccessInfoVO {
+	return client.PageNumResultInstanceAccessInfoVO{
+		List: []client.InstanceAccessInfoVO{
+			{
+				BootstrapServers: "kafka-1:9092",
+				DisplayName:      "kafka-1",
+				NetworkType:      "VPC",
+				Protocol:         "PLAINTEXT",
+				Mechanisms:       "PLAIN",
+			},
+		},
+	}
 }

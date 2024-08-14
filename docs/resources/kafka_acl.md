@@ -18,8 +18,7 @@ Kafka ACL resource
 ### Required
 
 - `environment_id` (String) Target Kafka environment
-- `id` (String) Kafka instance ID
-- `kafka_instance` (String) Target Kafka instance ID
+- `kafka_instance_id` (String) Target Kafka instance ID
 - `operation_group` (String) Operation group for ACL
 - `pattern_type` (String) Pattern type for resource
 - `principal` (String) Principal for ACL
@@ -29,3 +28,7 @@ Kafka ACL resource
 ### Optional
 
 - `permission` (String) Permission type for ACL
+
+### Read-Only
+
+- `id` (String) Kafka instance ID
