@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"terraform-provider-automq/client"
 
@@ -39,9 +40,7 @@ func ExpandFrameworkStringValueList(v basetypes.ListValuable) []string {
 	var output []string
 	if listValue, ok := v.(basetypes.ListValue); ok {
 		for _, value := range listValue.Elements() {
-			if stringValue, ok := value.(types.String); ok {
-				output = append(output, stringValue.ValueString())
-			}
+			output = append(output, value.(types.String).ValueString())
 		}
 	}
 	return output
@@ -56,7 +55,7 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 	request.Spec = client.KafkaInstanceRequestSpec{
 		Template:    "aku",
 		PaymentPlan: client.KafkaInstanceRequestPaymentPlan{PaymentType: "ON_DEMAND", Period: 1, Unit: "MONTH"},
-		Values:      []client.KafkaInstanceRequestValues{{Key: "aku", Value: fmt.Sprintf("%d", instance.ComputeSpecs.Aku.ValueInt64())}},
+		Values:      []client.ConfigItemParam{{Key: "aku", Value: fmt.Sprintf("%d", instance.ComputeSpecs.Aku.ValueInt64())}},
 	}
 	request.Spec.Version = instance.ComputeSpecs.Version.ValueString()
 	for i, network := range instance.Networks {
@@ -68,10 +67,18 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 			}
 		}
 	}
-	request.Integrations = make([]string, len(instance.Integrations))
-	for i, integration := range instance.Integrations {
-		request.Integrations[i] = integration.IntegrationID.String()
+	request.InstanceConfig = client.InstanceConfigParam{}
+	request.InstanceConfig.Configs = make([]client.ConfigItemParam, len(instance.Config.Elements()))
+	i := 0
+	for name, value := range instance.Config.Elements() {
+		config := value.(types.String)
+		request.InstanceConfig.Configs[i] = client.ConfigItemParam{
+			Key:   name,
+			Value: config.ValueString(),
+		}
+		i += 1
 	}
+	request.Integrations = ExpandFrameworkStringValueList(instance.Integrations)
 	request.AclEnabled = instance.ACL.ValueBool()
 }
 
@@ -93,7 +100,44 @@ func FlattenKafkaInstanceModel(instance *client.KafkaInstanceResponse, resource 
 	resource.LastUpdated = timetypes.NewRFC3339TimePointerValue(&instance.GmtModified)
 
 	resource.InstanceStatus = types.StringValue(instance.Status)
+	if integrations != nil {
+		integrationIds := make([]attr.Value, 0, len(integrations))
+		for _, integration := range integrations {
+			integrationIds = append(integrationIds, types.StringValue(integration.Code))
+		}
+		resource.Integrations = types.ListValueMust(types.StringType, integrationIds)
+	}
+	if endpoints != nil {
+		diags := populateInstanceAccessInfoList(context.Background(), resource, endpoints)
+		if diags.HasError() {
+			return diags
+		}
+	}
 	return nil
+}
+
+func populateInstanceAccessInfoList(ctx context.Context, data *KafkaInstanceResourceModel, in []client.InstanceAccessInfoVO) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	instanceAccessInfoList := make([]InstanceAccessInfo, len(in))
+
+	for i, item := range in {
+		instanceAccessInfoList[i] = InstanceAccessInfo{
+			DisplayName:      types.StringValue(item.DisplayName),
+			NetworkType:      types.StringValue(item.NetworkType),
+			Protocol:         types.StringValue(item.Protocol),
+			Mechanisms:       types.StringValue(item.Mechanisms),
+			BootstrapServers: types.StringValue(item.BootstrapServers),
+		}
+	}
+	data.Endpoints, diags = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: map[string]attr.Type{
+		"display_name":      types.StringType,
+		"network_type":      types.StringType,
+		"protocol":          types.StringType,
+		"mechanisms":        types.StringType,
+		"bootstrap_servers": types.StringType,
+	}}, instanceAccessInfoList)
+	return diags
 }
 
 func flattenNetworks(networks []client.Network) ([]NetworkModel, diag.Diagnostics) {

@@ -57,25 +57,12 @@ func (c *Client) DeleteKafkaInstance(instanceId string) error {
 	return nil
 }
 
-func (c *Client) AddInstanceIntegration(instanceId string, param IntegrationInstanceAddParam) error {
-	addRequest, err := json.Marshal(param)
+func (c *Client) ReplaceInstanceIntergation(instanceId string, param IntegrationInstanceParam) error {
+	integrationRequest, err := json.Marshal(param)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest("PUT", c.HostURL+"/api/v1/instances/integrations", strings.NewReader(string(addRequest)))
-	if err != nil {
-		return err
-	}
-	_, err = c.doRequest(req)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (c *Client) RemoveInstanceIntegration(instanceId, integrationId string) error {
-	var localVarPath = c.HostURL + "/api/v1/instances/integrations/" + integrationId
-	req, err := http.NewRequest("DELETE", localVarPath, nil)
+	req, err := http.NewRequest("PUT", c.HostURL+instancePath+"/"+instanceId+"/integrations", strings.NewReader(string(integrationRequest)))
 	if err != nil {
 		return err
 	}

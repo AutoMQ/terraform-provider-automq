@@ -235,11 +235,7 @@ func (v4 Signer) signWithBody(r *http.Request, body io.ReadSeeker, service, regi
 		ctx.handlePresignRemoval()
 	}
 
-	var err error
 	ctx.credValues = v4.Credential
-	if err != nil {
-		return http.Header{}, err
-	}
 
 	if err := ctx.build(v4.DisableHeaderHoisting); err != nil {
 		return nil, err

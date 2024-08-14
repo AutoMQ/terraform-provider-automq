@@ -3,14 +3,15 @@ package client
 import "time"
 
 type KafkaInstanceRequest struct {
-	DisplayName  string                        `json:"displayName"`
-	Description  string                        `json:"description"`
-	Provider     string                        `json:"provider"`
-	Region       string                        `json:"region"`
-	Spec         KafkaInstanceRequestSpec      `json:"spec"`
-	Networks     []KafkaInstanceRequestNetwork `json:"networks"`
-	AclEnabled   bool                          `json:"aclEnabled"`
-	Integrations []string                      `json:"integrations"`
+	DisplayName    string                        `json:"displayName"`
+	Description    string                        `json:"description"`
+	Provider       string                        `json:"provider"`
+	Region         string                        `json:"region"`
+	Spec           KafkaInstanceRequestSpec      `json:"spec"`
+	Networks       []KafkaInstanceRequestNetwork `json:"networks"`
+	AclEnabled     bool                          `json:"aclEnabled"`
+	Integrations   []string                      `json:"integrations"`
+	InstanceConfig InstanceConfigParam           `json:"instanceConfig"`
 }
 
 type InstanceBasicParam struct {
@@ -23,29 +24,24 @@ type InstanceVersionUpgradeParam struct {
 }
 
 type InstanceConfigParam struct {
-	Configs []KafkaInstanceRequestValues `json:"configs"`
+	Configs []ConfigItemParam `json:"configs"`
 }
 
 type SpecificationUpdateParam struct {
-	Values []KafkaInstanceRequestValues `json:"values"`
+	Values []ConfigItemParam `json:"values"`
 }
 
 type KafkaInstanceRequestSpec struct {
 	Version     string                          `json:"version"`
 	Template    string                          `json:"template"`
 	PaymentPlan KafkaInstanceRequestPaymentPlan `json:"paymentPlan"`
-	Values      []KafkaInstanceRequestValues    `json:"values"`
+	Values      []ConfigItemParam               `json:"values"`
 }
 
 type KafkaInstanceRequestPaymentPlan struct {
 	PaymentType string `json:"paymentType"`
 	Period      int    `json:"period"`
 	Unit        string `json:"unit"`
-}
-
-type KafkaInstanceRequestValues struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
 }
 
 type KafkaInstanceRequestNetwork struct {

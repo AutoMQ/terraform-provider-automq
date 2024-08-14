@@ -9,12 +9,14 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-timetypes/timetypes"
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -54,18 +56,18 @@ type KafkaInstanceResource struct {
 
 // KafkaInstanceResourceModel describes the resource data model.
 type KafkaInstanceResourceModel struct {
-	EnvironmentID types.String       `tfsdk:"environment_id"`
-	InstanceID    types.String       `tfsdk:"id"`
-	Name          types.String       `tfsdk:"name"`
-	Description   types.String       `tfsdk:"description"`
-	CloudProvider types.String       `tfsdk:"cloud_provider"`
-	Region        types.String       `tfsdk:"region"`
-	Networks      []NetworkModel     `tfsdk:"networks"`
-	ComputeSpecs  ComputeSpecsModel  `tfsdk:"compute_specs"`
-	Config        []ConfigModel      `tfsdk:"config"`
-	ACL           types.Bool         `tfsdk:"acl"`
-	Integrations  []IntegrationModel `tfsdk:"integrations"`
-	// Endpoints      []InstanceAccessInfo `tfsdk:"endpoints"`
+	EnvironmentID  types.String      `tfsdk:"environment_id"`
+	InstanceID     types.String      `tfsdk:"id"`
+	Name           types.String      `tfsdk:"name"`
+	Description    types.String      `tfsdk:"description"`
+	CloudProvider  types.String      `tfsdk:"cloud_provider"`
+	Region         types.String      `tfsdk:"region"`
+	Networks       []NetworkModel    `tfsdk:"networks"`
+	ComputeSpecs   ComputeSpecsModel `tfsdk:"compute_specs"`
+	Config         types.Map         `tfsdk:"config"`
+	ACL            types.Bool        `tfsdk:"acl"`
+	Integrations   types.List        `tfsdk:"integrations"`
+	Endpoints      types.List        `tfsdk:"endpoints"`
 	CreatedAt      timetypes.RFC3339 `tfsdk:"created_at"`
 	LastUpdated    timetypes.RFC3339 `tfsdk:"last_updated"`
 	InstanceStatus types.String      `tfsdk:"instance_status"`
@@ -73,11 +75,11 @@ type KafkaInstanceResourceModel struct {
 }
 
 type InstanceAccessInfo struct {
-	DisplayName      types.String `tfsdk:"displayName"`
-	NetworkType      types.String `tfsdk:"networkType"`
+	DisplayName      types.String `tfsdk:"display_name"`
+	NetworkType      types.String `tfsdk:"network_type"`
 	Protocol         types.String `tfsdk:"protocol"`
 	Mechanisms       types.String `tfsdk:"mechanisms"`
-	BootstrapServers types.String `tfsdk:"bootstrapServers"`
+	BootstrapServers types.String `tfsdk:"bootstrap_servers"`
 }
 
 type NetworkModel struct {
@@ -88,20 +90,6 @@ type NetworkModel struct {
 type ComputeSpecsModel struct {
 	Aku     types.Int64  `tfsdk:"aku"`
 	Version types.String `tfsdk:"version"`
-}
-
-type KafkaInstanceConfig struct {
-	Config []ConfigModel `tfsdk:"config"`
-}
-
-type ConfigModel struct {
-	Key   types.String `tfsdk:"key"`
-	Value types.String `tfsdk:"value"`
-}
-
-type IntegrationModel struct {
-	IntegrationID   types.String `tfsdk:"integration_id"`
-	IntegrationType types.String `tfsdk:"integration_type"`
 }
 
 func (r *KafkaInstanceResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -157,6 +145,12 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							Required:    true,
 							Description: "The subnets of the network",
 							ElementType: types.StringType,
+							Validators: []validator.List{
+								listvalidator.UniqueValues(),
+								listvalidator.SizeAtLeast(1),
+								listvalidator.SizeAtMost(1),
+							},
+							PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplace()},
 						},
 					},
 				},
@@ -176,34 +170,18 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					},
 				},
 			},
-			"config": schema.SingleNestedAttribute{
-				Optional:    true,
-				Description: "The config of the Kafka instance",
-				Attributes: map[string]schema.Attribute{
-					"key": schema.StringAttribute{
-						Required:    true,
-						Description: "The key of the config",
-					},
-					"value": schema.StringAttribute{
-						Required:    true,
-						Description: "The value of the config",
-					},
-				},
+			"config": schema.MapAttribute{
+				ElementType:         types.StringType,
+				MarkdownDescription: "Additional configuration for the Kafka topic",
+				Optional:            true,
 			},
-			"integrations": schema.ListNestedAttribute{
+			"integrations": schema.ListAttribute{
 				Optional:    true,
 				Description: "The integrations of the Kafka instance",
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"integration_id": schema.StringAttribute{
-							Required:    true,
-							Description: "The ID of the integration",
-						},
-						"integration_type": schema.StringAttribute{
-							Required:    true,
-							Description: "The type of the integration",
-						},
-					},
+				ElementType: types.StringType,
+				Validators: []validator.List{
+					listvalidator.UniqueValues(),
+					listvalidator.SizeAtMost(1),
 				},
 			},
 			"acl": schema.BoolAttribute{
@@ -225,6 +203,34 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				MarkdownDescription: "The status of the Kafka instance",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"endpoints": schema.ListNestedAttribute{
+				Computed:    true,
+				Description: "The endpoints of the Kafka instance",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"display_name": schema.StringAttribute{
+							Computed:    true,
+							Description: "The display name of the endpoint",
+						},
+						"network_type": schema.StringAttribute{
+							Computed:    true,
+							Description: "The network type of the endpoint",
+						},
+						"protocol": schema.StringAttribute{
+							Computed:    true,
+							Description: "The protocol of the endpoint",
+						},
+						"mechanisms": schema.StringAttribute{
+							Computed:    true,
+							Description: "The mechanisms of the endpoint",
+						},
+						"bootstrap_servers": schema.StringAttribute{
+							Computed:    true,
+							Description: "The bootstrap servers of the endpoint",
+						},
+					},
 				},
 			},
 		},
@@ -407,27 +413,75 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		}
 	}
 
-	if len(state.Integrations) != len(plan.Integrations) {
-		needAdd := findDiffIntegration(plan.Integrations, state.Integrations)
-		// Generate API request body from plan
-		param := client.IntegrationInstanceAddParam{}
-		for _, i := range needAdd {
-			param.Codes = append(param.Codes, i.IntegrationID.ValueString())
-		}
-		err = r.client.AddInstanceIntegration(instanceId, param)
-		if err != nil {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to add integrations to Kafka instance %q, got error: %s", instanceId, err))
-			return
-		}
-
-		needRemove := findDiffIntegration(state.Integrations, plan.Integrations)
-		for _, i := range needRemove {
-			err = r.client.RemoveInstanceIntegration(instanceId, i.IntegrationID.ValueString())
-			if err != nil {
-				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to remove integrations from Kafka instance %q, got error: %s", instanceId, err))
+	planConfig := plan.Config
+	stateConfig := state.Config
+	// diff planConfig and stateConfig
+	if !mapsEqual(planConfig, stateConfig) {
+		// 检查是否有被删除的配置
+		for name := range stateConfig.Elements() {
+			if _, ok := planConfig.Elements()[name]; !ok {
+				resp.Diagnostics.AddError("Config Update Error", fmt.Sprintf("Error occurred while updating Kafka Instance %q. "+
+					" At present, we don't support the removal of topic settings from the 'configs' block, "+
+					"meaning you can't reset to the instance's default settings. "+
+					"As a workaround, you can find the default value and manually set the current value to match the default.", instanceId))
 				return
 			}
 		}
+
+		in := client.InstanceConfigParam{}
+		in.Configs = make([]client.ConfigItemParam, len(planConfig.Elements()))
+		i := 0
+		for name, value := range planConfig.Elements() {
+			config := value.(types.String)
+			in.Configs[i] = client.ConfigItemParam{
+				Key:   name,
+				Value: config.ValueString(),
+			}
+			i += 1
+		}
+		_, err := r.client.UpdateKafkaInstanceConfig(instanceId, in)
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update Kafka instance %q, got error: %s", instanceId, err))
+		}
+		resp.Diagnostics.Append(ReadKafkaInstance(r, instanceId, &plan)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	}
+
+	// Check if the Integrations has changed
+	var isIntegrationChanged bool
+	for _, i := range plan.Integrations.Elements() {
+		found := false
+		for _, integration := range state.Integrations.Elements() {
+			if integration == i {
+				found = true
+				break
+			}
+		}
+		if !found {
+			isIntegrationChanged = true
+			break
+		}
+	}
+	if isIntegrationChanged {
+		// Generate API request body from plan
+		param := client.IntegrationInstanceParam{
+			Codes: ExpandFrameworkStringValueList(plan.Integrations),
+		}
+		err = r.client.ReplaceInstanceIntergation(instanceId, param)
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update integrations for Kafka instance %q, got error: %s", instanceId, err))
+			return
+		}
+		// get latest info
+		resp.Diagnostics.Append(ReadKafkaInstance(r, instanceId, &plan)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		// Save updated data into Terraform state
+		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	}
 
 	updateTimeout := r.UpdateTimeout(ctx, state.Timeouts)
@@ -457,9 +511,9 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 	if stateAKU != planAKU {
 		// Generate API request body from plan
 		specUpdate := client.SpecificationUpdateParam{
-			Values: make([]client.KafkaInstanceRequestValues, 1),
+			Values: make([]client.ConfigItemParam, 1),
 		}
-		specUpdate.Values[0] = client.KafkaInstanceRequestValues{
+		specUpdate.Values[0] = client.ConfigItemParam{
 			Key:   "aku",
 			Value: fmt.Sprintf("%d", planAKU),
 		}
@@ -478,23 +532,6 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		// Save updated data into Terraform state
 		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	}
-}
-
-func findDiffIntegration(plan []IntegrationModel, state []IntegrationModel) []IntegrationModel {
-	diff := []IntegrationModel{}
-	for _, p := range plan {
-		found := false
-		for _, s := range state {
-			if p.IntegrationID.ValueString() == s.IntegrationID.ValueString() {
-				found = true
-				break
-			}
-		}
-		if !found {
-			diff = append(diff, p)
-		}
-	}
-	return diff
 }
 
 func ReadKafkaInstance(r *KafkaInstanceResource, instanceId string, plan *KafkaInstanceResourceModel) diag.Diagnostics {
