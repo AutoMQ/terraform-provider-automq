@@ -120,7 +120,7 @@ func TestPresignRequest(t *testing.T) {
 
 	expectedDate := "19700101T000000Z"
 	expectedHeaders := "content-length;content-type;host;x-automq-meta-other-header;x-automq-meta-other-header_with_underscore;x-automq-target"
-	expectedSig := "3ee3989c67f00339fc4e5571df43e2eb426efe5047eda751aac601c07f9d82f6"
+	expectedSig := "e6148c3c06ab8171d42dbab583e00f885f8c92b385302ca6ee19fb5762b5157f"
 	expectedCred := "AKID/19700101/private/dynamodb/cmp_request"
 	expectedTarget := "prefix.Operation"
 
@@ -157,7 +157,7 @@ func TestPresignBodyWithArrayRequest(t *testing.T) {
 
 	expectedDate := "19700101T000000Z"
 	expectedHeaders := "content-length;content-type;host;x-automq-meta-other-header;x-automq-meta-other-header_with_underscore;x-automq-target"
-	expectedSig := "87e7b28557a3ff961cf09e25d99eeadd3990a972d613433eae0f32d4b4cd8daf"
+	expectedSig := "285e9af2c050afa4fd2c5556659613e780349de8a2394f9d93b3ebbefbae611e"
 	expectedCred := "AKID/19700101/private/dynamodb/cmp_request"
 	expectedTarget := "prefix.Operation"
 
@@ -191,7 +191,7 @@ func TestSignRequest(t *testing.T) {
 	}
 
 	expectedDate := "19700101T000000Z"
-	expectedSig := "AUTOMQ-HMAC-SHA256 Credential=AKID/19700101/private/dynamodb/cmp_request, SignedHeaders=content-length;content-type;host;x-automq-date;x-automq-meta-other-header;x-automq-meta-other-header_with_underscore;x-automq-target, Signature=b5ab44d63004fb6968f02bc270d1c6a0b90ff4216b70fec8f0cc30364aef8040"
+	expectedSig := "AUTOMQ-HMAC-SHA256 Credential=AKID/19700101/private/dynamodb/cmp_request, SignedHeaders=content-length;content-type;host;x-automq-date;x-automq-meta-other-header;x-automq-meta-other-header_with_underscore;x-automq-target, Signature=e644d1da39cf657acc94cb0979624d9ccc9e81943a413b49fe924c81ba6653cc"
 
 	q := req.Header
 	if e, a := expectedSig, q.Get("Authorization"); e != a {

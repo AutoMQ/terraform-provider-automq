@@ -4,27 +4,29 @@ terraform {
       source = "hashicorp.com/edu/automq"
     }
   }
-  required_version = ">= 0.1"
 }
 
-variable "env_id" {
-  default = "env-example"
-}
+locals {
+  env_id = "example"
 
-variable "user_password" {
-  default   = "password"
-  sensitive = true
+  automq_byoc_host          = "http://localhost:8081"
+  automq_byoc_access_key_id = "goiNxB8DfbbXJ85B"
+  automq_byoc_secret_key    = "QPyEIcBXHKOBzEeeCZcpNSMRjXtj4XiS"
+
+  instance_deploy_region = "cn-hangzhou"
+  instance_deploy_zone   = "cn-hangzhou-b"
+
+  instance_deploy_subnet = "vsw-bp14v5eikr8wrgoqje7hr"
 }
 
 provider "automq" {
-  byoc_host       = "http://18.140.0.78:8080"
-  byoc_access_key = "SvkmTn8lR0Rcwsd5"
-  byoc_secret_key = "QJ3mbeImC7M4lVWqzptAHsgmzzGU76OD"
+  automq_byoc_host          = local.automq_byoc_host
+  automq_byoc_access_key_id = local.automq_byoc_access_key_id
+  automq_byoc_secret_key    = local.automq_byoc_secret_key
 }
 
 resource "automq_integration" "example" {
-  environment_id = var.env_id
-  endpoint       = "http://localhost:8082"
+  environment_id = local.env_id
   name           = "integration-example"
   type           = "cloudWatch"
   cloudwatch_config = {
@@ -33,39 +35,32 @@ resource "automq_integration" "example" {
 }
 
 resource "automq_kafka_instance" "example" {
-  environment_id = var.env_id
+  environment_id = local.env_id
 
   name           = "automq-example-1"
   description    = "example"
-  cloud_provider = "aws"
-  region         = "ap-southeast-1"
+  cloud_provider = "aliyun"
+  region         = local.instance_deploy_region
   networks = [
     {
-      zone    = "ap-southeast-1a"
-      subnets = ["subnet-056e29f94d11b1414"]
+      zone    = local.instance_deploy_zone
+      subnets = [local.instance_deploy_subnet]
     }
   ]
   compute_specs = {
-    aku     = "6"
+    aku     = "12"
     version = "1.1.0"
   }
-  acl = true
-  integrations = [
-    {
-      integration_id   = automq_integration.example.id
-      integration_type = automq_integration.example.type
-    }
-  ]
-  // TODO 
+  acl          = true
+  integrations = [automq_integration.example.id]
 }
 
 resource "automq_kafka_topic" "example" {
-  environment_id = var.env_id
+  environment_id = local.env_id
 
   kafka_instance_id = automq_kafka_instance.example.id
   name              = "example"
-  partition         = 64
-  compact_strategy  = "DELETE"
+  partition         = 16
   configs = {
     "delete.retention.ms" = "86400"
     "retention.ms"        = "3600000"
@@ -74,15 +69,15 @@ resource "automq_kafka_topic" "example" {
 }
 
 resource "automq_kafka_user" "example" {
-  environment_id = var.env_id
+  environment_id = local.env_id
 
   kafka_instance_id = automq_kafka_instance.example.id
   username          = "automq_kafka_user"
-  password          = var.user_password
+  password          = "automq_kafka_user"
 }
 
 resource "automq_kafka_acl" "example" {
-  environment_id = var.env_id
+  environment_id = local.env_id
 
   kafka_instance_id = automq_kafka_instance.example.id
 

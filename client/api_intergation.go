@@ -1,22 +1,20 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
-	"net/http"
-	"strings"
+	"fmt"
 )
 
-func (c *Client) CreateIntergration(param IntegrationParam) (*IntegrationVO, error) {
-	integrationRequest, err := json.Marshal(param)
-	if err != nil {
-		return nil, err
-	}
-	localVarPath := c.HostURL + "/api/v1/integrations"
-	req, err := http.NewRequest("POST", localVarPath, strings.NewReader(string(integrationRequest)))
-	if err != nil {
-		return nil, err
-	}
-	body, err := c.doRequest(req)
+const (
+	IntegrationPath              = "/api/v1/integrations"
+	GetIntegrationPath           = "/api/v1/integrations/%s"
+	PatchIntegrationPath         = "/api/v1/integrations/%s"
+	ListInstanceIntegrationsPath = "/api/v1/instances/%s/integrations"
+)
+
+func (c *Client) CreateIntergration(ctx context.Context, param IntegrationParam) (*IntegrationVO, error) {
+	body, err := c.Post(ctx, IntegrationPath, param)
 	if err != nil {
 		return nil, err
 	}
@@ -28,13 +26,8 @@ func (c *Client) CreateIntergration(param IntegrationParam) (*IntegrationVO, err
 	return &integration, nil
 }
 
-func (c *Client) GetIntergration(integrationId string) (*IntegrationVO, error) {
-	localVarPath := c.HostURL + "/api/v1/integrations/" + integrationId
-	req, err := http.NewRequest("GET", localVarPath, nil)
-	if err != nil {
-		return nil, err
-	}
-	body, err := c.doRequest(req)
+func (c *Client) GetIntergration(ctx context.Context, integrationId string) (*IntegrationVO, error) {
+	body, err := c.Get(ctx, fmt.Sprintf(GetIntegrationPath, integrationId), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -46,17 +39,11 @@ func (c *Client) GetIntergration(integrationId string) (*IntegrationVO, error) {
 	return &integration, nil
 }
 
-func (c *Client) UpdateIntergration(integrationId string, param *IntegrationParam) (*IntegrationVO, error) {
-	integrationRequest, err := json.Marshal(param)
-	if err != nil {
-		return nil, err
-	}
-	localVarPath := c.HostURL + "/api/v1/integrations/" + integrationId
-	req, err := http.NewRequest("PATCH", localVarPath, strings.NewReader(string(integrationRequest)))
-	if err != nil {
-		return nil, err
-	}
-	body, err := c.doRequest(req)
+func (c *Client) UpdateIntergration(ctx context.Context, integrationId string, param *IntegrationParam) (*IntegrationVO, error) {
+	// make sure the type is not updated
+	param.Type = nil
+
+	body, err := c.Patch(ctx, fmt.Sprintf(PatchIntegrationPath, integrationId), param)
 	if err != nil {
 		return nil, err
 	}
@@ -68,26 +55,16 @@ func (c *Client) UpdateIntergration(integrationId string, param *IntegrationPara
 	return &integration, nil
 }
 
-func (c *Client) DeleteIntergration(integrationId string) error {
-	localVarPath := c.HostURL + "/api/v1/integrations/" + integrationId
-	req, err := http.NewRequest("DELETE", localVarPath, nil)
-	if err != nil {
-		return err
-	}
-	_, err = c.doRequest(req)
+func (c *Client) DeleteIntergration(ctx context.Context, integrationId string) error {
+	_, err := c.Delete(ctx, fmt.Sprintf(PatchIntegrationPath, integrationId))
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *Client) ListInstanceIntegrations(instanceId string) ([]IntegrationVO, error) {
-	localVarPath := c.HostURL + "/api/v1/instances/" + instanceId + "/integrations"
-	req, err := http.NewRequest("GET", localVarPath, nil)
-	if err != nil {
-		return nil, err
-	}
-	body, err := c.doRequest(req)
+func (c *Client) ListInstanceIntegrations(ctx context.Context, instanceId string) ([]IntegrationVO, error) {
+	body, err := c.Get(ctx, fmt.Sprintf(ListInstanceIntegrationsPath, instanceId), nil)
 	if err != nil {
 		return nil, err
 	}

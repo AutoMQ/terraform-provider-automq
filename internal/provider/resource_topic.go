@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"terraform-provider-automq/client"
-	"time"
+	"terraform-provider-automq/internal/framework"
+	"terraform-provider-automq/internal/models"
 
-	"github.com/hashicorp/terraform-plugin-framework-timetypes/timetypes"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -32,18 +32,6 @@ func NewKafkaTopicResource() resource.Resource {
 // KafkaTopicResource defines the resource implementation.
 type KafkaTopicResource struct {
 	client *client.Client
-}
-
-// KafkaTopicResourceModel describes the resource data model.
-type KafkaTopicResourceModel struct {
-	EnvironmentID types.String      `tfsdk:"environment_id"`
-	KafkaInstance types.String      `tfsdk:"kafka_instance_id"`
-	Name          types.String      `tfsdk:"name"`
-	Partition     types.Int64       `tfsdk:"partition"`
-	Configs       types.Map         `tfsdk:"configs"`
-	TopicID       types.String      `tfsdk:"topic_id"`
-	CreatedAt     timetypes.RFC3339 `tfsdk:"created_at"`
-	LastUpdated   timetypes.RFC3339 `tfsdk:"last_updated"`
 }
 
 func (r *KafkaTopicResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -87,14 +75,6 @@ func (r *KafkaTopicResource) Schema(ctx context.Context, req resource.SchemaRequ
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"created_at": schema.StringAttribute{
-				CustomType: timetypes.RFC3339Type{},
-				Computed:   true,
-			},
-			"last_updated": schema.StringAttribute{
-				CustomType: timetypes.RFC3339Type{},
-				Computed:   true,
-			},
 		},
 	}
 }
@@ -103,57 +83,40 @@ func (r *KafkaTopicResource) Configure(ctx context.Context, req resource.Configu
 	if req.ProviderData == nil {
 		return
 	}
-
 	client, ok := req.ProviderData.(*client.Client)
-
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
 			fmt.Sprintf("Expected *http.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
-
 		return
 	}
-
 	r.client = client
 }
 
 func (r *KafkaTopicResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var topic KafkaTopicResourceModel
+	var topic models.KafkaTopicResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &topic)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Generate API request body from plan
 	in := client.TopicCreateParam{}
-	ExpandKafkaTopicResource(topic, &in)
+	models.ExpandKafkaTopicResource(topic, &in)
 
 	instanceId := topic.KafkaInstance.ValueString()
 
-	out, err := r.client.CreateKafkaTopic(instanceId, in)
+	out, err := r.client.CreateKafkaTopic(ctx, instanceId, in)
 	if err != nil {
-		if isNotFoundError(err) {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka topic %q, got error: %s", topic, err))
-		}
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka topic %q, got error: %s", topic, err))
-	}
-	if out == nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka topic %q, got nil response", topic))
-	}
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	resp.Diagnostics.Append(FlattenKafkaTopic(out, &topic)...)
-	if resp.Diagnostics.HasError() {
-		return
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create Kafka topic %q, got error: %s", topic.Name.ValueString(), err))
 	}
 
-	now := time.Now()
-	topic.CreatedAt = timetypes.NewRFC3339TimePointerValue(&now)
-	topic.LastUpdated = timetypes.NewRFC3339TimePointerValue(&now)
+	resp.Diagnostics.Append(models.FlattenKafkaTopic(out, &topic)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	tflog.Trace(ctx, "created a Kafka topic resource")
 
@@ -161,19 +124,18 @@ func (r *KafkaTopicResource) Create(ctx context.Context, req resource.CreateRequ
 }
 
 func (r *KafkaTopicResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data KafkaTopicResourceModel
+	var data models.KafkaTopicResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	topicId := data.TopicID.ValueString()
 	instanceId := data.KafkaInstance.ValueString()
-	out, err := r.client.GetKafkaTopic(instanceId, topicId)
+	out, err := r.client.GetKafkaTopic(ctx, instanceId, topicId)
 	if err != nil {
-		if isNotFoundError(err) {
+		if framework.IsNotFoundError(err) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
@@ -182,34 +144,18 @@ func (r *KafkaTopicResource) Read(ctx context.Context, req resource.ReadRequest,
 	if out == nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka topic %q, got nil response", topicId))
 	}
-	resp.Diagnostics.Append(FlattenKafkaTopic(out, &data)...)
+
+	resp.Diagnostics.Append(models.FlattenKafkaTopic(out, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func ReadKafkaTopic(r *KafkaTopicResource, instanceId, topicId string, data *KafkaTopicResourceModel) diag.Diagnostics {
-	out, err := r.client.GetKafkaTopic(instanceId, topicId)
-	if err != nil {
-		if isNotFoundError(err) {
-			return diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get Kafka topic %q, got error: %s", topicId, err))}
-		}
-		return diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get Kafka topic %q, got error: %s", topicId, err))}
-	}
-	if out == nil {
-		return diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get Kafka topic %q, got nil response", topicId))}
-	}
-	return FlattenKafkaTopic(out, data)
-}
-
 func (r *KafkaTopicResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan KafkaTopicResourceModel
+	var plan, state models.KafkaTopicResourceModel
+
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	var state KafkaTopicResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -225,26 +171,26 @@ func (r *KafkaTopicResource) Update(ctx context.Context, req resource.UpdateRequ
 				" At present, we don't support reducing the number of partitions for a topic. ", topicId))
 			return
 		}
+
 		in := client.TopicPartitionParam{}
 		in.Partition = planPartition
-		err := r.client.UpdateKafkaTopicPartition(instanceId, topicId, in)
+		err := r.client.UpdateKafkaTopicPartition(ctx, instanceId, topicId, in)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update Kafka topic %q, got error: %s", topicId, err))
 		}
-		resp.Diagnostics.Append(ReadKafkaTopic(r, instanceId, topicId, &plan)...)
+
+		resp.Diagnostics.Append(ReadKafkaTopic(ctx, r, instanceId, topicId, &plan)...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		now := time.Now()
-		plan.LastUpdated = timetypes.NewRFC3339TimePointerValue(&now)
-		plan.CreatedAt = state.CreatedAt
 		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	}
+
 	planConfig := plan.Configs
 	stateConfig := state.Configs
-	// diff planConfig and stateConfig
-	if !mapsEqual(planConfig, stateConfig) {
-		// 检查是否有被删除的配置
+	// check if the configs are different
+	if !models.MapsEqual(planConfig, stateConfig) {
+		// check if the planConfig has removed any config
 		for name := range stateConfig.Elements() {
 			if _, ok := planConfig.Elements()[name]; !ok {
 				resp.Diagnostics.AddError("Config Update Error", fmt.Sprintf("Error occurred while updating Kafka TopicId %q. "+
@@ -256,43 +202,34 @@ func (r *KafkaTopicResource) Update(ctx context.Context, req resource.UpdateRequ
 		}
 
 		in := client.TopicConfigParam{}
-		in.Configs = make([]client.ConfigItemParam, len(planConfig.Elements()))
-		i := 0
-		for name, value := range planConfig.Elements() {
-			config := value.(types.String)
-			in.Configs[i] = client.ConfigItemParam{
-				Key:   name,
-				Value: config.ValueString(),
-			}
-			i += 1
-		}
-		_, err := r.client.UpdateKafkaTopicConfig(instanceId, topicId, in)
+		in.Configs = models.CreateConfigFromMapValue(planConfig)
+
+		_, err := r.client.UpdateKafkaTopicConfig(ctx, instanceId, topicId, in)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update Kafka topic %q, got error: %s", topicId, err))
 		}
-		resp.Diagnostics.Append(ReadKafkaTopic(r, instanceId, topicId, &plan)...)
+
+		resp.Diagnostics.Append(ReadKafkaTopic(ctx, r, instanceId, topicId, &plan)...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		now := time.Now()
-		plan.LastUpdated = timetypes.NewRFC3339TimePointerValue(&now)
-		plan.CreatedAt = state.CreatedAt
+
 		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	}
 }
 
 func (r *KafkaTopicResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var state KafkaTopicResourceModel
+	var state models.KafkaTopicResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
 	topicId := state.TopicID.ValueString()
 	instanceId := state.KafkaInstance.ValueString()
 
-	err := r.client.DeleteKafkaTopic(instanceId, topicId)
+	err := r.client.DeleteKafkaTopic(ctx, instanceId, topicId)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete Kafka topic %q, got error: %s", topicId, err))
 	}
@@ -300,4 +237,15 @@ func (r *KafkaTopicResource) Delete(ctx context.Context, req resource.DeleteRequ
 
 func (r *KafkaTopicResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+func ReadKafkaTopic(ctx context.Context, r *KafkaTopicResource, instanceId, topicId string, data *models.KafkaTopicResourceModel) diag.Diagnostics {
+	out, err := r.client.GetKafkaTopic(ctx, instanceId, topicId)
+	if err != nil {
+		return diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get Kafka topic %q, got error: %s", topicId, err))}
+	}
+	if out == nil {
+		return diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get Kafka topic %q, got nil response", topicId))}
+	}
+	return models.FlattenKafkaTopic(out, data)
 }

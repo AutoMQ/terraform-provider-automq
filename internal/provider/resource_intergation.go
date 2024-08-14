@@ -6,6 +6,8 @@ import (
 	"context"
 	"fmt"
 	"terraform-provider-automq/client"
+	"terraform-provider-automq/internal/framework"
+	"terraform-provider-automq/internal/models"
 
 	"github.com/hashicorp/terraform-plugin-framework-timetypes/timetypes"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -15,7 +17,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -30,37 +31,6 @@ func NewIntegrationResource() resource.Resource {
 // IntegrationResource defines the resource implementation.
 type IntegrationResource struct {
 	client *client.Client
-}
-
-// IntegrationResourceModel describes the resource data model.
-type IntegrationResourceModel struct {
-	EnvironmentID    types.String                 `tfsdk:"environment_id"`
-	Name             types.String                 `tfsdk:"name"`
-	Type             types.String                 `tfsdk:"type"`
-	EndPoint         types.String                 `tfsdk:"endpoint"`
-	ID               types.String                 `tfsdk:"id"`
-	KafkaConfig      *KafkaIntegrationConfig      `tfsdk:"kafka_config"`
-	PrometheusConfig *PrometheusIntegrationConfig `tfsdk:"prometheus_config"`
-	CloudWatchConfig *CloudWatchIntegrationConfig `tfsdk:"cloudwatch_config"`
-	CreatedAt        timetypes.RFC3339            `tfsdk:"created_at"`
-	LastUpdated      timetypes.RFC3339            `tfsdk:"last_updated"`
-}
-
-type KafkaIntegrationConfig struct {
-	SecurityProtocol types.String `tfsdk:"security_protocol"`
-	SaslMechanism    types.String `tfsdk:"sasl_mechanism"`
-	SaslUsername     types.String `tfsdk:"sasl_username"`
-	SaslPassword     types.String `tfsdk:"sasl_password"`
-}
-
-type PrometheusIntegrationConfig struct {
-	Username    types.String `tfsdk:"username"`
-	Password    types.String `tfsdk:"password"`
-	BearerToken types.String `tfsdk:"bearer_token"`
-}
-
-type CloudWatchIntegrationConfig struct {
-	NameSpace types.String `tfsdk:"namespace"`
 }
 
 func (r *IntegrationResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -176,106 +146,104 @@ func (r *IntegrationResource) Configure(ctx context.Context, req resource.Config
 	if req.ProviderData == nil {
 		return
 	}
-
 	client, ok := req.ProviderData.(*client.Client)
-
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
 			fmt.Sprintf("Expected *http.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
-
 		return
 	}
-
 	r.client = client
 }
 
 func (r *IntegrationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var integration IntegrationResourceModel
+	var integration models.IntegrationResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &integration)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Generate API request to create the integration.
 	in := client.IntegrationParam{}
-	resp.Diagnostics.Append(ExpandIntergationResource(&in, integration))
+	resp.Diagnostics.Append(models.ExpandIntergationResource(&in, integration))
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	out, err := r.client.CreateIntergration(in)
+	out, err := r.client.CreateIntergration(ctx, in)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create integration", err.Error())
 		return
 	}
 
-	FlattenIntergrationResource(out, &integration)
+	models.FlattenIntergrationResource(out, &integration)
 
 	tflog.Trace(ctx, "created an integration resource")
 	resp.Diagnostics.Append(resp.State.Set(ctx, &integration)...)
 }
 
 func (r *IntegrationResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data IntegrationResourceModel
+	var data models.IntegrationResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
 	intergationId := data.ID.ValueString()
-	out, err := r.client.GetIntergration(intergationId)
+	out, err := r.client.GetIntergration(ctx, intergationId)
 	if err != nil {
-		if isNotFoundError(err) {
+		if framework.IsNotFoundError(err) {
 			resp.State.RemoveResource(ctx)
+			return
 		}
 		resp.Diagnostics.AddError("Failed to read integration", err.Error())
 		return
 	}
-	FlattenIntergrationResource(out, &data)
+
+	models.FlattenIntergrationResource(out, &data)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *IntegrationResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var state, plan IntegrationResourceModel
+	var state, plan models.IntegrationResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
 	// Generate API request to update the integration.
 	intergationId := state.ID.ValueString()
 	in := client.IntegrationParam{}
-	resp.Diagnostics.Append(ExpandIntergationResource(&in, plan))
-	in.Type = nil
-	out, err := r.client.UpdateIntergration(intergationId, &in)
+	resp.Diagnostics.Append(models.ExpandIntergationResource(&in, plan))
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	out, err := r.client.UpdateIntergration(ctx, intergationId, &in)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update integration", err.Error())
 		return
 	}
-	FlattenIntergrationResource(out, &plan)
+	models.FlattenIntergrationResource(out, &plan)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *IntegrationResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data IntegrationResourceModel
+	var data models.IntegrationResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
 	IntegrationId := data.ID.ValueString()
-	err := r.client.DeleteIntergration(IntegrationId)
+	err := r.client.DeleteIntergration(ctx, IntegrationId)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete integration", err.Error())
 		return

@@ -4,18 +4,24 @@ terraform {
       source = "hashicorp.com/edu/automq"
     }
   }
-  required_version = ">= 0.1"
+}
+
+locals {
+  env_id = "example"
+
+  automq_byoc_host          = "http://localhost:8081"
+  automq_byoc_access_key_id = "RSaIMzrFC0kAmS1x"
+  automq_byoc_secret_key    = "msnGqOuaV5gblXPvkWfxg7Ao7Nq2iyMo"
 }
 
 provider "automq" {
-  byoc_host       = "http://localhost:8081"
-  byoc_access_key = "VLaUIeNYndeOAXjaol32o4UAHvX8A7VE"
-  byoc_secret_key = "CHlRi0hOIA8pAnzW"
-  token           = "123456"
+  automq_byoc_host          = local.automq_byoc_host
+  automq_byoc_access_key_id = local.automq_byoc_access_key_id
+  automq_byoc_secret_key    = local.automq_byoc_secret_key
 }
 
 resource "automq_kafka_topic" "example" {
-  environment_id    = "example123"
+  environment_id    = local.env_id
   kafka_instance_id = "kf-gm4q8tk1wqlavkg2"
   name              = "example"
   partition         = 72

@@ -1,23 +1,20 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
-	"net/http"
-	"strings"
+	"fmt"
+)
+
+const (
+	KafkaUserPath       = "/api/v1/instances/%s/users"
+	DeleteKafkaUserPath = "/api/v1/instances/%s/users/%s"
 )
 
 // CreateUser creates a new user
-func (c *Client) CreateKafkaUser(instanceId string, user InstanceUserCreateParam) (*KafkaUserVO, error) {
-	userRequest, err := json.Marshal(user)
-	if err != nil {
-		return nil, err
-	}
-	var localVarPath = c.HostURL + "/api/v1/instances/" + instanceId + "/users"
-	req, err := http.NewRequest("POST", localVarPath, strings.NewReader(string(userRequest)))
-	if err != nil {
-		return nil, err
-	}
-	body, err := c.doRequest(req)
+func (c *Client) CreateKafkaUser(ctx context.Context, instanceId string, user InstanceUserCreateParam) (*KafkaUserVO, error) {
+	path := fmt.Sprintf(KafkaUserPath, instanceId)
+	body, err := c.Post(ctx, path, user)
 	if err != nil {
 		return nil, err
 	}
@@ -29,27 +26,20 @@ func (c *Client) CreateKafkaUser(instanceId string, user InstanceUserCreateParam
 	return &newuser, nil
 }
 
-func (c *Client) DeleteKafkaUser(instanceId string, userName string) error {
-	var localVarPath = c.HostURL + "/api/v1/instances/" + instanceId + "/users/" + userName
-	req, err := http.NewRequest("DELETE", localVarPath, nil)
-	if err != nil {
-		return err
-	}
-	_, err = c.doRequest(req)
+func (c *Client) DeleteKafkaUser(ctx context.Context, instanceId string, userName string) error {
+	path := fmt.Sprintf(DeleteKafkaUserPath, instanceId, userName)
+	_, err := c.Delete(ctx, path)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *Client) GetKafkaUser(instanceId string, userName string) (*KafkaUserVO, error) {
-	var localVarPath = c.HostURL + "/api/v1/instances/" + instanceId + "/users"
-	localVarPath = localVarPath + "?userNames=" + userName
-	req, err := http.NewRequest("GET", localVarPath, nil)
-	if err != nil {
-		return nil, err
-	}
-	body, err := c.doRequest(req)
+func (c *Client) GetKafkaUser(ctx context.Context, instanceId string, userName string) (*KafkaUserVO, error) {
+	path := fmt.Sprintf(KafkaUserPath, instanceId)
+	queryParams := make(map[string]string)
+	queryParams["userNames"] = userName
+	body, err := c.Get(ctx, path, queryParams)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +49,7 @@ func (c *Client) GetKafkaUser(instanceId string, userName string) (*KafkaUserVO,
 		return nil, err
 	}
 	if len(userPage.List) == 0 {
-		return nil, nil
+		return nil, &ErrorResponse{Code: 404, ErrorMessage: "user not found"}
 	}
 	user := userPage.List[0]
 	return &user, nil

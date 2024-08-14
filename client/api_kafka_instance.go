@@ -1,22 +1,26 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"strings"
 )
 
-func (c *Client) CreateKafkaInstance(kafka KafkaInstanceRequest) (*KafkaInstanceResponse, error) {
-	kafkaRequest, err := json.Marshal(kafka)
-	if err != nil {
-		return nil, err
-	}
-	req, err := http.NewRequest("POST", c.HostURL+"/api/v1/instances", strings.NewReader(string(kafkaRequest)))
-	if err != nil {
-		return nil, err
-	}
-	body, err := c.doRequest(req)
+const (
+	InstancePath                   = "/api/v1/instances"
+	GetInstancePath                = "/api/v1/instances/%s"
+	DeleteInstancePath             = "/api/v1/instances/%s"
+	ReplaceInstanceIntergationPath = "/api/v1/instances/%s/integrations"
+	TurnOnInstanceAclPath          = "/api/v1/instances/%s/acls:enable"
+	GetInstanceEndpointsPath       = "/api/v1/instances/%s/endpoints"
+	UpdateInstanceBasicInfoPath    = "/api/v1/instances/%s/basic"
+	UpdateInstanceVersionPath      = "/api/v1/instances/%s/versions/%s"
+	UpdateInstanceConfigPath       = "/api/v1/instances/%s/configurations"
+	UpdateInstanceComputeSpecsPath = "/api/v1/instances/%s/spec"
+)
+
+func (c *Client) CreateKafkaInstance(ctx context.Context, kafka KafkaInstanceRequest) (*KafkaInstanceResponse, error) {
+	body, err := c.Post(ctx, InstancePath, kafka)
 	if err != nil {
 		return nil, err
 	}
@@ -28,69 +32,48 @@ func (c *Client) CreateKafkaInstance(kafka KafkaInstanceRequest) (*KafkaInstance
 	return &newkafka, nil
 }
 
-func (c *Client) GetKafkaInstance(instanceId string) (*KafkaInstanceResponse, error) {
-	req, err := http.NewRequest("GET", c.HostURL+"/api/v1/instances/"+instanceId, nil)
-	if err != nil {
-		return nil, fmt.Errorf("error creating request: %v", err)
-	}
-	body, err := c.doRequest(req)
+func (c *Client) GetKafkaInstance(ctx context.Context, instanceId string) (*KafkaInstanceResponse, error) {
+	body, err := c.Get(ctx, fmt.Sprintf(GetInstancePath, instanceId), nil)
 	if err != nil {
 		return nil, err
 	}
 	instance := KafkaInstanceResponse{}
 	err = json.Unmarshal(body, &instance)
 	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+		return nil, err
 	}
 	return &instance, nil
 }
 
-func (c *Client) DeleteKafkaInstance(instanceId string) error {
-	req, err := http.NewRequest("DELETE", c.HostURL+instancePath+"/"+instanceId, nil)
-	if err != nil {
-		return err
-	}
-	_, err = c.doRequest(req)
+func (c *Client) DeleteKafkaInstance(ctx context.Context, instanceId string) error {
+	_, err := c.Delete(ctx, fmt.Sprintf(DeleteInstancePath, instanceId))
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *Client) ReplaceInstanceIntergation(instanceId string, param IntegrationInstanceParam) error {
-	integrationRequest, err := json.Marshal(param)
-	if err != nil {
-		return err
-	}
-	req, err := http.NewRequest("PUT", c.HostURL+instancePath+"/"+instanceId+"/integrations", strings.NewReader(string(integrationRequest)))
-	if err != nil {
-		return err
-	}
-	_, err = c.doRequest(req)
+func (c *Client) ReplaceInstanceIntergation(ctx context.Context, instanceId string, param IntegrationInstanceParam) error {
+	path := fmt.Sprintf(ReplaceInstanceIntergationPath, instanceId)
+	_, err := c.Put(ctx, path, param)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *Client) TurnOnInstanceAcl(instanceId string) error {
-	req, err := http.NewRequest("POST", c.HostURL+instancePath+"/"+instanceId+"/acls:enable", nil)
-	if err != nil {
-		return err
-	}
-	_, err = c.doRequest(req)
+func (c *Client) TurnOnInstanceAcl(ctx context.Context, instanceId string) error {
+	path := fmt.Sprintf(TurnOnInstanceAclPath, instanceId)
+	_, err := c.Post(ctx, path, nil)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *Client) GetInstanceEndpoints(instanceId string) ([]InstanceAccessInfoVO, error) {
-	req, err := http.NewRequest("GET", c.HostURL+instancePath+"/"+instanceId+"/endpoints", nil)
-	if err != nil {
-		return nil, err
-	}
-	body, err := c.doRequest(req)
+func (c *Client) GetInstanceEndpoints(ctx context.Context, instanceId string) ([]InstanceAccessInfoVO, error) {
+	path := fmt.Sprintf(GetInstanceEndpointsPath, instanceId)
+	body, err := c.Get(ctx, path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -102,33 +85,25 @@ func (c *Client) GetInstanceEndpoints(instanceId string) ([]InstanceAccessInfoVO
 	return endpoints.List, nil
 }
 
-func (c *Client) UpdateKafkaInstanceBasicInfo(instanceId string, updateParam InstanceBasicParam) (*KafkaInstanceResponse, error) {
-	return c.updateInstance(instanceId, updateParam, "/basic")
+func (c *Client) UpdateKafkaInstanceBasicInfo(ctx context.Context, instanceId string, updateParam InstanceBasicParam) (*KafkaInstanceResponse, error) {
+	return c.updateInstance(ctx, instanceId, updateParam, UpdateInstanceBasicInfoPath)
 }
 
-func (c *Client) UpdateKafkaInstanceVersion(instanceId string, version string) (*KafkaInstanceResponse, error) {
+func (c *Client) UpdateKafkaInstanceVersion(ctx context.Context, instanceId string, version string) (*KafkaInstanceResponse, error) {
 	updateParam := InstanceVersionUpgradeParam{Version: version}
-	return c.updateInstance(instanceId, updateParam, "/versions/"+version)
+	return c.updateInstance(ctx, instanceId, updateParam, UpdateInstanceVersionPath)
 }
 
-func (c *Client) UpdateKafkaInstanceConfig(instanceId string, updateParam InstanceConfigParam) (*KafkaInstanceResponse, error) {
-	return c.updateInstance(instanceId, updateParam, "/configurations")
+func (c *Client) UpdateKafkaInstanceConfig(ctx context.Context, instanceId string, updateParam InstanceConfigParam) (*KafkaInstanceResponse, error) {
+	return c.updateInstance(ctx, instanceId, updateParam, UpdateInstanceConfigPath)
 }
 
-func (c *Client) UpdateKafkaInstanceComputeSpecs(instanceId string, updateParam SpecificationUpdateParam) (*KafkaInstanceResponse, error) {
-	return c.updateInstance(instanceId, updateParam, "/spec")
+func (c *Client) UpdateKafkaInstanceComputeSpecs(ctx context.Context, instanceId string, updateParam SpecificationUpdateParam) (*KafkaInstanceResponse, error) {
+	return c.updateInstance(ctx, instanceId, updateParam, UpdateInstanceComputeSpecsPath)
 }
 
-func (c *Client) updateInstance(instanceId string, updateParam interface{}, path string) (*KafkaInstanceResponse, error) {
-	updateRequest, err := json.Marshal(updateParam)
-	if err != nil {
-		return nil, err
-	}
-	req, err := http.NewRequest("PATCH", c.HostURL+instancePath+"/"+instanceId+path, strings.NewReader(string(updateRequest)))
-	if err != nil {
-		return nil, err
-	}
-	body, err := c.doRequest(req)
+func (c *Client) updateInstance(ctx context.Context, instanceId string, updateParam interface{}, path string) (*KafkaInstanceResponse, error) {
+	body, err := c.Patch(ctx, fmt.Sprintf(path, instanceId), updateParam)
 	if err != nil {
 		return nil, err
 	}
