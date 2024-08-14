@@ -27,14 +27,15 @@ AutoMQ Kafka instance resource
 ### Optional
 
 - `acl` (Boolean) The ACL of the Kafka instance
-- `config` (Attributes) The config of the Kafka instance (see [below for nested schema](#nestedatt--config))
+- `config` (Map of String) Additional configuration for the Kafka topic
 - `description` (String) The description of the Kafka instance
-- `integrations` (Attributes List) The integrations of the Kafka instance (see [below for nested schema](#nestedatt--integrations))
+- `integrations` (List of String) The integrations of the Kafka instance
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 
 ### Read-Only
 
 - `created_at` (String)
+- `endpoints` (Attributes List) The endpoints of the Kafka instance (see [below for nested schema](#nestedatt--endpoints))
 - `id` (String) The ID of the Kafka instance
 - `instance_status` (String) The status of the Kafka instance
 - `last_updated` (String)
@@ -60,24 +61,6 @@ Required:
 - `zone` (String) The zone of the network
 
 
-<a id="nestedatt--config"></a>
-### Nested Schema for `config`
-
-Required:
-
-- `key` (String) The key of the config
-- `value` (String) The value of the config
-
-
-<a id="nestedatt--integrations"></a>
-### Nested Schema for `integrations`
-
-Required:
-
-- `integration_id` (String) The ID of the integration
-- `integration_type` (String) The type of the integration
-
-
 <a id="nestedblock--timeouts"></a>
 ### Nested Schema for `timeouts`
 
@@ -85,3 +68,15 @@ Optional:
 
 - `create` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
 - `delete` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.
+
+
+<a id="nestedatt--endpoints"></a>
+### Nested Schema for `endpoints`
+
+Read-Only:
+
+- `bootstrap_servers` (String) The bootstrap servers of the endpoint
+- `display_name` (String) The display name of the endpoint
+- `mechanisms` (String) The mechanisms of the endpoint
+- `network_type` (String) The network type of the endpoint
+- `protocol` (String) The protocol of the endpoint
