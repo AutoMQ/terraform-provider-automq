@@ -6,6 +6,8 @@ import (
 	"context"
 	"fmt"
 	"terraform-provider-automq/client"
+	"terraform-provider-automq/internal/framework"
+	"terraform-provider-automq/internal/models"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -15,7 +17,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -30,19 +31,6 @@ func NewKafkaAclResource() resource.Resource {
 // KafkaAclResource defines the resource implementation.
 type KafkaAclResource struct {
 	client *client.Client
-}
-
-// KafkaAclResourceModel describes the resource data model.
-type KafkaAclResourceModel struct {
-	EnvironmentID  types.String `tfsdk:"environment_id"`
-	KafkaInstance  types.String `tfsdk:"kafka_instance_id"`
-	ID             types.String `tfsdk:"id"`
-	ResourceType   types.String `tfsdk:"resource_type"`
-	ResourceName   types.String `tfsdk:"resource_name"`
-	PatternType    types.String `tfsdk:"pattern_type"`
-	Principal      types.String `tfsdk:"principal"`
-	OperationGroup types.String `tfsdk:"operation_group"`
-	Permission     types.String `tfsdk:"permission"`
 }
 
 func (r *KafkaAclResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -123,23 +111,19 @@ func (r *KafkaAclResource) Configure(ctx context.Context, req resource.Configure
 	if req.ProviderData == nil {
 		return
 	}
-
 	client, ok := req.ProviderData.(*client.Client)
-
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
 			fmt.Sprintf("Expected *http.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
-
 		return
 	}
-
 	r.client = client
 }
 
 func (r *KafkaAclResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan KafkaAclResourceModel
+	var plan models.KafkaAclResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 
@@ -150,22 +134,22 @@ func (r *KafkaAclResource) Create(ctx context.Context, req resource.CreateReques
 	instance := plan.KafkaInstance.ValueString()
 	param := client.KafkaAclBindingParam{}
 	// Expand the Kafka ACL resource
-	ExpandKafkaACLResource(plan, &param)
+	models.ExpandKafkaACLResource(plan, &param)
 	in := client.KafkaAclBindingParams{Params: []client.KafkaAclBindingParam{param}}
-	out, err := r.client.CreateKafkaAcls(instance, in)
+	out, err := r.client.CreateKafkaAcls(ctx, instance, in)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to Create Kafka ACL", err.Error())
 		return
 	}
 	// flatten the response and set the ID to the state
-	FlattenKafkaACLResource(out, &plan)
+	models.FlattenKafkaACLResource(out, &plan)
 
 	tflog.Trace(ctx, "created a Kafka ACL resource")
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *KafkaAclResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state KafkaAclResourceModel
+	var state models.KafkaAclResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
@@ -174,16 +158,16 @@ func (r *KafkaAclResource) Read(ctx context.Context, req resource.ReadRequest, r
 	}
 	aclId := state.ID.ValueString()
 	instance := state.KafkaInstance.ValueString()
-	out, err := r.client.GetKafkaAcls(instance, aclId)
+	out, err := r.client.GetKafkaAcls(ctx, instance, aclId)
 	if err != nil {
-		if isNotFoundError(err) {
+		if framework.IsNotFoundError(err) {
 			resp.State.RemoveResource(ctx)
 		}
 		resp.Diagnostics.AddError("Failed to read Kafka ACL", err.Error())
 		return
 	}
 	// flatten the response and set the state
-	FlattenKafkaACLResource(out, &state)
+	models.FlattenKafkaACLResource(out, &state)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -192,7 +176,7 @@ func (r *KafkaAclResource) Update(ctx context.Context, req resource.UpdateReques
 }
 
 func (r *KafkaAclResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data KafkaAclResourceModel
+	var data models.KafkaAclResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
@@ -200,10 +184,10 @@ func (r *KafkaAclResource) Delete(ctx context.Context, req resource.DeleteReques
 		return
 	}
 	param := client.KafkaAclBindingParam{}
-	ExpandKafkaACLResource(data, &param)
+	models.ExpandKafkaACLResource(data, &param)
 	in := client.KafkaAclBindingParams{Params: []client.KafkaAclBindingParam{param}}
 	instance := data.KafkaInstance.ValueString()
-	err := r.client.DeleteKafkaAcls(instance, in)
+	err := r.client.DeleteKafkaAcls(ctx, instance, in)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete Kafka ACL", err.Error())
 		return

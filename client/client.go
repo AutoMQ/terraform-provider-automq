@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"terraform-provider-automq/client/signer"
 	"time"
 )
@@ -58,26 +59,71 @@ func NewClient(ctx context.Context, host string, credentials AuthCredentials) (*
 			SecretAccessKey: credentials.SecretAccessKey,
 		}),
 	}
-	if err := c.checkAuth(); err != nil {
-		return nil, err
-	}
 	return c, nil
 }
 
-func (c *Client) doRequest(req *http.Request) ([]byte, error) {
+func (c *Client) Post(ctx context.Context, path string, body interface{}) ([]byte, error) {
+	b, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	return c.doRequest(ctx, "POST", path, strings.NewReader(string(b)))
+}
+
+func (c *Client) Get(ctx context.Context, path string, queryParams map[string]string) ([]byte, error) {
+	if queryParams != nil {
+		path += "?" + buildQueryParams(queryParams)
+	}
+	return c.doRequest(ctx, "GET", path, nil)
+}
+
+func (c *Client) Delete(ctx context.Context, path string) ([]byte, error) {
+	return c.doRequest(ctx, "DELETE", path, nil)
+}
+
+func (c *Client) Put(ctx context.Context, path string, body interface{}) ([]byte, error) {
+	b, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	return c.doRequest(ctx, "PUT", path, strings.NewReader(string(b)))
+}
+
+func (c *Client) Patch(ctx context.Context, path string, body interface{}) ([]byte, error) {
+	b, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	return c.doRequest(ctx, "PATCH", path, strings.NewReader(string(b)))
+}
+
+func buildQueryParams(queryParams map[string]string) string {
+	query := ""
+	for key, value := range queryParams {
+		query += key + "=" + value + "&"
+	}
+	return query
+}
+
+func (c *Client) doRequest(_ context.Context, method, path string, body io.Reader) ([]byte, error) {
+	req, err := http.NewRequest(method, c.HostURL+path, body)
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept-Language", "en")
+
 	var seeker io.ReadSeeker
-	if sr, ok := req.Body.(io.ReadSeeker); ok {
+	if sr, ok := body.(io.ReadSeeker); ok {
 		seeker = sr
-	} else if rc, ok := req.Body.(io.Reader); ok {
+	} else if rc, ok := body.(io.ReadCloser); ok {
 		data, err := io.ReadAll(rc)
 		if err != nil {
 			return nil, &ErrorResponse{Code: 0, ErrorMessage: "Error reading request body", Err: err}
 		}
 		seeker = bytes.NewReader(data)
 	}
-	_, err := c.Signer.Sign(req, seeker, "cmp", "private", time.Now())
+	_, err = c.Signer.Sign(req, seeker, "cmp", "private", time.Now())
 	if err != nil {
 		return nil, &ErrorResponse{Code: 0, ErrorMessage: "Error signing request", Err: err}
 	}
@@ -93,19 +139,18 @@ func (c *Client) doRequest(req *http.Request) ([]byte, error) {
 		}
 	}()
 
-	body, err := io.ReadAll(res.Body)
+	data, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, &ErrorResponse{Code: res.StatusCode, ErrorMessage: "Error reading response body", Err: err}
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		apiError := APIError{}
-		err = json.Unmarshal(body, &apiError)
+		err = json.Unmarshal(data, &apiError)
 		if err != nil {
-			return nil, &ErrorResponse{Code: res.StatusCode, ErrorMessage: string(body), Err: err}
+			return nil, &ErrorResponse{Code: res.StatusCode, ErrorMessage: string(data), Err: err}
 		}
 		return nil, &ErrorResponse{Code: res.StatusCode, APIError: apiError}
 	}
-
-	return body, nil
+	return data, nil
 }

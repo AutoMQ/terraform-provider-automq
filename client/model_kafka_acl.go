@@ -1,5 +1,10 @@
 package client
 
+import (
+	"fmt"
+	"strings"
+)
+
 // KafkaAclBindingVO struct for KafkaAclBindingVO
 type KafkaAclBindingVO struct {
 	AccessControl   *KafkaAccessControlVO   `json:"accessControl,omitempty"`
@@ -61,4 +66,31 @@ type PageNumResultKafkaAclBindingVO struct {
 	Total     *int64              `json:"total,omitempty"`
 	List      []KafkaAclBindingVO `json:"list,omitempty"`
 	TotalPage *int64              `json:"totalPage,omitempty"`
+}
+
+func GenerateAclID(param interface{}) (string, error) {
+	switch p := param.(type) {
+	case KafkaAclBindingParam:
+		return fmt.Sprintf("%s|%s|%s|%s",
+			p.AccessControlParam.User,
+			p.ResourcePatternParam.ResourceType,
+			p.AccessControlParam.PermissionType,
+			p.ResourcePatternParam.Name), nil
+	case KafkaAclBindingVO:
+		return fmt.Sprintf("%s|%s|%s|%s",
+			p.AccessControl.User,
+			p.ResourcePattern.ResourceType,
+			p.AccessControl.PermissionType,
+			p.ResourcePattern.Name), nil
+	default:
+		return "", fmt.Errorf("unsupported type %T", p)
+	}
+}
+
+func ParseAclID(aclID string) (user string, resourceType string, permissionType string, resourceName string, err error) {
+	parts := strings.Split(aclID, "|")
+	if len(parts) != 4 {
+		return "", "", "", "", fmt.Errorf("invalid aclID")
+	}
+	return parts[0], parts[1], parts[2], parts[3], nil
 }

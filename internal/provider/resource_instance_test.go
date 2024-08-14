@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"terraform-provider-automq/client"
+	"terraform-provider-automq/internal/models"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/wiremock/go-wiremock"
@@ -143,7 +144,7 @@ resource "automq_kafka_instance" "test" {
 func testAccKafkaInstanceResponseInCreating() client.KafkaInstanceResponse {
 	instanceResponse := newInstanceResponse()
 
-	instanceResponse.Status = stateCreating
+	instanceResponse.Status = models.StateCreating
 	instanceResponse.GmtCreate = time.Now()
 	instanceResponse.GmtModified = time.Now()
 	return instanceResponse
@@ -153,7 +154,7 @@ func testAccKafkaInstanceResponseInCreating() client.KafkaInstanceResponse {
 func testAccKafkaInstanceResponseInAvailable() client.KafkaInstanceResponse {
 	instanceResponse := newInstanceResponse()
 
-	instanceResponse.Status = stateAvailable
+	instanceResponse.Status = models.StateAvailable
 	instanceResponse.GmtModified = time.Now()
 	return instanceResponse
 }
@@ -162,7 +163,7 @@ func testAccKafkaInstanceResponseInAvailable() client.KafkaInstanceResponse {
 func testAccKafkaInstanceResponseInDeleting() client.KafkaInstanceResponse {
 	instanceResponse := newInstanceResponse()
 
-	instanceResponse.Status = stateDeleting
+	instanceResponse.Status = models.StateDeleting
 	instanceResponse.GmtModified = time.Now()
 	return instanceResponse
 }
