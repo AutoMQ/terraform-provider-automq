@@ -35,27 +35,27 @@ func (r *KafkaInstanceDataSource) Metadata(ctx context.Context, req datasource.M
 func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		// This description is used by the documentation generator and the language server.
-		MarkdownDescription: "AutoMQ Kafka instance resource",
+		MarkdownDescription: "![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>Using the `automq_kafka_instance` resource type, you can create and manage Kafka instances, where each instance represents a physical cluster.",
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
-				MarkdownDescription: "Target Kafka environment",
+				MarkdownDescription: "Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.",
 				Required:            true,
 			},
 			"id": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "The ID of the Kafka instance",
+				MarkdownDescription: "The ID of the Kafka instance.",
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription: "The name of the Kafka instance",
+				MarkdownDescription: "The name of the Kafka instance. It can contain letters (a-z or A-Z), numbers (0-9), underscores (_), and hyphens (-), with a length limit of 3 to 64 characters.",
 				Optional:            true,
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription: "The description of the Kafka instance",
+				MarkdownDescription: "The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.",
 				Computed:            true,
 			},
 			"cloud_provider": schema.StringAttribute{
-				MarkdownDescription: "The cloud provider of the Kafka instance",
+				MarkdownDescription: "The cloud provider of kafka instance. Currently, 'aws' is supported.",
 				Computed:            true,
 			},
 			"region": schema.StringAttribute{
@@ -64,16 +64,16 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 			},
 			"networks": schema.ListNestedAttribute{
 				Computed:    true,
-				Description: "The networks of the Kafka instance",
+				Description: "The networks of the Kafka instance. Currently, you can get one availability zone or three availability zones.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"zone": schema.StringAttribute{
 							Computed:    true,
-							Description: "The zone of the network",
+							Description: "The availability zone ID of the cloud provider.",
 						},
 						"subnets": schema.ListAttribute{
 							Computed:    true,
-							Description: "The subnets of the network",
+							Description: "The subnets under the corresponding availability zone for deploying the instance. Currently, only one subnet can be set for each availability zone.",
 							ElementType: types.StringType,
 							Validators: []validator.List{
 								listvalidator.UniqueValues(),
@@ -86,31 +86,31 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 			},
 			"compute_specs": schema.SingleNestedAttribute{
 				Computed:    true,
-				Description: "The compute specs of the Kafka instance",
+				Description: "The compute specs of the instance, contains aku and version.",
 				Attributes: map[string]schema.Attribute{
 					"aku": schema.Int64Attribute{
 						Computed:    true,
-						Description: "The template of the compute specs",
+						Description: "AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc).",
 					},
 					"version": schema.StringAttribute{
 						Computed:    true,
-						Description: "The version of the compute specs",
+						Description: "The software version of AutoMQ instance.",
 					},
 				},
 			},
 			"configs": schema.MapAttribute{
 				ElementType:         types.StringType,
-				MarkdownDescription: "Additional configuration for the Kafka topic",
+				MarkdownDescription: "Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/release-notes).",
 				Computed:            true,
 			},
 			"integrations": schema.ListAttribute{
 				Computed:    true,
-				Description: "The integrations of the Kafka instance",
+				Description: "List of All Integrations Associated with the Current Instance. AutoMQ supports integration with external products like `prometheus` and `cloudwatch`, forwarding instance Metrics data to Prometheus and CloudWatch.",
 				ElementType: types.StringType,
 			},
 			"acl": schema.BoolAttribute{
 				Computed:    true,
-				Description: "The ACL of the Kafka instance",
+				Description: "The ACL status the Kafka instance.",
 			},
 			"created_at": schema.StringAttribute{
 				CustomType: timetypes.RFC3339Type{},
@@ -122,32 +122,32 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 			},
 			"instance_status": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "The status of the Kafka instance",
+				MarkdownDescription: "The status of instance. Currently supports statuses: `Creating`, `Running`, `Deleting`, `Changing` and `Abnormal`. For definitions and limitations of each status, please refer to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/manage-instances#lifecycle).",
 			},
 			"endpoints": schema.ListNestedAttribute{
 				Computed:    true,
-				Description: "The endpoints of the Kafka instance",
+				Description: "The bootstrap endpoints of instance. AutoMQ supports multiple access protocols; therefore, the Endpoint is a list.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"display_name": schema.StringAttribute{
 							Computed:    true,
-							Description: "The display name of the endpoint",
+							Description: "The name of the endpoint",
 						},
 						"network_type": schema.StringAttribute{
 							Computed:    true,
-							Description: "The network type of the endpoint",
+							Description: "The network type of endpoint. Currently support `VPC` and `INTERNET`. `VPC` type is generally used for internal network access, while `INTERNET` type is used for accessing the AutoMQ cluster from the internet.",
 						},
 						"protocol": schema.StringAttribute{
 							Computed:    true,
-							Description: "The protocol of the endpoint",
+							Description: "The protocol of endpoint. Currently support `PLAINTEXT` and `SASL_PLAINTEXT`.",
 						},
 						"mechanisms": schema.StringAttribute{
 							Computed:    true,
-							Description: "The mechanisms of the endpoint",
+							Description: "The supported mechanisms of endpoint. Currently support `PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512`.",
 						},
 						"bootstrap_servers": schema.StringAttribute{
 							Computed:    true,
-							Description: "The bootstrap servers of the endpoint",
+							Description: "The bootstrap servers of the endpoint.",
 						},
 					},
 				},

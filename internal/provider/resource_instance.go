@@ -51,7 +51,7 @@ func (r *KafkaInstanceResource) Metadata(ctx context.Context, req resource.Metad
 func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		// This description is used by the documentation generator and the language server.
-		MarkdownDescription: "Using the `automq_kafka_instance` resource type, you can create and manage Kafka instances, where each instance represents a physical cluster.",
+		MarkdownDescription: "![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>Using the `automq_kafka_instance` resource type, you can create and manage Kafka instances, where each instance represents a physical cluster.",
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
@@ -122,7 +122,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					"version": schema.StringAttribute{
 						Optional:    true,
 						Computed:    true,
-						Description: "The software version of AutoMQ. By default, there is no need to set version; the latest version will be used. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.",
+						Description: "The software version of AutoMQ instance. By default, there is no need to set version; the latest version will be used. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.",
 					},
 				},
 			},
@@ -187,7 +187,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						},
 						"bootstrap_servers": schema.StringAttribute{
 							Computed:    true,
-							Description: "The bootstrap servers of endpoint",
+							Description: "The bootstrap servers of endpoint.",
 						},
 					},
 				},

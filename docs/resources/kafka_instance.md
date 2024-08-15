@@ -8,7 +8,7 @@ description: |-
 
 # automq_kafka_instance (Resource)
 
-Using the `automq_kafka_instance` resource type, you can create and manage Kafka instances, where each instance represents a physical cluster.
+![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>Using the `automq_kafka_instance` resource type, you can create and manage Kafka instances, where each instance represents a physical cluster.
 
 ## Example Usage
 
@@ -89,7 +89,7 @@ Required:
 
 Optional:
 
-- `version` (String) The software version of AutoMQ. By default, there is no need to set version; the latest version will be used. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.
+- `version` (String) The software version of AutoMQ instance. By default, there is no need to set version; the latest version will be used. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.
 
 
 <a id="nestedatt--networks"></a>
@@ -115,7 +115,7 @@ Optional:
 
 Read-Only:
 
-- `bootstrap_servers` (String) The bootstrap servers of endpoint
+- `bootstrap_servers` (String) The bootstrap servers of endpoint.
 - `display_name` (String) The name of endpoint
 - `mechanisms` (String) The supported mechanisms of endpoint. Currently support `PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512`.
 - `network_type` (String) The network type of endpoint. Currently support `VPC` and `INTERNET`. `VPC` type is generally used for internal network access, while `INTERNET` type is used for accessing the AutoMQ cluster from the internet.
