@@ -3,6 +3,7 @@ package models
 import (
 	"terraform-provider-automq/client"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
@@ -19,6 +20,14 @@ func CreateConfigFromMapValue(planConfig basetypes.MapValue) []client.ConfigItem
 		i += 1
 	}
 	return configs
+}
+
+func CreateMapFromConfigValue(configs []client.ConfigItemParam) basetypes.MapValue {
+	configMap := make(map[string]attr.Value, len(configs))
+	for _, config := range configs {
+		configMap[config.Key] = types.StringValue(config.Value)
+	}
+	return types.MapValueMust(types.StringType, configMap)
 }
 
 func MapsEqual(a, b types.Map) bool {

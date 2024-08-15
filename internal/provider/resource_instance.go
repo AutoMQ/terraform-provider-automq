@@ -126,6 +126,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				ElementType:         types.StringType,
 				MarkdownDescription: "Additional configuration for the Kafka topic",
 				Optional:            true,
+				Computed:            true,
 			},
 			"integrations": schema.ListAttribute{
 				Optional:    true,
@@ -233,7 +234,7 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 	// Flatten API response into Terraform state
-	resp.Diagnostics.Append(models.FlattenKafkaInstanceModel(out, &instance, nil, nil)...)
+	resp.Diagnostics.Append(models.FlattenKafkaInstanceModel(out, &instance, nil, nil, nil)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -286,8 +287,15 @@ func (r *KafkaInstanceResource) Read(ctx context.Context, req resource.ReadReque
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get endpoints for Kafka instance %q, got error: %s", state.InstanceID.ValueString(), err))
 		return
 	}
+	// Get instance configurations
+	configs, err := r.client.GetInstanceConfigs(ctx, instanceId)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get configurations for Kafka instance %q, got error: %s", state.InstanceID.ValueString(), err))
+		return
+	}
+
 	// Flatten API response into Terraform state
-	resp.Diagnostics.Append(models.FlattenKafkaInstanceModel(instance, &state, integrations, endpoints)...)
+	resp.Diagnostics.Append(models.FlattenKafkaInstanceModel(instance, &state, integrations, endpoints, configs)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -553,6 +561,11 @@ func ReadKafkaInstance(ctx context.Context, r *KafkaInstanceResource, instanceId
 	if err != nil {
 		return diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get endpoints for Kafka instance %q, got error: %s", plan.InstanceID.ValueString(), err))}
 	}
+	// Get instance configurations
+	configs, err := r.client.GetInstanceConfigs(ctx, instanceId)
+	if err != nil {
+		return diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get configurations for Kafka instance %q, got error: %s", plan.InstanceID.ValueString(), err))}
+	}
 
-	return models.FlattenKafkaInstanceModel(instance, plan, integrations, endpoints)
+	return models.FlattenKafkaInstanceModel(instance, plan, integrations, endpoints, configs)
 }

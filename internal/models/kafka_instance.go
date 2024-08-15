@@ -44,6 +44,24 @@ type KafkaInstanceResourceModel struct {
 	Timeouts       timeouts.Value    `tfsdk:"timeouts"`
 }
 
+type KafkaInstanceModel struct {
+	EnvironmentID  types.String       `tfsdk:"environment_id"`
+	InstanceID     types.String       `tfsdk:"id"`
+	Name           types.String       `tfsdk:"name"`
+	Description    types.String       `tfsdk:"description"`
+	CloudProvider  types.String       `tfsdk:"cloud_provider"`
+	Region         types.String       `tfsdk:"region"`
+	Networks       []NetworkModel     `tfsdk:"networks"`
+	ComputeSpecs   *ComputeSpecsModel `tfsdk:"compute_specs"`
+	Configs        types.Map          `tfsdk:"configs"`
+	ACL            types.Bool         `tfsdk:"acl"`
+	Integrations   types.List         `tfsdk:"integrations"`
+	Endpoints      types.List         `tfsdk:"endpoints"`
+	CreatedAt      timetypes.RFC3339  `tfsdk:"created_at"`
+	LastUpdated    timetypes.RFC3339  `tfsdk:"last_updated"`
+	InstanceStatus types.String       `tfsdk:"instance_status"`
+}
+
 type InstanceAccessInfo struct {
 	DisplayName      types.String `tfsdk:"display_name"`
 	NetworkType      types.String `tfsdk:"network_type"`
@@ -89,7 +107,25 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 	request.AclEnabled = instance.ACL.ValueBool()
 }
 
-func FlattenKafkaInstanceModel(instance *client.KafkaInstanceResponse, resource *KafkaInstanceResourceModel, integrations []client.IntegrationVO, endpoints []client.InstanceAccessInfoVO) diag.Diagnostics {
+func ConvertKafkaInstanceModel(resource *KafkaInstanceResourceModel, model *KafkaInstanceModel) {
+	model.EnvironmentID = resource.EnvironmentID
+	model.InstanceID = resource.InstanceID
+	model.Name = resource.Name
+	model.Description = resource.Description
+	model.CloudProvider = resource.CloudProvider
+	model.Region = resource.Region
+	model.Networks = resource.Networks
+	model.ComputeSpecs = &resource.ComputeSpecs
+	model.Configs = resource.Configs
+	model.ACL = resource.ACL
+	model.Integrations = resource.Integrations
+	model.Endpoints = resource.Endpoints
+	model.CreatedAt = resource.CreatedAt
+	model.LastUpdated = resource.LastUpdated
+	model.InstanceStatus = resource.InstanceStatus
+}
+
+func FlattenKafkaInstanceModel(instance *client.KafkaInstanceResponse, resource *KafkaInstanceResourceModel, integrations []client.IntegrationVO, endpoints []client.InstanceAccessInfoVO, configs []client.ConfigItemParam) diag.Diagnostics {
 	resource.InstanceID = types.StringValue(instance.InstanceID)
 	resource.Name = types.StringValue(instance.DisplayName)
 	resource.Description = types.StringValue(instance.Description)
@@ -119,6 +155,9 @@ func FlattenKafkaInstanceModel(instance *client.KafkaInstanceResponse, resource 
 		if diags.HasError() {
 			return diags
 		}
+	}
+	if configs != nil {
+		resource.Configs = CreateMapFromConfigValue(configs)
 	}
 	return nil
 }
