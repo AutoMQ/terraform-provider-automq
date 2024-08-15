@@ -66,16 +66,44 @@ func TestExpandKafkaACLResource(t *testing.T) {
 func TestParsePrincipalUser(t *testing.T) {
 	tests := []struct {
 		principal string
+		hasDiag   bool
 		expected  string
 	}{
-		{"User:test-user", "test-user"},
-		{"User:admin", "admin"},
-		{"admin", "admin"},
+		{
+			principal: "User:test-user",
+			expected:  "test-user",
+			hasDiag:   false,
+		},
+		{
+			principal: "User:admin",
+			expected:  "admin",
+			hasDiag:   false,
+		},
+		{
+			principal: "User:admin:admin",
+			expected:  "admin:admin",
+			hasDiag:   false,
+		},
+		{
+			principal: "User:",
+			expected:  "",
+			hasDiag:   true,
+		},
+		{
+			principal: "User",
+			expected:  "",
+			hasDiag:   true,
+		},
 	}
-
 	for _, test := range tests {
-		result := ParsePrincipalUser(test.principal)
-		assert.Equal(t, test.expected, result)
+		user, err := ParsePrincipalUser(test.principal)
+
+		if test.hasDiag {
+			assert.NotNil(t, err)
+		} else {
+			assert.Nil(t, err)
+			assert.Equal(t, test.expected, user)
+		}
 	}
 }
 
@@ -110,7 +138,9 @@ func TestFlattenKafkaACLResource(t *testing.T) {
 
 	for _, test := range tests {
 		resource := &KafkaAclResourceModel{}
-		FlattenKafkaACLResource(test.acl, resource)
+		diag := FlattenKafkaACLResource(test.acl, resource)
+
+		assert.Nil(t, diag)
 
 		assert.Equal(t, test.expected.ResourceType.ValueString(), resource.ResourceType.ValueString())
 		assert.Equal(t, test.expected.ResourceName.ValueString(), resource.ResourceName.ValueString())
