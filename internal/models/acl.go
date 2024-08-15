@@ -39,10 +39,10 @@ func ParsePrincipalUser(principal string) string {
 	return principal
 }
 
-func FlattenKafkaACLResource(acl *client.KafkaAclBindingVO, resource *KafkaAclResourceModel) {
+func FlattenKafkaACLResource(acl *client.KafkaAclBindingVO, resource *KafkaAclResourceModel) error {
 	aclId, err := client.GenerateAclID(*acl)
 	if err != nil {
-		return
+		return err
 	}
 	resource.ID = types.StringValue(aclId)
 
@@ -52,4 +52,5 @@ func FlattenKafkaACLResource(acl *client.KafkaAclBindingVO, resource *KafkaAclRe
 	resource.Principal = types.StringValue("User:" + acl.AccessControl.User)
 	resource.OperationGroup = types.StringValue(acl.AccessControl.OperationGroup.Name)
 	resource.Permission = types.StringValue(acl.AccessControl.PermissionType)
+	return nil
 }

@@ -142,7 +142,11 @@ func (r *KafkaAclResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 	// flatten the response and set the ID to the state
-	models.FlattenKafkaACLResource(out, &plan)
+	err = models.FlattenKafkaACLResource(out, &plan)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to flatten Kafka ACL", err.Error())
+		return
+	}
 
 	tflog.Trace(ctx, "created a Kafka ACL resource")
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -167,7 +171,11 @@ func (r *KafkaAclResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 	// flatten the response and set the state
-	models.FlattenKafkaACLResource(out, &state)
+	err = models.FlattenKafkaACLResource(out, &state)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to flatten Kafka ACL", err.Error())
+		return
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

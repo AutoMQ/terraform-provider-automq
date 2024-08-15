@@ -1,6 +1,7 @@
 package models
 
 import (
+	"strings"
 	"terraform-provider-automq/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -30,7 +31,7 @@ func ExpandKafkaTopicResource(topic KafkaTopicResourceModel, request *client.Top
 			Value: config.ValueString(),
 		}
 		if name == "cleanup.policy" {
-			request.CompactStrategy = config.ValueString()
+			request.CompactStrategy = strings.ToUpper(config.ValueString())
 		}
 		i += 1
 	}
