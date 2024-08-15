@@ -36,7 +36,7 @@ func (r *KafkaUserResource) Metadata(ctx context.Context, req resource.MetadataR
 
 func (r *KafkaUserResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "`automq_kafka_user` provides acl user identity information for more secure access to kafka clusters.",
+		MarkdownDescription: "![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>`automq_kafka_user` provides acl user identity information for more secure access to kafka clusters.",
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{

@@ -8,7 +8,7 @@ description: |-
 
 # automq_kafka_acl (Resource)
 
-`automq_kafka_acl` provides an Access Control List (ACL) Policy in AutoMQ Cluster. AutoMQ supports ACL authorization for Cluster, Topic, Consumer Group, and Transaction ID resources, and simplifies the complex API actions of Apache Kafka through Operation Groups.
+![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>`automq_kafka_acl` provides an Access Control List (ACL) Policy in AutoMQ Cluster. AutoMQ supports ACL authorization for Cluster, Topic, Consumer Group, and Transaction ID resources, and simplifies the complex API actions of Apache Kafka through Operation Groups.
 
 ## Example Usage
 
