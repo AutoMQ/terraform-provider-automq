@@ -3,12 +3,12 @@
 page_title: "automq_kafka_user Resource - automq"
 subcategory: ""
 description: |-
-  Kafka User resource
+  automq_kafka_user provides acl user identity information for more secure access to kafka clusters.
 ---
 
 # automq_kafka_user (Resource)
 
-Kafka User resource
+`automq_kafka_user` provides acl user identity information for more secure access to kafka clusters.
 
 ## Example Usage
 
@@ -49,11 +49,11 @@ resource "automq_kafka_user" "example" {
 
 ### Required
 
-- `environment_id` (String) Target environment ID
-- `kafka_instance_id` (String) Target Kafka instance ID
-- `password` (String) Password for the Kafka user
-- `username` (String) Username for the Kafka user
+- `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
+- `kafka_instance_id` (String) Target Kafka instance ID, each instance represents a kafka cluster. The instance id looks like kf-xxxxxxx.
+- `password` (String) Password for the Kafka user, limited to 8-24 characters.
+- `username` (String) Username for the Kafka user, limited to 4-64 characters.
 
 ### Read-Only
 
-- `id` (String) Kafka user identifier
+- `id` (String) Kafka user identifier.

@@ -36,21 +36,21 @@ func (r *KafkaUserResource) Metadata(ctx context.Context, req resource.MetadataR
 
 func (r *KafkaUserResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Kafka User resource",
+		MarkdownDescription: "`automq_kafka_user` provides acl user identity information for more secure access to kafka clusters.",
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
-				MarkdownDescription: "Target environment ID",
+				MarkdownDescription: "Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"kafka_instance_id": schema.StringAttribute{
-				MarkdownDescription: "Target Kafka instance ID",
+				MarkdownDescription: "Target Kafka instance ID, each instance represents a kafka cluster. The instance id looks like kf-xxxxxxx.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"username": schema.StringAttribute{
-				MarkdownDescription: "Username for the Kafka user",
+				MarkdownDescription: "Username for the Kafka user, limited to 4-64 characters.",
 				Required:            true,
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(4, 64),
@@ -58,7 +58,7 @@ func (r *KafkaUserResource) Schema(ctx context.Context, req resource.SchemaReque
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"password": schema.StringAttribute{
-				MarkdownDescription: "Password for the Kafka user",
+				MarkdownDescription: "Password for the Kafka user, limited to 8-24 characters.",
 				Required:            true,
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(8, 24),
@@ -67,7 +67,7 @@ func (r *KafkaUserResource) Schema(ctx context.Context, req resource.SchemaReque
 			},
 			"id": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "Kafka user identifier",
+				MarkdownDescription: "Kafka user identifier.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
