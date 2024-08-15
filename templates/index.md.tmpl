@@ -1,21 +1,24 @@
 ---
 page_title: "Provider: AutoMQ"
 description: |-
-AutoMQ Provider is utilized to manage AutoMQ Cloud environments, including both BYOC (Bring Your Own Cloud) and SaaS (Software as a Service) types. The provider allows for the management of environments, instances within those environments, and Kafka resources within those instances (such as Topics, Users, and ACLs).
 
-When using the AutoMQ Provider, it is necessary to have the AutoMQ environment installed and deployed beforehand. You must access the environment console to create a Service Account, which will provide the Access Key information. Subsequently, you need to configure the correct Access Key and Endpoint.
+AutoMQ Provider is utilized to manage resources in AutoMQ environment. The provider allows for the management of instances and Kafka resources within those instances (such as Topics, Users, and ACLs).
 
 ---
-
 
 # AutoMQ Provider
 ![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)
 
-AutoMQ Provider is utilized to manage AutoMQ Cloud environments, including both BYOC (Bring Your Own Cloud) and SaaS (Software as a Service) types. The provider allows for the management of environments, instances within those environments, and Kafka resources within those instances (such as Topics, Users, and ACLs).
+## Prerequisites
 
-## Authentication with AutoMQ Cloud
+The AutoMQ environment represents a namespace, with each environment containing a complete set of AutoMQ control plane and data plane. All control and data planes of the AutoMQ BYOC environment are deployed within the user's VPC to ensure data privacy and security.
 
-This provider requires a `automq_byoc_access_key_id` and `automq_byoc_secret_key` for authentication with AutoMQ Cloud environment, enabling users to securely manage their AutoMQ resources. You can get these by creating a Service account refer to [docs](https://docs.automq.com/automq-cloud/manage-identities-and-access).
+The AutoMQ Provider is used to manage an already installed AutoMQ environment. Therefore, before using the AutoMQ Provider, you need to complete the environment installation and obtain the access point and initial account information.
+
+Refer to the following for specific operations:
+- Install the AutoMQ environment by following the [documentation](https://github.com/AutoMQ/terraform-provider-automq/pull/22).
+- Create a ServiceAccount and obtain an AccessKey: After the environment is installed, users need to access the AutoMQ environment console through a web browser, create a Service Account, and use the AccessKey of the Service Account. You can get these by creating a Service account; refer to [docs](https://docs.automq.com/automq-cloud/manage-identities-and-access).
+
 
 ## Example Usage
 ### Example Provider Configuration
