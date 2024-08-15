@@ -8,6 +8,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+const (
+	IntegrationTypeCloudWatch = "cloudWatch"
+	IntegrationTypeKafka      = "kafka"
+	IntegrationTypePrometheus = "prometheus"
+
+	SecurityProtocolSASLPlain = "SASL_PLAINTEXT"
+	SecurityProtocolPlainText = "PLAINTEXT"
+)
+
 // IntegrationResourceModel describes the resource data model.
 type IntegrationResourceModel struct {
 	EnvironmentID    types.String                 `tfsdk:"environment_id"`
@@ -43,7 +52,7 @@ func ExpandIntergationResource(in *client.IntegrationParam, integration Integrat
 	integrationType := integration.Type.ValueString()
 	in.Name = integration.Name.ValueString()
 	in.Type = &integrationType
-	if integrationType == "cloudWatch" {
+	if integrationType == IntegrationTypeCloudWatch {
 		in.Name = integration.Name.ValueString()
 		if integration.CloudWatchConfig == nil {
 			return diag.NewErrorDiagnostic("Missing required field", "cloud_watch_config is required for CloudWatch integration")
@@ -57,7 +66,7 @@ func ExpandIntergationResource(in *client.IntegrationParam, integration Integrat
 				Value: integration.CloudWatchConfig.NameSpace.ValueString(),
 			},
 		}
-	} else if integrationType == "kafka" {
+	} else if integrationType == IntegrationTypeKafka {
 		in.Name = integration.Name.ValueString()
 		if integration.EndPoint.IsNull() || integration.EndPoint.IsUnknown() {
 			return diag.NewErrorDiagnostic("Missing required field", "endpoint is required for Kafka integration")
@@ -69,7 +78,7 @@ func ExpandIntergationResource(in *client.IntegrationParam, integration Integrat
 		if integration.KafkaConfig.SecurityProtocol.ValueString() == "" {
 			return diag.NewErrorDiagnostic("Missing required field", "security_protocol is required for Kafka integration")
 		}
-		if integration.KafkaConfig.SecurityProtocol.ValueString() == "SASL_PLAINTEXT" {
+		if integration.KafkaConfig.SecurityProtocol.ValueString() == SecurityProtocolSASLPlain {
 			if integration.KafkaConfig.SaslMechanism.ValueString() == "" {
 				return diag.NewErrorDiagnostic("Missing required field", "sasl_mechanism is required for Kafka integration")
 			}
@@ -97,7 +106,7 @@ func ExpandIntergationResource(in *client.IntegrationParam, integration Integrat
 					Value: integration.KafkaConfig.SaslPassword.ValueString(),
 				},
 			}
-		} else if integration.KafkaConfig.SecurityProtocol.ValueString() == "PLAINTEXT" {
+		} else if integration.KafkaConfig.SecurityProtocol.ValueString() == SecurityProtocolPlainText {
 			in.Config = []client.ConfigItemParam{
 				{
 					Key:   "security_protocol",
@@ -105,7 +114,7 @@ func ExpandIntergationResource(in *client.IntegrationParam, integration Integrat
 				},
 			}
 		}
-	} else if integrationType == "prometheus" {
+	} else if integrationType == IntegrationTypePrometheus {
 		in.Name = integration.Name.ValueString()
 		if integration.EndPoint.IsNull() || integration.EndPoint.IsUnknown() {
 			return diag.NewErrorDiagnostic("Missing required field", "endpoint is required for Prometheus integration")
@@ -125,13 +134,13 @@ func FlattenIntergrationResource(integration *client.IntegrationVO, resource *In
 }
 
 func flattenIntergrationTypeConfig(iType string, config map[string]interface{}, resource *IntegrationResourceModel) {
-	if iType == "Kafka" {
+	if iType == IntegrationTypeKafka {
 		flattenKafkaConfig(config, resource)
 		return
-	} else if iType == "CloudWatch" {
+	} else if iType == IntegrationTypeCloudWatch {
 		flattenCloudWatchConfig(config, resource)
 		return
-	} else if iType == "Prometheus" {
+	} else if iType == IntegrationTypePrometheus {
 		return
 	}
 }
@@ -139,7 +148,7 @@ func flattenIntergrationTypeConfig(iType string, config map[string]interface{}, 
 func flattenKafkaConfig(config map[string]interface{}, resource *IntegrationResourceModel) {
 	resource.KafkaConfig = &KafkaIntegrationConfig{}
 	if v, ok := config["securityProtocol"]; ok {
-		resource.KafkaConfig.SaslMechanism = types.StringValue(v.(string))
+		resource.KafkaConfig.SecurityProtocol = types.StringValue(v.(string))
 	}
 	if v, ok := config["saslMechanism"]; ok {
 		resource.KafkaConfig.SaslMechanism = types.StringValue(v.(string))
@@ -154,7 +163,7 @@ func flattenKafkaConfig(config map[string]interface{}, resource *IntegrationReso
 
 func flattenCloudWatchConfig(config map[string]interface{}, resource *IntegrationResourceModel) {
 	resource.CloudWatchConfig = &CloudWatchIntegrationConfig{}
-	if v, ok := config["namespece"]; ok {
+	if v, ok := config["namespace"]; ok {
 		resource.CloudWatchConfig.NameSpace = types.StringValue(v.(string))
 	}
 }
