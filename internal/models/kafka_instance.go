@@ -125,7 +125,7 @@ func ConvertKafkaInstanceModel(resource *KafkaInstanceResourceModel, model *Kafk
 	model.InstanceStatus = resource.InstanceStatus
 }
 
-func FlattenKafkaInstanceModel(instance *client.KafkaInstanceResponse, resource *KafkaInstanceResourceModel, integrations []client.IntegrationVO, endpoints []client.InstanceAccessInfoVO, configs []client.ConfigItemParam) diag.Diagnostics {
+func FlattenKafkaInstanceModel(instance *client.KafkaInstanceResponse, resource *KafkaInstanceResourceModel, integrations []client.IntegrationVO, endpoints []client.InstanceAccessInfoVO) diag.Diagnostics {
 	resource.InstanceID = types.StringValue(instance.InstanceID)
 	resource.Name = types.StringValue(instance.DisplayName)
 	resource.Description = types.StringValue(instance.Description)
@@ -155,9 +155,6 @@ func FlattenKafkaInstanceModel(instance *client.KafkaInstanceResponse, resource 
 		if diags.HasError() {
 			return diags
 		}
-	}
-	if configs != nil {
-		resource.Configs = CreateMapFromConfigValue(configs)
 	}
 	return nil
 }

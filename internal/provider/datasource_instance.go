@@ -240,19 +240,24 @@ func (r *KafkaInstanceDataSource) Read(ctx context.Context, req datasource.ReadR
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get endpoints for Kafka instance %q, got error: %s", instanceId, err))
 		return
 	}
+	model := models.KafkaInstanceModel{}
+	// Flatten API response into Terraform state
+	resp.Diagnostics.Append(models.FlattenKafkaInstanceModel(out, &instance, integrations, endpoints)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	// Get instance configurations
 	configs, err := r.client.GetInstanceConfigs(ctx, instanceId)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get configurations for Kafka instance %q, got error: %s", instanceId, err))
 		return
 	}
-	model := models.KafkaInstanceModel{}
-	// Flatten API response into Terraform state
-	resp.Diagnostics.Append(models.FlattenKafkaInstanceModel(out, &instance, integrations, endpoints, configs)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+
+	// Convert API response into data source model
 	models.ConvertKafkaInstanceModel(&instance, &model)
+	// Update the model with the configurations
+	model.Configs = models.CreateMapFromConfigValue(configs)
+
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
 }
