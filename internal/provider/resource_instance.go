@@ -86,6 +86,10 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 			"networks": schema.ListNestedAttribute{
 				Required:    true,
 				Description: "The networks of the Kafka instance",
+				Validators: []validator.List{
+					listvalidator.UniqueValues(),
+					listvalidator.SizeBetween(1, 3),
+				},
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"zone": schema.StringAttribute{
@@ -553,6 +557,5 @@ func ReadKafkaInstance(ctx context.Context, r *KafkaInstanceResource, instanceId
 	if err != nil {
 		return diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get endpoints for Kafka instance %q, got error: %s", plan.InstanceID.ValueString(), err))}
 	}
-
 	return models.FlattenKafkaInstanceModel(instance, plan, integrations, endpoints)
 }
