@@ -8,6 +8,7 @@ import (
 
 const (
 	InstancePath                   = "/api/v1/instances"
+	InstanceConfigPath             = "/api/v1/instances/%s/configurations"
 	GetInstancePath                = "/api/v1/instances/%s"
 	DeleteInstancePath             = "/api/v1/instances/%s"
 	ReplaceInstanceIntergationPath = "/api/v1/instances/%s/integrations"
@@ -15,7 +16,6 @@ const (
 	GetInstanceEndpointsPath       = "/api/v1/instances/%s/endpoints"
 	UpdateInstanceBasicInfoPath    = "/api/v1/instances/%s/basic"
 	UpdateInstanceVersionPath      = "/api/v1/instances/%s/versions/%s"
-	UpdateInstanceConfigPath       = "/api/v1/instances/%s/configurations"
 	UpdateInstanceComputeSpecsPath = "/api/v1/instances/%s/spec"
 )
 
@@ -43,6 +43,29 @@ func (c *Client) GetKafkaInstance(ctx context.Context, instanceId string) (*Kafk
 		return nil, err
 	}
 	return &instance, nil
+}
+
+func (c *Client) GetKafkaInstanceByName(ctx context.Context, name string) (*KafkaInstanceResponse, error) {
+	queryParams := make(map[string]string)
+	queryParams["keyword"] = name
+	body, err := c.Get(ctx, InstancePath, queryParams)
+	if err != nil {
+		return nil, err
+	}
+	instances := KafkaInstanceResponseList{}
+	err = json.Unmarshal(body, &instances)
+	if err != nil {
+		return nil, err
+	}
+	if len(instances.List) > 0 {
+		for _, item := range instances.List {
+			if item.DisplayName == name {
+				return &item, nil
+			}
+		}
+		return nil, &ErrorResponse{Code: 404, ErrorMessage: "kafka instance not found"}
+	}
+	return nil, &ErrorResponse{Code: 404, ErrorMessage: "kafka instance not found"}
 }
 
 func (c *Client) DeleteKafkaInstance(ctx context.Context, instanceId string) error {
@@ -85,6 +108,20 @@ func (c *Client) GetInstanceEndpoints(ctx context.Context, instanceId string) ([
 	return endpoints.List, nil
 }
 
+func (c *Client) GetInstanceConfigs(ctx context.Context, instanceId string) ([]ConfigItemParam, error) {
+	path := fmt.Sprintf(InstanceConfigPath, instanceId)
+	body, err := c.Get(ctx, path, nil)
+	if err != nil {
+		return nil, err
+	}
+	instance := PageNumResultConfigItemVO{}
+	err = json.Unmarshal(body, &instance)
+	if err != nil {
+		return nil, err
+	}
+	return instance.List, nil
+}
+
 func (c *Client) UpdateKafkaInstanceBasicInfo(ctx context.Context, instanceId string, updateParam InstanceBasicParam) (*KafkaInstanceResponse, error) {
 	return c.updateInstance(ctx, instanceId, updateParam, UpdateInstanceBasicInfoPath)
 }
@@ -95,7 +132,7 @@ func (c *Client) UpdateKafkaInstanceVersion(ctx context.Context, instanceId stri
 }
 
 func (c *Client) UpdateKafkaInstanceConfig(ctx context.Context, instanceId string, updateParam InstanceConfigParam) (*KafkaInstanceResponse, error) {
-	return c.updateInstance(ctx, instanceId, updateParam, UpdateInstanceConfigPath)
+	return c.updateInstance(ctx, instanceId, updateParam, InstanceConfigPath)
 }
 
 func (c *Client) UpdateKafkaInstanceComputeSpecs(ctx context.Context, instanceId string, updateParam SpecificationUpdateParam) (*KafkaInstanceResponse, error) {

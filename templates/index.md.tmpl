@@ -1,20 +1,5 @@
 ---
-page_title: "Provider: Redpanda"
+page_title: "Provider: AutoMQ"
 description: |-
-  The Redpanda Data Terraform provider is used to manage Redpanda Dedicated and Cloud clusters and Kafka resources within them. To connect to a Redpanda Cloud cluster, a client_id and client_secret are required.
----
-
-# Redpanda Provider
-
-!!! THIS IS AN ALPHA RELEASE !!!
-
-Please be aware that all features are subject to change and may not be fully supported at this time.
-
-The Redpanda provider is designed for managing Redpanda clusters and Kafka resources in Redpanda Dedicated and Cloud environments. It supports the provisioning, management, and configuration of clusters and Kafka resources, facilitating seamless integration into Terraform workflows.
-
-{{ .SchemaMarkdown | trimspace }}
-
-## Authentication with Redpanda Cloud
-
-This provider requires a `client_id` and `client_secret` for authentication with Redpanda Cloud services, enabling users to securely manage their Redpanda resources. You can get these by creating an account in [Redpanda Cloud](https://cloudv2.redpanda.com/home) and then [creating a client in the Redpanda Cloud UI](https://cloudv2.redpanda.com/clients).
+  The AutoMQ Terraform provider is used to manage AutoMQ Cloud BYOC and SaaS instances and Kafka resources within them. 
 

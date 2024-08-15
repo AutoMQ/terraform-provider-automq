@@ -10,8 +10,8 @@ locals {
   env_id = "example"
 
   automq_byoc_host          = "http://localhost:8081"
-  automq_byoc_access_key_id = "goiNxB8DfbbXJ85B"
-  automq_byoc_secret_key    = "QPyEIcBXHKOBzEeeCZcpNSMRjXtj4XiS"
+  automq_byoc_access_key_id = "RSaIMzrFC0kAmS1x"
+  automq_byoc_secret_key    = "msnGqOuaV5gblXPvkWfxg7Ao7Nq2iyMo"
 
   instance_deploy_region = "cn-hangzhou"
   instance_deploy_zone   = "cn-hangzhou-b"
@@ -48,11 +48,15 @@ resource "automq_kafka_instance" "example" {
     }
   ]
   compute_specs = {
-    aku     = "12"
+    aku     = "18"
     version = "1.1.0"
   }
   acl          = true
   integrations = [automq_integration.example.id]
+  configs = {
+    "auto.create.topics.enable" = "false"
+    "log.retention.ms"          = "3600000"
+  }
 }
 
 resource "automq_kafka_topic" "example" {
@@ -72,7 +76,7 @@ resource "automq_kafka_user" "example" {
   environment_id = local.env_id
 
   kafka_instance_id = automq_kafka_instance.example.id
-  username          = "automq_kafka_user"
+  username          = "automq_kafka_user-1"
   password          = "automq_kafka_user"
 }
 

@@ -124,3 +124,12 @@ type InstanceAccessInfoVO struct {
 	Mechanisms       string `json:"mechanisms"`
 	BootstrapServers string `json:"bootstrapServers"`
 }
+
+// PageNumResultConfigItemVO struct for PageNumResultConfigItemVO
+type PageNumResultConfigItemVO struct {
+	PageNum   *int32            `json:"pageNum,omitempty"`
+	PageSize  *int32            `json:"pageSize,omitempty"`
+	Total     *int64            `json:"total,omitempty"`
+	List      []ConfigItemParam `json:"list,omitempty"`
+	TotalPage *int64            `json:"totalPage,omitempty"`
+}

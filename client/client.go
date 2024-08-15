@@ -46,7 +46,7 @@ func (e *ErrorResponse) Error() string {
 	if e.APIError.ErrorModel.Code != "" {
 		return fmt.Sprintf("Error %d: %s: %s", e.Code, e.APIError.ErrorModel.Code, e.APIError.ErrorModel.Message)
 	}
-	return fmt.Sprintf("Error %d: %s, detail: %s", e.Code, e.ErrorMessage, e.Err.Error())
+	return fmt.Sprintf("Error Code %d: %s", e.Code, e.ErrorMessage)
 }
 
 func NewClient(ctx context.Context, host string, credentials AuthCredentials) (*Client, error) {

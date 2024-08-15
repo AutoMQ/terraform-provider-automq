@@ -41,8 +41,8 @@ type IntegrationUpdateParam struct {
 
 // ConfigItemParam struct for ConfigItemParam
 type ConfigItemParam struct {
-	Key   string `json:"key,omitempty"`
-	Value string `json:"value,omitempty"`
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 // PageNumResultIntegrationVO struct for PageNumResultIntegrationVO

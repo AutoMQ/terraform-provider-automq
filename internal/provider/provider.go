@@ -190,7 +190,9 @@ func (p *AutoMQProvider) Resources(ctx context.Context) []func() resource.Resour
 }
 
 func (p *AutoMQProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{}
+	return []func() datasource.DataSource{
+		NewKafkaInstanceDataSource,
+	}
 }
 
 func (p *AutoMQProvider) Functions(ctx context.Context) []func() function.Function {
