@@ -86,6 +86,10 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 			"networks": schema.ListNestedAttribute{
 				Required:    true,
 				Description: "The networks of the Kafka instance",
+				Validators: []validator.List{
+					listvalidator.UniqueValues(),
+					listvalidator.SizeBetween(1, 3),
+				},
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"zone": schema.StringAttribute{
@@ -126,7 +130,6 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				ElementType:         types.StringType,
 				MarkdownDescription: "Additional configuration for the Kafka topic",
 				Optional:            true,
-				Computed:            true,
 			},
 			"integrations": schema.ListAttribute{
 				Optional:    true,
