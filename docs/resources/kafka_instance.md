@@ -3,12 +3,12 @@
 page_title: "automq_kafka_instance Resource - automq"
 subcategory: ""
 description: |-
-  AutoMQ Kafka instance resource
+  Using the automq_kafka_instance resource type, you can create and manage Kafka instances, where each instance represents a physical cluster.
 ---
 
 # automq_kafka_instance (Resource)
 
-AutoMQ Kafka instance resource
+Using the `automq_kafka_instance` resource type, you can create and manage Kafka instances, where each instance represents a physical cluster.
 
 ## Example Usage
 
@@ -57,27 +57,27 @@ resource "automq_kafka_instance" "example" {
 
 ### Required
 
-- `cloud_provider` (String) The cloud provider of the Kafka instance
-- `compute_specs` (Attributes) The compute specs of the Kafka instance (see [below for nested schema](#nestedatt--compute_specs))
-- `environment_id` (String) Target Kafka environment
-- `name` (String) The name of the Kafka instance
-- `networks` (Attributes List) The networks of the Kafka instance (see [below for nested schema](#nestedatt--networks))
-- `region` (String) The region of the Kafka instance
+- `cloud_provider` (String) To set up a Kafka instance, you need to specify the target cloud provider environment for deployment. Currently, 'aws' is supported.
+- `compute_specs` (Attributes) The compute specs of the instance, contains aku and version. (see [below for nested schema](#nestedatt--compute_specs))
+- `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
+- `name` (String) The name of the Kafka instance. It can contain letters (a-z or A-Z), numbers (0-9), underscores (_), and hyphens (-), with a length limit of 3 to 64 characters.
+- `networks` (Attributes List) To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones. (see [below for nested schema](#nestedatt--networks))
+- `region` (String) To set up an instance, you need to specify the target region for deployment. Refer to the RegionId list provided by each cloud provider for available regions. Using AWS as an example, refer to this [documentation](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html) to set the correct `RegionId`.
 
 ### Optional
 
-- `acl` (Boolean) The ACL of the Kafka instance
-- `configs` (Map of String) Additional configuration for the Kafka topic
-- `description` (String) The description of the Kafka instance
-- `integrations` (List of String) The integrations of the Kafka instance
+- `acl` (Boolean) Configure ACL enablement. Default is false (disabled).
+- `configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/release-notes).
+- `description` (String) The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.
+- `integrations` (List of String) Configure integration settings. AutoMQ supports integration with external products like `prometheus` and `cloudwatch`, forwarding instance Metrics data to Prometheus and CloudWatch.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 
 ### Read-Only
 
 - `created_at` (String)
-- `endpoints` (Attributes List) The endpoints of the Kafka instance (see [below for nested schema](#nestedatt--endpoints))
-- `id` (String) The ID of the Kafka instance
-- `instance_status` (String) The status of the Kafka instance
+- `endpoints` (Attributes List) The bootstrap endpoints of instance. AutoMQ supports multiple access protocols; therefore, the Endpoint is a list. (see [below for nested schema](#nestedatt--endpoints))
+- `id` (String) The ID of the Kafka instance.
+- `instance_status` (String) The status of instance. Currently supports statuses: `Creating`, `Running`, `Deleting`, `Changing` and `Abnormal`. For definitions and limitations of each status, please refer to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/manage-instances#lifecycle).
 - `last_updated` (String)
 
 <a id="nestedatt--compute_specs"></a>
@@ -85,11 +85,11 @@ resource "automq_kafka_instance" "example" {
 
 Required:
 
-- `aku` (Number) The template of the compute specs
+- `aku` (Number) AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.
 
 Optional:
 
-- `version` (String) The version of the compute specs
+- `version` (String) The software version of AutoMQ. By default, there is no need to set version; the latest version will be used. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.
 
 
 <a id="nestedatt--networks"></a>
@@ -97,8 +97,8 @@ Optional:
 
 Required:
 
-- `subnets` (List of String) The subnets of the network
-- `zone` (String) The zone of the network
+- `subnets` (List of String) Specify the subnet under the corresponding availability zone for deploying the instance. Currently, only one subnet can be set for each availability zone.
+- `zone` (String) The availability zone ID of the cloud provider.
 
 
 <a id="nestedblock--timeouts"></a>
@@ -115,8 +115,8 @@ Optional:
 
 Read-Only:
 
-- `bootstrap_servers` (String) The bootstrap servers of the endpoint
-- `display_name` (String) The display name of the endpoint
-- `mechanisms` (String) The mechanisms of the endpoint
-- `network_type` (String) The network type of the endpoint
-- `protocol` (String) The protocol of the endpoint
+- `bootstrap_servers` (String) The bootstrap servers of endpoint
+- `display_name` (String) The name of endpoint
+- `mechanisms` (String) The supported mechanisms of endpoint. Currently support `PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512`.
+- `network_type` (String) The network type of endpoint. Currently support `VPC` and `INTERNET`. `VPC` type is generally used for internal network access, while `INTERNET` type is used for accessing the AutoMQ cluster from the internet.
+- `protocol` (String) The protocol of endpoint. Currently support `PLAINTEXT` and `SASL_PLAINTEXT`.

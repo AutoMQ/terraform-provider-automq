@@ -3,12 +3,12 @@
 page_title: "automq_integration Resource - automq"
 subcategory: ""
 description: |-
-  Integration resource
+  AutoMQ uses automq_integration to describe external third-party data transmission. By creating integrations and associating them with AutoMQ instances, you can forward instance Metrics and other data to external systems. Currently supported integration types are Prometheus and CloudWatch.
 ---
 
 # automq_integration (Resource)
 
-Integration resource
+AutoMQ uses `automq_integration` to describe external third-party data transmission. By creating integrations and associating them with AutoMQ instances, you can forward instance Metrics and other data to external systems. Currently supported integration types are Prometheus and CloudWatch.
 
 ## Example Usage
 
@@ -52,21 +52,21 @@ resource "automq_integration" "example" {
 
 ### Required
 
-- `environment_id` (String) Target environment ID
-- `name` (String) Name of the integration
-- `type` (String) Type of the integration
+- `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
+- `name` (String) The integrated name identifies different configurations and contains 3 to 64 characters, including letters a to z or a to z, digits 0 to 9, underscores (_), and hyphens (-).
+- `type` (String) Type of integration, currently support `kafka` and `cloudwatch`
 
 ### Optional
 
-- `cloudwatch_config` (Attributes) CloudWatch (see [below for nested schema](#nestedatt--cloudwatch_config))
-- `endpoint` (String) Endpoint of the integration
-- `kafka_config` (Attributes) Kafka configuration (see [below for nested schema](#nestedatt--kafka_config))
-- `prometheus_config` (Attributes) Prometheus (see [below for nested schema](#nestedatt--prometheus_config))
+- `cloudwatch_config` (Attributes) CloudWatch integration configurations. When Type is `cloudwatch`, it must be set. (see [below for nested schema](#nestedatt--cloudwatch_config))
+- `endpoint` (String) Endpoint of integration. When selecting Prometheus and Kafka integration, you need to configure the corresponding endpoints. For detailed configuration instructions, please refer to the [documentation](https://docs.automq.com/automq-cloud/manage-environments/byoc-environment/manage-integrations).
+- `kafka_config` (Attributes) Kafka integration configurations. When Type is `kafka`, it must be set. (see [below for nested schema](#nestedatt--kafka_config))
+- `prometheus_config` (Attributes) Prometheus integration configurations. When Type is `prometheus`, it must be set. (see [below for nested schema](#nestedatt--prometheus_config))
 
 ### Read-Only
 
 - `created_at` (String)
-- `id` (String) Integration identifier
+- `id` (String) Integration identifier, Used for binding and association with the instance.
 - `last_updated` (String)
 
 <a id="nestedatt--cloudwatch_config"></a>
@@ -74,7 +74,7 @@ resource "automq_integration" "example" {
 
 Optional:
 
-- `namespace` (String) Namespace
+- `namespace` (String) Set cloudwatch namespace, AutoMQ will write all Metrics data under this namespace. The namespace name must contain 1 to 255 valid ASCII characters and may be alphanumeric, periods, hyphens, underscores, forward slashes, pound signs, colons, and spaces, but not all spaces.
 
 
 <a id="nestedatt--kafka_config"></a>
@@ -82,10 +82,10 @@ Optional:
 
 Required:
 
-- `sasl_mechanism` (String) SASL mechanism for Kafka
-- `sasl_password` (String) SASL password for Kafka
-- `sasl_username` (String) SASL username for Kafka
-- `security_protocol` (String) Security protocol for Kafka
+- `sasl_mechanism` (String) SASL mechanism for external kafka cluster, currently support `PLAIN`, `SCRAM-SHA-256` and `SCRAM-SHA-512`
+- `sasl_password` (String) SASL password for Kafka, The username and password are declared and returned when creating the kafka_user resource in AutoMQ.
+- `sasl_username` (String) SASL username for Kafka, The username and password are declared and returned when creating the kafka_user resource in AutoMQ.
+- `security_protocol` (String) Security protocol for external kafka cluster, currently support `PLAINTEXT` and `SASL_PLAINTEXT`
 
 
 <a id="nestedatt--prometheus_config"></a>

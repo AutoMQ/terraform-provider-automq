@@ -39,28 +39,28 @@ func (r *KafkaAclResource) Metadata(ctx context.Context, req resource.MetadataRe
 
 func (r *KafkaAclResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Kafka ACL resource",
+		MarkdownDescription: "`automq_kafka_acl` provides an Access Control List (ACL) Policy in AutoMQ Cluster. AutoMQ supports ACL authorization for Cluster, Topic, Consumer Group, and Transaction ID resources, and simplifies the complex API actions of Apache Kafka through Operation Groups.",
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
-				MarkdownDescription: "Target Kafka environment",
+				MarkdownDescription: "Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"kafka_instance_id": schema.StringAttribute{
-				MarkdownDescription: "Target Kafka instance ID",
+				MarkdownDescription: "Target Kafka instance ID, each instance represents a kafka cluster. The instance id looks like kf-xxxxxxx.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"id": schema.StringAttribute{
-				MarkdownDescription: "Kafka instance ID",
+				MarkdownDescription: "The Kafka ACL Resource ID is returned upon successful creation of the ACL.",
 				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"resource_type": schema.StringAttribute{
-				MarkdownDescription: "Resource type for ACL",
+				MarkdownDescription: "The Kafka ACL authorized resource types, currently support `CLUSTER`, `TOPIC`, `CONSUMERGROUP` and `TRANSACTION_ID`.",
 				Required:            true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("TOPIC", "CONSUMERGROUP", "CLUSTER", "TRANSACTION_ID"),
@@ -68,12 +68,12 @@ func (r *KafkaAclResource) Schema(ctx context.Context, req resource.SchemaReques
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"resource_name": schema.StringAttribute{
-				MarkdownDescription: "Name of the resource for ACL",
+				MarkdownDescription: "The target resource name for Kafka ACL authorization, can be a specific resource name or a resource name prefix (when using prefix matching, only the prefix needs to be provided without ending with \"\\*\"). If only \"\\*\" is specified, it represents all resources.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"pattern_type": schema.StringAttribute{
-				MarkdownDescription: "Pattern type for resource",
+				MarkdownDescription: "Set the resource name matching pattern, supporting `LITERAL` and `PREFIXED`. `LITERAL` represents exact matching, while `PREFIXED` represents prefix matching.",
 				Required:            true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("LITERAL", "PREFIXED"),
@@ -81,12 +81,12 @@ func (r *KafkaAclResource) Schema(ctx context.Context, req resource.SchemaReques
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"principal": schema.StringAttribute{
-				MarkdownDescription: "Principal for ACL",
+				MarkdownDescription: "Set the authorized target principal, which currently supports Kafka User type principals, i.e., User:xxxx. Specify the Kafka user name. Principal must start with `User:` and contact with kafka_username.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"operation_group": schema.StringAttribute{
-				MarkdownDescription: "Operation group for ACL",
+				MarkdownDescription: "Set the authorized operation group. For the Topic resource type, the supported operations are `ALL (all permissions)`, `PRODUCE (produce messages only)`, and `CONSUME (consume messages only)`. For other resource types, only `ALL (all permissions)` is supported.",
 				Required:            true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("ALL", "PRODUCE", "CONSUME"),
@@ -94,7 +94,7 @@ func (r *KafkaAclResource) Schema(ctx context.Context, req resource.SchemaReques
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"permission": schema.StringAttribute{
-				MarkdownDescription: "Permission type for ACL",
+				MarkdownDescription: "Set the permission type, which supports `ALLOW` and `DENY`. `ALLOW` grants permission to perform the operation, while `DENY` prohibits the operation. `DENY` takes precedence over `ALLOW`.",
 				Optional:            true,
 				Computed:            true,
 				Default:             stringdefault.StaticString("ALLOW"),

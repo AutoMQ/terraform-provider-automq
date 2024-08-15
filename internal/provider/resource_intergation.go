@@ -39,21 +39,21 @@ func (r *IntegrationResource) Metadata(ctx context.Context, req resource.Metadat
 
 func (r *IntegrationResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Integration resource",
+		MarkdownDescription: "AutoMQ uses `automq_integration` to describe external third-party data transmission. By creating integrations and associating them with AutoMQ instances, you can forward instance Metrics and other data to external systems. Currently supported integration types are Prometheus and CloudWatch.",
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
-				MarkdownDescription: "Target environment ID",
+				MarkdownDescription: "Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription: "Name of the integration",
+				MarkdownDescription: "The integrated name identifies different configurations and contains 3 to 64 characters, including letters a to z or a to z, digits 0 to 9, underscores (_), and hyphens (-).",
 				Required:            true,
 				Validators:          []validator.String{stringvalidator.LengthBetween(1, 64)},
 			},
 			"type": schema.StringAttribute{
-				MarkdownDescription: "Type of the integration",
+				MarkdownDescription: "Type of integration, currently support `kafka` and `cloudwatch`",
 				Required:            true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("prometheus", "kafka", "cloudWatch"),
@@ -61,42 +61,42 @@ func (r *IntegrationResource) Schema(ctx context.Context, req resource.SchemaReq
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"endpoint": schema.StringAttribute{
-				MarkdownDescription: "Endpoint of the integration",
+				MarkdownDescription: "Endpoint of integration. When selecting Prometheus and Kafka integration, you need to configure the corresponding endpoints. For detailed configuration instructions, please refer to the [documentation](https://docs.automq.com/automq-cloud/manage-environments/byoc-environment/manage-integrations).",
 				Optional:            true,
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(1, 256),
 				},
 			},
 			"kafka_config": schema.SingleNestedAttribute{
-				MarkdownDescription: "Kafka configuration",
+				MarkdownDescription: "Kafka integration configurations. When Type is `kafka`, it must be set.",
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"security_protocol": schema.StringAttribute{
-						MarkdownDescription: "Security protocol for Kafka",
+						MarkdownDescription: "Security protocol for external kafka cluster, currently support `PLAINTEXT` and `SASL_PLAINTEXT`",
 						Required:            true,
 						Validators: []validator.String{
 							stringvalidator.OneOf("PLAINTEXT", "SASL_PLAINTEXT"),
 						},
 					},
 					"sasl_mechanism": schema.StringAttribute{
-						MarkdownDescription: "SASL mechanism for Kafka",
+						MarkdownDescription: "SASL mechanism for external kafka cluster, currently support `PLAIN`, `SCRAM-SHA-256` and `SCRAM-SHA-512`",
 						Required:            true,
 						Validators: []validator.String{
 							stringvalidator.OneOf("PLAIN", "SCRAM-SHA-256", "SCRAM-SHA-512"),
 						},
 					},
 					"sasl_username": schema.StringAttribute{
-						MarkdownDescription: "SASL username for Kafka",
+						MarkdownDescription: "SASL username for Kafka, The username and password are declared and returned when creating the kafka_user resource in AutoMQ.",
 						Required:            true,
 					},
 					"sasl_password": schema.StringAttribute{
-						MarkdownDescription: "SASL password for Kafka",
+						MarkdownDescription: "SASL password for Kafka, The username and password are declared and returned when creating the kafka_user resource in AutoMQ.",
 						Required:            true,
 					},
 				},
 			},
 			"prometheus_config": schema.SingleNestedAttribute{
-				MarkdownDescription: "Prometheus",
+				MarkdownDescription: "Prometheus integration configurations. When Type is `prometheus`, it must be set.",
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"username": schema.StringAttribute{
@@ -114,18 +114,18 @@ func (r *IntegrationResource) Schema(ctx context.Context, req resource.SchemaReq
 				},
 			},
 			"cloudwatch_config": schema.SingleNestedAttribute{
-				MarkdownDescription: "CloudWatch",
+				MarkdownDescription: "CloudWatch integration configurations. When Type is `cloudwatch`, it must be set.",
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"namespace": schema.StringAttribute{
-						MarkdownDescription: "Namespace",
+						MarkdownDescription: "Set cloudwatch namespace, AutoMQ will write all Metrics data under this namespace. The namespace name must contain 1 to 255 valid ASCII characters and may be alphanumeric, periods, hyphens, underscores, forward slashes, pound signs, colons, and spaces, but not all spaces.",
 						Optional:            true,
 					},
 				},
 			},
 			"id": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "Integration identifier",
+				MarkdownDescription: "Integration identifier, Used for binding and association with the instance.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
