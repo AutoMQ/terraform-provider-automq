@@ -1,6 +1,7 @@
 ---
 page_title: "Provider: AutoMQ"
 description: |-
+
 AutoMQ Provider is utilized to manage resources in AutoMQ environment. The provider allows for the management of instances and Kafka resources within those instances (such as Topics, Users, and ACLs).
 
 ---

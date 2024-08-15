@@ -95,24 +95,6 @@ func (r *IntegrationResource) Schema(ctx context.Context, req resource.SchemaReq
 					},
 				},
 			},
-			"prometheus_config": schema.SingleNestedAttribute{
-				MarkdownDescription: "Prometheus integration configurations. When Type is `prometheus`, it must be set.",
-				Optional:            true,
-				Attributes: map[string]schema.Attribute{
-					"username": schema.StringAttribute{
-						MarkdownDescription: "Username",
-						Optional:            true,
-					},
-					"password": schema.StringAttribute{
-						MarkdownDescription: "Password",
-						Optional:            true,
-					},
-					"bearer_token": schema.StringAttribute{
-						MarkdownDescription: "Bearer token",
-						Optional:            true,
-					},
-				},
-			},
 			"cloudwatch_config": schema.SingleNestedAttribute{
 				MarkdownDescription: "CloudWatch integration configurations. When Type is `cloudwatch`, it must be set.",
 				Optional:            true,

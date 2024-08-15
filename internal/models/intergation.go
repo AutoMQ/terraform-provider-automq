@@ -25,7 +25,6 @@ type IntegrationResourceModel struct {
 	EndPoint         types.String                 `tfsdk:"endpoint"`
 	ID               types.String                 `tfsdk:"id"`
 	KafkaConfig      *KafkaIntegrationConfig      `tfsdk:"kafka_config"`
-	PrometheusConfig *PrometheusIntegrationConfig `tfsdk:"prometheus_config"`
 	CloudWatchConfig *CloudWatchIntegrationConfig `tfsdk:"cloudwatch_config"`
 	CreatedAt        timetypes.RFC3339            `tfsdk:"created_at"`
 	LastUpdated      timetypes.RFC3339            `tfsdk:"last_updated"`
