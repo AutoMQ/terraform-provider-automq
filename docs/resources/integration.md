@@ -61,7 +61,6 @@ resource "automq_integration" "example" {
 - `cloudwatch_config` (Attributes) CloudWatch integration configurations. When Type is `cloudwatch`, it must be set. (see [below for nested schema](#nestedatt--cloudwatch_config))
 - `endpoint` (String) Endpoint of integration. When selecting Prometheus and Kafka integration, you need to configure the corresponding endpoints. For detailed configuration instructions, please refer to the [documentation](https://docs.automq.com/automq-cloud/manage-environments/byoc-environment/manage-integrations).
 - `kafka_config` (Attributes) Kafka integration configurations. When Type is `kafka`, it must be set. (see [below for nested schema](#nestedatt--kafka_config))
-- `prometheus_config` (Attributes) Prometheus integration configurations. When Type is `prometheus`, it must be set. (see [below for nested schema](#nestedatt--prometheus_config))
 
 ### Read-Only
 
@@ -86,13 +85,3 @@ Required:
 - `sasl_password` (String) SASL password for Kafka, The username and password are declared and returned when creating the kafka_user resource in AutoMQ.
 - `sasl_username` (String) SASL username for Kafka, The username and password are declared and returned when creating the kafka_user resource in AutoMQ.
 - `security_protocol` (String) Security protocol for external kafka cluster, currently support `PLAINTEXT` and `SASL_PLAINTEXT`
-
-
-<a id="nestedatt--prometheus_config"></a>
-### Nested Schema for `prometheus_config`
-
-Optional:
-
-- `bearer_token` (String) Bearer token
-- `password` (String) Password
-- `username` (String) Username
