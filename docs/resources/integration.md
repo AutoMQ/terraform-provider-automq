@@ -52,7 +52,6 @@ resource "automq_integration" "example" {
 
 ### Required
 
-- `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
 - `name` (String) The integrated name identifies different configurations and contains 3 to 64 characters, including letters a to z or a to z, digits 0 to 9, underscores (_), and hyphens (-).
 - `type` (String) Type of integration, currently support `kafka` and `cloudwatch`
 
@@ -60,6 +59,7 @@ resource "automq_integration" "example" {
 
 - `cloudwatch_config` (Attributes) CloudWatch integration configurations. When Type is `cloudwatch`, it must be set. (see [below for nested schema](#nestedatt--cloudwatch_config))
 - `endpoint` (String) Endpoint of integration. When selecting Prometheus and Kafka integration, you need to configure the corresponding endpoints. For detailed configuration instructions, please refer to the [documentation](https://docs.automq.com/automq-cloud/manage-environments/byoc-environment/manage-integrations).
+- `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
 - `kafka_config` (Attributes) Kafka integration configurations. When Type is `kafka`, it must be set. (see [below for nested schema](#nestedatt--kafka_config))
 
 ### Read-Only

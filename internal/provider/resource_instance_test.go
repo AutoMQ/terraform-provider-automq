@@ -118,18 +118,19 @@ func TestAccKafkaInstanceResource(t *testing.T) {
 func testAccKafkaInstanceResourceConfig(mockServerUrl string) string {
 	return fmt.Sprintf(`
 provider "automq" {
-  automq_byoc_host  = "%s"
+  automq_byoc_endpoint  = "%s"
   automq_byoc_access_key_id = "VLaUIeNYndeOAXjaol32o4UAHvX8A7VE"
   automq_byoc_secret_key = "CHlRi0hOIA8pAnzW"
+  automq_environment_id = "env-1"
 }
 resource "automq_kafka_instance" "test" {
   environment_id = "env-1"
   name   = "test"
   description    = "test"
-  cloud_provider = "aliyun"
-  region         = "cn-hangzhou"
+  cloud_provider = "aws"
+  region         = "ap-southeast-1"
   networks = [{
-    zone   = "cn-hangzhou-b"
+    zone   = "ap-southeast-1a"
     subnets = ["vsw-bp14v5eikr8wrgoqje7hr"]
   }]
   compute_specs = {
@@ -173,14 +174,14 @@ func newInstanceResponse() client.KafkaInstanceResponse {
 	instanceResponse.InstanceID = "kf-cakz90r71mspc7vy"
 	instanceResponse.DisplayName = "test"
 	instanceResponse.Description = "test"
-	instanceResponse.Provider = "aliyun"
-	instanceResponse.Region = "cn-hangzhou"
+	instanceResponse.Provider = "aws"
+	instanceResponse.Region = "ap-southeast-1"
 	instanceResponse.Spec.Version = "1.2.0"
 	instanceResponse.Spec.PaymentPlan.PaymentType = "ON_DEMAND"
 	instanceResponse.Spec.PaymentPlan.Period = 1
 	instanceResponse.Spec.PaymentPlan.Unit = "MONTH"
 	instanceResponse.Spec.Values = []client.Value{{Key: "aku", Value: 6}}
-	instanceResponse.Networks = []client.Network{{Zone: "cn-hangzhou-b", Subnets: []client.Subnet{{Subnet: "vsw-bp14v5eikr8wrgoqje7hr"}}}}
+	instanceResponse.Networks = []client.Network{{Zone: "ap-southeast-1a", Subnets: []client.Subnet{{Subnet: "vsw-bp14v5eikr8wrgoqje7hr"}}}}
 	return instanceResponse
 }
 

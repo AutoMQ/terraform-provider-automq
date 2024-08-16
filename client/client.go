@@ -13,12 +13,17 @@ import (
 )
 
 type Client struct {
-	HostURL     string
-	HTTPClient  *http.Client
-	Token       string
-	Credentials AuthCredentials
-	Signer      *signer.Signer
+	HostURL       string
+	HTTPClient    *http.Client
+	Token         string
+	Credentials   AuthCredentials
+	Signer        *signer.Signer
+	EnvironmentID string
 }
+
+type EnvironmentID string
+
+const EnvIdKey EnvironmentID = "environment_id"
 
 type AuthCredentials struct {
 	AccessKeyID     string
@@ -43,13 +48,22 @@ type ErrorModel struct {
 }
 
 func (e *ErrorResponse) Error() string {
+	var errMsg strings.Builder
+	errMsg.WriteString(fmt.Sprintf("Something went wrong. Error Code: %d\n", e.Code))
+
 	if e.APIError.ErrorModel.Code != "" {
-		return fmt.Sprintf("Error %d: %s: %s", e.Code, e.APIError.ErrorModel.Code, e.APIError.ErrorModel.Message)
+		errMsg.WriteString(fmt.Sprintf("API Error: %s\n", e.APIError.ErrorModel.Code))
+		errMsg.WriteString(fmt.Sprintf("Message: %s\n", e.APIError.ErrorModel.Message))
+	} else {
+		errMsg.WriteString(fmt.Sprintf("Message: %s\n", e.ErrorMessage))
 	}
-	return fmt.Sprintf("Error Code %d: %s", e.Code, e.ErrorMessage)
+	if e.APIError.ErrorModel.Detail != "" {
+		errMsg.WriteString(fmt.Sprintf("Details: %s\n", e.APIError.ErrorModel.Detail))
+	}
+	return errMsg.String()
 }
 
-func NewClient(ctx context.Context, host string, credentials AuthCredentials) (*Client, error) {
+func NewClient(ctx context.Context, host string, credentials AuthCredentials, envId string) (*Client, error) {
 	c := &Client{
 		HTTPClient:  &http.Client{Timeout: 0 * time.Second},
 		HostURL:     host,
@@ -58,6 +72,7 @@ func NewClient(ctx context.Context, host string, credentials AuthCredentials) (*
 			AccessKeyID:     credentials.AccessKeyID,
 			SecretAccessKey: credentials.SecretAccessKey,
 		}),
+		EnvironmentID: envId,
 	}
 	return c, nil
 }
@@ -105,13 +120,21 @@ func buildQueryParams(queryParams map[string]string) string {
 	return query
 }
 
-func (c *Client) doRequest(_ context.Context, method, path string, body io.Reader) ([]byte, error) {
+func (c *Client) doRequest(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
 	req, err := http.NewRequest(method, c.HostURL+path, body)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept-Language", "en")
+	environmentID, ok := ctx.Value(EnvIdKey).(string)
+	if ok {
+		req.Header.Set("X-automq-environment-id", environmentID)
+	} else if c.EnvironmentID != "" {
+		req.Header.Set("X-automq-environment-id", c.EnvironmentID)
+	} else {
+		return nil, &ErrorResponse{Code: 0, ErrorMessage: "Error getting environment ID from context"}
+	}
 
 	var seeker io.ReadSeeker
 	if sr, ok := body.(io.ReadSeeker); ok {

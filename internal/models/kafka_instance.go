@@ -82,7 +82,7 @@ type ComputeSpecsModel struct {
 func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *client.KafkaInstanceRequest) {
 	request.DisplayName = instance.Name.ValueString()
 	request.Description = instance.Description.ValueString()
-	request.Provider = instance.CloudProvider.ValueString()
+	request.Provider = mapCloudProviderValue(instance.CloudProvider)
 	request.Region = instance.Region.ValueString()
 	request.Networks = make([]client.KafkaInstanceRequestNetwork, len(instance.Networks))
 	request.Spec = client.KafkaInstanceRequestSpec{
@@ -128,7 +128,7 @@ func FlattenKafkaInstanceModel(instance *client.KafkaInstanceResponse, resource 
 	resource.InstanceID = types.StringValue(instance.InstanceID)
 	resource.Name = types.StringValue(instance.DisplayName)
 	resource.Description = types.StringValue(instance.Description)
-	resource.CloudProvider = types.StringValue(instance.Provider)
+	resource.CloudProvider = mapCloudProvider(instance.Provider)
 	resource.Region = types.StringValue(instance.Region)
 	resource.ACL = types.BoolValue(instance.AclEnabled)
 	networks, diag := flattenNetworks(instance.Networks)
@@ -213,5 +213,23 @@ func flattenComputeSpecs(spec client.Spec) ComputeSpecsModel {
 	return ComputeSpecsModel{
 		Aku:     aku,
 		Version: types.StringValue(spec.Version),
+	}
+}
+
+func mapCloudProvider(provider string) types.String {
+	switch provider {
+	case "aliyun":
+		return types.StringValue("alicloud")
+	default:
+		return types.StringValue(provider)
+	}
+}
+
+func mapCloudProviderValue(provider types.String) string {
+	switch provider.ValueString() {
+	case "alicloud":
+		return "aliyun"
+	default:
+		return provider.ValueString()
 	}
 }
