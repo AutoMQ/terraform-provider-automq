@@ -110,18 +110,18 @@ func buildSigner() Signer {
 }
 
 func TestPresignRequest(t *testing.T) {
-	req, body := buildRequest("dynamodb", "private", "{}")
+	req, body := buildRequest("dynamodb", "private1", "{}")
 
 	signer := buildSigner()
-	_, err := signer.Presign(req, body, "dynamodb", "private", 300*time.Second, epochTime())
+	_, err := signer.Presign(req, body, "dynamodb", "private1", 300*time.Second, epochTime())
 	if err != nil {
 		t.Fatalf("expect no error, got %v", err)
 	}
 
 	expectedDate := "19700101T000000Z"
 	expectedHeaders := "content-length;content-type;host;x-automq-meta-other-header;x-automq-meta-other-header_with_underscore;x-automq-target"
-	expectedSig := "e6148c3c06ab8171d42dbab583e00f885f8c92b385302ca6ee19fb5762b5157f"
-	expectedCred := "AKID/19700101/private/dynamodb/cmp_request"
+	expectedSig := "fdbcdc952965b02674c77715be3fd9130faf44a6c784652622cc15fe9df425ca"
+	expectedCred := "AKID/19700101/private1/dynamodb/cmp_request"
 	expectedTarget := "prefix.Operation"
 
 	q := req.URL.Query()

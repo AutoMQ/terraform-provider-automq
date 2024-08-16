@@ -202,7 +202,7 @@ func (r *KafkaTopicResource) Update(ctx context.Context, req resource.UpdateRequ
 		}
 
 		in := client.TopicConfigParam{}
-		in.Configs = models.CreateConfigFromMapValue(planConfig)
+		in.Configs = models.ExpandStringValueMap(planConfig)
 
 		_, err := r.client.UpdateKafkaTopicConfig(ctx, instanceId, topicId, in)
 		if err != nil {

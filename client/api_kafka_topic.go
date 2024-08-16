@@ -53,7 +53,7 @@ func (c *Client) UpdateKafkaTopicPartition(ctx context.Context, instanceId strin
 	path := fmt.Sprintf(UpdateKafkaTopicPartitionPath, instanceId, topicId)
 	_, err := c.Patch(ctx, path, partition)
 	if err != nil {
-		return nil
+		return err
 	}
 	return nil
 }

@@ -146,23 +146,25 @@ func flattenIntergrationTypeConfig(iType string, config map[string]interface{}, 
 
 func flattenKafkaConfig(config map[string]interface{}, resource *IntegrationResourceModel) {
 	resource.KafkaConfig = &KafkaIntegrationConfig{}
-	if v, ok := config["securityProtocol"]; ok {
-		resource.KafkaConfig.SecurityProtocol = types.StringValue(v.(string))
+	if v, ok := config["securityProtocol"].(string); ok {
+		resource.KafkaConfig.SecurityProtocol = types.StringValue(v)
 	}
-	if v, ok := config["saslMechanism"]; ok {
-		resource.KafkaConfig.SaslMechanism = types.StringValue(v.(string))
+	if v, ok := config["saslMechanism"].(string); ok {
+		resource.KafkaConfig.SaslMechanism = types.StringValue(v)
 	}
-	if v, ok := config["saslUsername"]; ok {
-		resource.KafkaConfig.SaslUsername = types.StringValue(v.(string))
+	if v, ok := config["saslUsername"].(string); ok {
+		resource.KafkaConfig.SaslUsername = types.StringValue(v)
 	}
-	if v, ok := config["saslPassword"]; ok {
-		resource.KafkaConfig.SaslPassword = types.StringValue(v.(string))
+	if v, ok := config["saslPassword"].(string); ok {
+		resource.KafkaConfig.SaslPassword = types.StringValue(v)
 	}
 }
 
 func flattenCloudWatchConfig(config map[string]interface{}, resource *IntegrationResourceModel) {
 	resource.CloudWatchConfig = &CloudWatchIntegrationConfig{}
 	if v, ok := config["namespace"]; ok {
-		resource.CloudWatchConfig.NameSpace = types.StringValue(v.(string))
+		if str, ok := v.(string); ok {
+			resource.CloudWatchConfig.NameSpace = types.StringValue(str)
+		}
 	}
 }

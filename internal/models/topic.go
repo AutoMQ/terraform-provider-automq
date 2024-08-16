@@ -25,13 +25,14 @@ func ExpandKafkaTopicResource(topic KafkaTopicResourceModel, request *client.Top
 	request.Configs = make([]client.ConfigItemParam, len(topic.Configs.Elements()))
 	i := 0
 	for name, value := range topic.Configs.Elements() {
-		config := value.(types.String)
-		request.Configs[i] = client.ConfigItemParam{
-			Key:   name,
-			Value: config.ValueString(),
-		}
-		if name == "cleanup.policy" {
-			request.CompactStrategy = strings.ToUpper(config.ValueString())
+		if config, ok := value.(types.String); ok {
+			request.Configs[i] = client.ConfigItemParam{
+				Key:   name,
+				Value: config.ValueString(),
+			}
+			if name == "cleanup.policy" {
+				request.CompactStrategy = strings.ToUpper(config.ValueString())
+			}
 		}
 		i += 1
 	}
@@ -43,6 +44,6 @@ func ExpandKafkaTopicResource(topic KafkaTopicResourceModel, request *client.Top
 func FlattenKafkaTopic(topic *client.TopicVO, resource *KafkaTopicResourceModel) diag.Diagnostics {
 	resource.TopicID = types.StringValue(topic.TopicId)
 	resource.Name = types.StringValue(topic.Name)
-	resource.Partition = types.Int64Value(int64(topic.Partition))
+	resource.Partition = types.Int64Value(topic.Partition)
 	return nil
 }

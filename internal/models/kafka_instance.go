@@ -10,7 +10,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 const (
@@ -102,7 +101,7 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 		}
 	}
 	request.InstanceConfig = client.InstanceConfigParam{}
-	request.InstanceConfig.Configs = CreateConfigFromMapValue(instance.Configs)
+	request.InstanceConfig.Configs = ExpandStringValueMap(instance.Configs)
 	request.Integrations = ExpandStringValueList(instance.Integrations)
 	request.AclEnabled = instance.ACL.ValueBool()
 }
@@ -215,14 +214,4 @@ func flattenComputeSpecs(spec client.Spec) ComputeSpecsModel {
 		Aku:     aku,
 		Version: types.StringValue(spec.Version),
 	}
-}
-
-func ExpandStringValueList(v basetypes.ListValuable) []string {
-	var output []string
-	if listValue, ok := v.(basetypes.ListValue); ok {
-		for _, value := range listValue.Elements() {
-			output = append(output, value.(types.String).ValueString())
-		}
-	}
-	return output
 }
