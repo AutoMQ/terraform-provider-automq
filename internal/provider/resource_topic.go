@@ -242,7 +242,7 @@ func (r *KafkaTopicResource) Delete(ctx context.Context, req resource.DeleteRequ
 }
 
 func (r *KafkaTopicResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resource.ImportStatePassthroughID(ctx, path.Root("topic_id"), req, resp)
 }
 
 func ReadKafkaTopic(ctx context.Context, r *KafkaTopicResource, instanceId, topicId string, data *models.KafkaTopicResourceModel) diag.Diagnostics {

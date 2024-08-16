@@ -62,7 +62,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				Subnets: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
 			},
 		},
-		ComputeSpecs: ComputeSpecsModel{
+		ComputeSpecs: &ComputeSpecsModel{
 			Aku:     types.Int64Value(4),
 			Version: types.StringValue("1.0.0"),
 		},
