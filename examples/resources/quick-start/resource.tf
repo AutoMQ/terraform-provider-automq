@@ -9,7 +9,7 @@ terraform {
 locals {
   env_id = "cmp-dev"
 
-  automq_byoc_endpoint       = "http://localhost:8081"
+  automq_byoc_endpoint      = "http://localhost:8081"
   automq_byoc_access_key_id = "9vBQQqxthaNJ9cCo"
   automq_byoc_secret_key    = "4REoWzOrU4l6dlZs1onK5Dbye6AxkGlJ"
 
@@ -20,15 +20,15 @@ locals {
 }
 
 provider "automq" {
-  automq_environment_id       = local.env_id
-  automq_byoc_endpoint        = local.automq_byoc_endpoint
+  automq_environment_id     = local.env_id
+  automq_byoc_endpoint      = local.automq_byoc_endpoint
   automq_byoc_access_key_id = local.automq_byoc_access_key_id
   automq_byoc_secret_key    = local.automq_byoc_secret_key
 }
 
 resource "automq_integration" "example" {
-  name           = "integration-example-1"
-  type           = "cloudWatch"
+  name = "integration-example-1"
+  type = "cloudWatch"
   cloudwatch_config = {
     namespace = "example"
   }
