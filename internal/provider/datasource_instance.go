@@ -256,7 +256,7 @@ func (r *KafkaInstanceDataSource) Read(ctx context.Context, req datasource.ReadR
 	// Convert API response into data source model
 	models.ConvertKafkaInstanceModel(&instance, &model)
 	// Update the model with the configurations
-	model.Configs = models.CreateMapFromConfigValue(configs)
+	model.Configs = models.FlattenStringValueMap(configs)
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
