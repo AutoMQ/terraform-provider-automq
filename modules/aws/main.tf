@@ -139,4 +139,5 @@ module "automq_byoc" {
   automq_byoc_env_version                  = var.automq_byoc_env_version
   specified_ami_by_marketplace             = var.specified_ami_by_marketplace
   automq_byoc_env_console_ami              = var.automq_byoc_env_console_ami
+  automq_byoc_env_console_cidr             = var.automq_byoc_env_console_cidr
 }

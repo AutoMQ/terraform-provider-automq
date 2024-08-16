@@ -53,3 +53,9 @@ variable "automq_byoc_env_console_ami" {
   description = "When obtaining ami id from non-cloud market, manually specify ami id."
   type = string
 }
+
+variable "automq_byoc_env_console_cidr" {
+  description = "Set CIDR block to restrict the source IP address range for accessing the AutoMQ environment console. If not set, the default is 0.0.0.0/0."
+  type = string
+  default = "0.0.0.0/0"
+}
