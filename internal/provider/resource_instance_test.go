@@ -118,7 +118,7 @@ func TestAccKafkaInstanceResource(t *testing.T) {
 func testAccKafkaInstanceResourceConfig(mockServerUrl string) string {
 	return fmt.Sprintf(`
 provider "automq" {
-  automq_byoc_host  = "%s"
+  automq_byoc_endpoint  = "%s"
   automq_byoc_access_key_id = "VLaUIeNYndeOAXjaol32o4UAHvX8A7VE"
   automq_byoc_secret_key = "CHlRi0hOIA8pAnzW"
 }
