@@ -81,11 +81,17 @@ variable "specific_ops_bucket_name" {
 variable "specified_ami_by_marketplace" {
   description = "Specifies the switch to obtain ami id from the cloud market. If true, it means to obtain the specified version of ami id through the cloud market. Otherwise, it needs to be specified manually."
   type = bool
-  default = false
+  default = true
 }
 
 variable "automq_byoc_env_console_ami" {
   description = "When obtaining ami id from non-cloud market, manually specify ami id."
   type = string
-  default = "ami-0abd5122c337075b6"
+  default = ""
+}
+
+variable "automq_byoc_env_console_cidr" {
+  description = "Set CIDR block to restrict the source IP address range for accessing the AutoMQ environment console. If not set, the default is 0.0.0.0/0."
+  type = string
+  default = "0.0.0.0/0"
 }

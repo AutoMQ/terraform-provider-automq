@@ -77,3 +77,8 @@ output "automq_byoc_instance_id" {
   description = "AutoMQ BYOC Console instance ID."
   value = module.automq_byoc.automq_byoc_instance_id
 }
+
+output "automq_byoc_env_console_cidr" {
+  description = "AutoMQ BYOC security group CIDR"
+  value = module.automq_byoc.automq_byoc_env_console_cidr
+}
