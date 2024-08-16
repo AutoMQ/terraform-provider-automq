@@ -10,13 +10,13 @@ locals {
   env_id = "cmp-dev"
 
   automq_byoc_endpoint      = "http://localhost:8081"
-  automq_byoc_access_key_id = "9vBQQqxthaNJ9cCo"
-  automq_byoc_secret_key    = "4REoWzOrU4l6dlZs1onK5Dbye6AxkGlJ"
+  automq_byoc_access_key_id = "RSaIMzrFC0kAmS1x"
+  automq_byoc_secret_key    = "msnGqOuaV5gblXPvkWfxg7Ao7Nq2iyMo"
 
-  instance_deploy_region = "ap-southeast-1"
-  instance_deploy_zone   = "ap-southeast-1a"
+  instance_deploy_region = "cn-hangzhou"
+  instance_deploy_zone   = "cn-hangzhou-b"
 
-  instance_deploy_subnet = "subnet-06226ce8b221db030"
+  instance_deploy_subnet = "vsw-bp14v5eikr8wrgoqje7hr"
 }
 
 provider "automq" {
@@ -26,18 +26,10 @@ provider "automq" {
   automq_byoc_secret_key    = local.automq_byoc_secret_key
 }
 
-resource "automq_integration" "example" {
-  name = "integration-example-1"
-  type = "cloudWatch"
-  cloudwatch_config = {
-    namespace = "example"
-  }
-}
-
 resource "automq_kafka_instance" "example" {
-  name           = "automq-example-2"
+  name           = "automq-example-1"
   description    = "example"
-  cloud_provider = "aws"
+  cloud_provider = "alicloud"
   region         = local.instance_deploy_region
   networks = [
     {
@@ -49,8 +41,7 @@ resource "automq_kafka_instance" "example" {
     aku     = "18"
     version = "1.1.0"
   }
-  acl          = true
-  integrations = [automq_integration.example.id]
+  acl = true
   configs = {
     "auto.create.topics.enable" = "false"
     "log.retention.ms"          = "3600000"

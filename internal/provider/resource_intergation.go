@@ -53,7 +53,7 @@ func (r *IntegrationResource) Schema(ctx context.Context, req resource.SchemaReq
 				Validators:          []validator.String{stringvalidator.LengthBetween(1, 64)},
 			},
 			"type": schema.StringAttribute{
-				MarkdownDescription: "Type of integration, currently support `kafka` and `cloudwatch`",
+				MarkdownDescription: "Type of integration, currently support `kafka` and `cloudWatch`",
 				Required:            true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("prometheus", "kafka", "cloudWatch"),

@@ -189,7 +189,7 @@ func newInstanceIntegrationResponse() client.PageNumResultIntegrationVO {
 	return client.PageNumResultIntegrationVO{
 		List: []client.IntegrationVO{
 			{
-				Type:     "cloudwatch",
+				Type:     "cloudWatch",
 				Code:     "integration-1",
 				Name:     "cloudwatch",
 				EndPoint: nil,
