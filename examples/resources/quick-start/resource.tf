@@ -7,39 +7,37 @@ terraform {
 }
 
 locals {
-  env_id = "example"
+  env_id = "cmp-dev"
 
-  automq_byoc_host          = "http://localhost:8081"
-  automq_byoc_access_key_id = "RSaIMzrFC0kAmS1x"
-  automq_byoc_secret_key    = "msnGqOuaV5gblXPvkWfxg7Ao7Nq2iyMo"
+  automq_byoc_endpoint      = "http://localhost:8081"
+  automq_byoc_access_key_id = "9vBQQqxthaNJ9cCo"
+  automq_byoc_secret_key    = "4REoWzOrU4l6dlZs1onK5Dbye6AxkGlJ"
 
-  instance_deploy_region = "cn-hangzhou"
-  instance_deploy_zone   = "cn-hangzhou-b"
+  instance_deploy_region = "ap-southeast-1"
+  instance_deploy_zone   = "ap-southeast-1a"
 
-  instance_deploy_subnet = "vsw-bp14v5eikr8wrgoqje7hr"
+  instance_deploy_subnet = "subnet-06226ce8b221db030"
 }
 
 provider "automq" {
-  automq_byoc_host          = local.automq_byoc_host
+  automq_environment_id     = local.env_id
+  automq_byoc_endpoint      = local.automq_byoc_endpoint
   automq_byoc_access_key_id = local.automq_byoc_access_key_id
   automq_byoc_secret_key    = local.automq_byoc_secret_key
 }
 
 resource "automq_integration" "example" {
-  environment_id = local.env_id
-  name           = "integration-example"
-  type           = "cloudWatch"
+  name = "integration-example-1"
+  type = "cloudWatch"
   cloudwatch_config = {
     namespace = "example"
   }
 }
 
 resource "automq_kafka_instance" "example" {
-  environment_id = local.env_id
-
-  name           = "automq-example-1"
+  name           = "automq-example-2"
   description    = "example"
-  cloud_provider = "aliyun"
+  cloud_provider = "aws"
   region         = local.instance_deploy_region
   networks = [
     {
@@ -60,8 +58,6 @@ resource "automq_kafka_instance" "example" {
 }
 
 resource "automq_kafka_topic" "example" {
-  environment_id = local.env_id
-
   kafka_instance_id = automq_kafka_instance.example.id
   name              = "example"
   partition         = 16
@@ -73,16 +69,12 @@ resource "automq_kafka_topic" "example" {
 }
 
 resource "automq_kafka_user" "example" {
-  environment_id = local.env_id
-
   kafka_instance_id = automq_kafka_instance.example.id
   username          = "automq_kafka_user-1"
   password          = "automq_kafka_user"
 }
 
 resource "automq_kafka_acl" "example" {
-  environment_id = local.env_id
-
   kafka_instance_id = automq_kafka_instance.example.id
 
   resource_type   = "TOPIC"

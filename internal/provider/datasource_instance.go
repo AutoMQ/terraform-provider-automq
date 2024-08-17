@@ -40,7 +40,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
 				MarkdownDescription: "Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.",
-				Required:            true,
+				Optional:            true,
 			},
 			"id": schema.StringAttribute{
 				Optional:            true,
@@ -179,6 +179,9 @@ func (r *KafkaInstanceDataSource) Read(ctx context.Context, req datasource.ReadR
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+	if !config.EnvironmentID.IsNull() {
+		ctx = context.WithValue(ctx, client.EnvIdKey, config.EnvironmentID.ValueString())
 	}
 
 	instance := models.KafkaInstanceResourceModel{}

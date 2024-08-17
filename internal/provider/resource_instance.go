@@ -56,7 +56,8 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
 				MarkdownDescription: "Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.",
-				Required:            true,
+				Optional:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -76,7 +77,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 			"cloud_provider": schema.StringAttribute{
 				MarkdownDescription: "To set up a Kafka instance, you need to specify the target cloud provider environment for deployment. Currently, `aws` is supported. This parameter must match the cloud provider and region where the current environment is deployed.",
 				Required:            true,
-				Validators:          []validator.String{stringvalidator.OneOf("aws", "aws-cn", "aliyun")},
+				Validators:          []validator.String{stringvalidator.OneOf("aws")},
 			},
 			"region": schema.StringAttribute{
 				MarkdownDescription: "To set up an instance, you need to specify the target region for deployment. This parameter must match the cloud provider and region where the current environment is deployed.",
@@ -224,6 +225,9 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &instance)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+	if !instance.EnvironmentID.IsNull() {
+		ctx = context.WithValue(ctx, client.EnvIdKey, instance.EnvironmentID.ValueString())
 	}
 
 	// Generate API request body from plan

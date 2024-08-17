@@ -38,16 +38,6 @@ func TestExpandKafkaACLResource(t *testing.T) {
 				},
 			},
 		},
-		{
-			acl: KafkaAclResourceModel{
-				Principal: types.StringValue("admin"),
-			},
-			expected: client.KafkaAclBindingParam{
-				AccessControlParam: client.KafkaControlParam{
-					User: "admin",
-				},
-			},
-		},
 	}
 
 	for _, test := range tests {

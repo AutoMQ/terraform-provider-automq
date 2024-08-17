@@ -45,7 +45,8 @@ func (r *KafkaTopicResource) Schema(ctx context.Context, req resource.SchemaRequ
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
 				MarkdownDescription: "Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.",
-				Required:            true,
+				Optional:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"kafka_instance_id": schema.StringAttribute{
 				MarkdownDescription: "Target Kafka instance ID, each instance represents a kafka cluster. The instance id looks like kf-xxxxxxx.",
@@ -101,7 +102,9 @@ func (r *KafkaTopicResource) Create(ctx context.Context, req resource.CreateRequ
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
+	if !topic.EnvironmentID.IsNull() {
+		ctx = context.WithValue(ctx, client.EnvIdKey, topic.EnvironmentID.ValueString())
+	}
 	// Generate API request body from plan
 	in := client.TopicCreateParam{}
 	models.ExpandKafkaTopicResource(topic, &in)
@@ -129,6 +132,9 @@ func (r *KafkaTopicResource) Read(ctx context.Context, req resource.ReadRequest,
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+	if !data.EnvironmentID.IsNull() {
+		ctx = context.WithValue(ctx, client.EnvIdKey, data.EnvironmentID.ValueString())
 	}
 
 	topicId := data.TopicID.ValueString()
@@ -236,7 +242,7 @@ func (r *KafkaTopicResource) Delete(ctx context.Context, req resource.DeleteRequ
 }
 
 func (r *KafkaTopicResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resource.ImportStatePassthroughID(ctx, path.Root("topic_id"), req, resp)
 }
 
 func ReadKafkaTopic(ctx context.Context, r *KafkaTopicResource, instanceId, topicId string, data *models.KafkaTopicResourceModel) diag.Diagnostics {

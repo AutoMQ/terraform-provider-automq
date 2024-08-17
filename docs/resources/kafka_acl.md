@@ -54,7 +54,6 @@ resource "automq_kafka_acl" "example" {
 
 ### Required
 
-- `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
 - `kafka_instance_id` (String) Target Kafka instance ID, each instance represents a kafka cluster. The instance id looks like kf-xxxxxxx.
 - `operation_group` (String) Set the authorized operation group. For the Topic resource type, the supported operations are `ALL` (all permissions), `PRODUCE` (produce messages only), and `CONSUME` (consume messages only). For other resource types, only `ALL` (all permissions) is supported.
 - `pattern_type` (String) Set the resource name matching pattern, supporting `LITERAL` and `PREFIXED`. `LITERAL` represents exact matching, while `PREFIXED` represents prefix matching.
@@ -64,6 +63,7 @@ resource "automq_kafka_acl" "example" {
 
 ### Optional
 
+- `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
 - `permission` (String) Set the permission type, which supports `ALLOW` and `DENY`. Default value is `ALLOW`. `ALLOW` grants permission to perform the operation, while `DENY` prohibits the operation. `DENY` takes precedence over `ALLOW`.
 
 ### Read-Only

@@ -41,9 +41,10 @@ type AutoMQProvider struct {
 
 // autoMQProviderModel describes the provider data model.
 type autoMQProviderModel struct {
+	EnvironmentID types.String `tfsdk:"automq_environment_id"`
 	BYOCAccessKey types.String `tfsdk:"automq_byoc_access_key_id"`
 	BYOCSecretKey types.String `tfsdk:"automq_byoc_secret_key"`
-	BYOCHost      types.String `tfsdk:"automq_byoc_host"`
+	BYOCEndpoint  types.String `tfsdk:"automq_byoc_endpoint"`
 }
 
 func (p *AutoMQProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -54,6 +55,10 @@ func (p *AutoMQProvider) Metadata(ctx context.Context, req provider.MetadataRequ
 func (p *AutoMQProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"automq_environment_id": schema.StringAttribute{
+				MarkdownDescription: "Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.",
+				Optional:            true,
+			},
 			"automq_byoc_access_key_id": schema.StringAttribute{
 				MarkdownDescription: "Set the Access Key Id of Service Account. You can create and manage Access Keys by using the AutoMQ Cloud BYOC Console. Learn more about AutoMQ Cloud BYOC Console access [here](https://docs.automq.com/automq-cloud/manage-identities-and-access/service-accounts).",
 				Optional:            true,
@@ -62,7 +67,7 @@ func (p *AutoMQProvider) Schema(ctx context.Context, req provider.SchemaRequest,
 				MarkdownDescription: "Set the Secret Access Key of Service Account. You can create and manage Access Keys by using the AutoMQ Cloud BYOC Console. Learn more about AutoMQ Cloud BYOC Console access [here](https://docs.automq.com/automq-cloud/manage-identities-and-access/service-accounts).",
 				Optional:            true,
 			},
-			"automq_byoc_host": schema.StringAttribute{
+			"automq_byoc_endpoint": schema.StringAttribute{
 				MarkdownDescription: "Set the AutoMQ BYOC environment endpoint. The endpoint looks like http://{hostname}:8080. You can get this endpoint when deploy environment complete.",
 				Optional:            true,
 			},
@@ -79,9 +84,9 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 	// Configuration values are now available.
-	if data.BYOCHost.IsUnknown() {
+	if data.BYOCEndpoint.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("automq_byoc_host"),
+			path.Root("automq_byoc_endpoint"),
 			"Unknown AutoMQ API Host",
 			"The provider cannot create the AutoMQ API client as there is an unknown configuration value for the AutoMQ API host. "+
 				"Either target apply the source of the value first, set the value statically in the configuration, or use the AUTOMQ_HOST environment variable.",
@@ -112,12 +117,13 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	// Default values to environment variables, but override
 	// with Terraform configuration value if set.
 
-	byco_host := os.Getenv("AUTOMQ_BYOC_HOST")
+	byoc_endpoint := os.Getenv("AUTOMQ_BYOC_HOST")
 	byoc_access_key := os.Getenv("AUTOMQ_BYOC_ACCESS_KEY")
 	byoc_secret_key := os.Getenv("AUTOMQ_BYOC_SECRET_KEY")
+	environmentID := ""
 
-	if !data.BYOCHost.IsNull() {
-		byco_host = data.BYOCHost.ValueString()
+	if !data.BYOCEndpoint.IsNull() {
+		byoc_endpoint = data.BYOCEndpoint.ValueString()
 	}
 	if !data.BYOCAccessKey.IsNull() {
 		byoc_access_key = data.BYOCAccessKey.ValueString()
@@ -125,13 +131,16 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	if !data.BYOCSecretKey.IsNull() {
 		byoc_secret_key = data.BYOCSecretKey.ValueString()
 	}
+	if !data.EnvironmentID.IsNull() {
+		environmentID = data.EnvironmentID.ValueString()
+	}
 
 	// If any of the expected configurations are missing, return
 	// errors with provider-specific guidance.
 
-	if byco_host == "" {
+	if byoc_endpoint == "" {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("automq_byoc_host"),
+			path.Root("automq_byoc_endpoint"),
 			"Missing AutoMQ API Host",
 			"The provider cannot create the AutoMQ API client as there is a missing or empty value for the AutoMQ API host. "+
 				"Set the host value in the configuration or use the AUTOMQ_HOST environment variable. "+
@@ -162,7 +171,7 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 
-	ctx = tflog.SetField(ctx, "automq_env_byoc_host", byco_host)
+	ctx = tflog.SetField(ctx, "automq_env_byoc_host", byoc_endpoint)
 	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "automq_env_token")
 
 	tflog.Debug(ctx, "Creating AutoMQ client")
@@ -172,7 +181,7 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		SecretAccessKey: data.BYOCSecretKey.ValueString(),
 	}
 
-	client, err := client.NewClient(ctx, byco_host, credential)
+	client, err := client.NewClient(ctx, byoc_endpoint, credential, environmentID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Create AutoMQ API Client",

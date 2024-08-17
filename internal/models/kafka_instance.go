@@ -25,22 +25,22 @@ const (
 
 // KafkaInstanceResourceModel describes the resource data model.
 type KafkaInstanceResourceModel struct {
-	EnvironmentID  types.String      `tfsdk:"environment_id"`
-	InstanceID     types.String      `tfsdk:"id"`
-	Name           types.String      `tfsdk:"name"`
-	Description    types.String      `tfsdk:"description"`
-	CloudProvider  types.String      `tfsdk:"cloud_provider"`
-	Region         types.String      `tfsdk:"region"`
-	Networks       []NetworkModel    `tfsdk:"networks"`
-	ComputeSpecs   ComputeSpecsModel `tfsdk:"compute_specs"`
-	Configs        types.Map         `tfsdk:"configs"`
-	ACL            types.Bool        `tfsdk:"acl"`
-	Integrations   types.List        `tfsdk:"integrations"`
-	Endpoints      types.List        `tfsdk:"endpoints"`
-	CreatedAt      timetypes.RFC3339 `tfsdk:"created_at"`
-	LastUpdated    timetypes.RFC3339 `tfsdk:"last_updated"`
-	InstanceStatus types.String      `tfsdk:"instance_status"`
-	Timeouts       timeouts.Value    `tfsdk:"timeouts"`
+	EnvironmentID  types.String       `tfsdk:"environment_id"`
+	InstanceID     types.String       `tfsdk:"id"`
+	Name           types.String       `tfsdk:"name"`
+	Description    types.String       `tfsdk:"description"`
+	CloudProvider  types.String       `tfsdk:"cloud_provider"`
+	Region         types.String       `tfsdk:"region"`
+	Networks       []NetworkModel     `tfsdk:"networks"`
+	ComputeSpecs   *ComputeSpecsModel `tfsdk:"compute_specs"`
+	Configs        types.Map          `tfsdk:"configs"`
+	ACL            types.Bool         `tfsdk:"acl"`
+	Integrations   types.List         `tfsdk:"integrations"`
+	Endpoints      types.List         `tfsdk:"endpoints"`
+	CreatedAt      timetypes.RFC3339  `tfsdk:"created_at"`
+	LastUpdated    timetypes.RFC3339  `tfsdk:"last_updated"`
+	InstanceStatus types.String       `tfsdk:"instance_status"`
+	Timeouts       timeouts.Value     `tfsdk:"timeouts"`
 }
 
 type KafkaInstanceModel struct {
@@ -82,7 +82,7 @@ type ComputeSpecsModel struct {
 func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *client.KafkaInstanceRequest) {
 	request.DisplayName = instance.Name.ValueString()
 	request.Description = instance.Description.ValueString()
-	request.Provider = instance.CloudProvider.ValueString()
+	request.Provider = mapCloudProviderValue(instance.CloudProvider)
 	request.Region = instance.Region.ValueString()
 	request.Networks = make([]client.KafkaInstanceRequestNetwork, len(instance.Networks))
 	request.Spec = client.KafkaInstanceRequestSpec{
@@ -114,7 +114,7 @@ func ConvertKafkaInstanceModel(resource *KafkaInstanceResourceModel, model *Kafk
 	model.CloudProvider = resource.CloudProvider
 	model.Region = resource.Region
 	model.Networks = resource.Networks
-	model.ComputeSpecs = &resource.ComputeSpecs
+	model.ComputeSpecs = resource.ComputeSpecs
 	model.Configs = resource.Configs
 	model.ACL = resource.ACL
 	model.Integrations = resource.Integrations
@@ -128,7 +128,7 @@ func FlattenKafkaInstanceModel(instance *client.KafkaInstanceResponse, resource 
 	resource.InstanceID = types.StringValue(instance.InstanceID)
 	resource.Name = types.StringValue(instance.DisplayName)
 	resource.Description = types.StringValue(instance.Description)
-	resource.CloudProvider = types.StringValue(instance.Provider)
+	resource.CloudProvider = mapCloudProvider(instance.Provider)
 	resource.Region = types.StringValue(instance.Region)
 	resource.ACL = types.BoolValue(instance.AclEnabled)
 	networks, diag := flattenNetworks(instance.Networks)
@@ -202,7 +202,7 @@ func flattenNetworks(networks []client.Network) ([]NetworkModel, diag.Diagnostic
 	return networksModel, nil
 }
 
-func flattenComputeSpecs(spec client.Spec) ComputeSpecsModel {
+func flattenComputeSpecs(spec client.Spec) *ComputeSpecsModel {
 	var aku types.Int64
 	for _, value := range spec.Values {
 		if value.Key == "aku" {
@@ -210,8 +210,26 @@ func flattenComputeSpecs(spec client.Spec) ComputeSpecsModel {
 			break
 		}
 	}
-	return ComputeSpecsModel{
+	return &ComputeSpecsModel{
 		Aku:     aku,
 		Version: types.StringValue(spec.Version),
+	}
+}
+
+func mapCloudProvider(provider string) types.String {
+	switch provider {
+	case "aliyun":
+		return types.StringValue("alicloud")
+	default:
+		return types.StringValue(provider)
+	}
+}
+
+func mapCloudProviderValue(provider types.String) string {
+	switch provider.ValueString() {
+	case "alicloud":
+		return "aliyun"
+	default:
+		return provider.ValueString()
 	}
 }

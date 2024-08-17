@@ -49,10 +49,13 @@ resource "automq_kafka_user" "example" {
 
 ### Required
 
-- `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
 - `kafka_instance_id` (String) Target Kafka instance ID, each instance represents a kafka cluster. The instance id looks like kf-xxxxxxx.
 - `password` (String) Password for the Kafka user, limited to 8-24 characters.
 - `username` (String) Username for the Kafka user, limited to 4-64 characters.
+
+### Optional
+
+- `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
 
 ### Read-Only
 
