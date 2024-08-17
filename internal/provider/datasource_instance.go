@@ -35,7 +35,7 @@ func (r *KafkaInstanceDataSource) Metadata(ctx context.Context, req datasource.M
 func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		// This description is used by the documentation generator and the language server.
-		MarkdownDescription: "![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>Using the `automq_kafka_instance` resource type, you can create and manage Kafka instances, where each instance represents a physical cluster.",
+		MarkdownDescription: "![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>Using the `automq_kafka_instance` data source, you can manage kafka resoure within instance.",
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
@@ -55,7 +55,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 				Computed:            true,
 			},
 			"cloud_provider": schema.StringAttribute{
-				MarkdownDescription: "The cloud provider of kafka instance. Currently, 'aws' is supported.",
+				MarkdownDescription: "The cloud provider of kafka instance. Currently, `aws` is supported.",
 				Computed:            true,
 			},
 			"region": schema.StringAttribute{
@@ -100,7 +100,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 			},
 			"configs": schema.MapAttribute{
 				ElementType:         types.StringType,
-				MarkdownDescription: "Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/release-notes).",
+				MarkdownDescription: "Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).",
 				Computed:            true,
 			},
 			"integrations": schema.ListAttribute{

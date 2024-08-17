@@ -74,12 +74,12 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				Optional:            true,
 			},
 			"cloud_provider": schema.StringAttribute{
-				MarkdownDescription: "To set up a Kafka instance, you need to specify the target cloud provider environment for deployment. Currently, 'aws' is supported.",
+				MarkdownDescription: "To set up a Kafka instance, you need to specify the target cloud provider environment for deployment. Currently, `aws` is supported. This parameter must match the cloud provider and region where the current environment is deployed.",
 				Required:            true,
 				Validators:          []validator.String{stringvalidator.OneOf("aws", "aws-cn", "aliyun")},
 			},
 			"region": schema.StringAttribute{
-				MarkdownDescription: "To set up an instance, you need to specify the target region for deployment. Refer to the RegionId list provided by each cloud provider for available regions. Using AWS as an example, refer to this [documentation](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html) to set the correct `RegionId`.",
+				MarkdownDescription: "To set up an instance, you need to specify the target region for deployment. This parameter must match the cloud provider and region where the current environment is deployed.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
@@ -117,7 +117,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				Attributes: map[string]schema.Attribute{
 					"aku": schema.Int64Attribute{
 						Required:    true,
-						Description: "AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.",
+						Description: "AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.",
 					},
 					"version": schema.StringAttribute{
 						Optional:    true,
@@ -128,12 +128,12 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 			},
 			"configs": schema.MapAttribute{
 				ElementType:         types.StringType,
-				MarkdownDescription: "Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/release-notes).",
+				MarkdownDescription: "Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).",
 				Optional:            true,
 			},
 			"integrations": schema.ListAttribute{
 				Optional:    true,
-				Description: "Configure integration settings. AutoMQ supports integration with external products like `prometheus` and `cloudwatch`, forwarding instance Metrics data to Prometheus and CloudWatch.",
+				Description: "Configure integration setting. Set existed integration id. AutoMQ supports integration with external products like `prometheus` and `cloudwatch`, forwarding instance Metrics data to Prometheus and CloudWatch. Currently, only one integration is supported. Configuring multiple integrations simultaneously is not supported.",
 				ElementType: types.StringType,
 				Validators: []validator.List{
 					listvalidator.UniqueValues(),
