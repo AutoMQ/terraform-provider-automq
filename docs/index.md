@@ -16,8 +16,8 @@ The AutoMQ environment represents a namespace, with each environment containing 
 The AutoMQ Provider is used to manage an already installed AutoMQ environment. Therefore, before using the AutoMQ Provider, you need to complete the environment installation and obtain the access point and initial account information.
 
 Refer to the following for specific operations:
-- Install the AutoMQ environment by following the [documentation](https://github.com/AutoMQ/terraform-provider-automq/pull/22).
-- Create a ServiceAccount and obtain an AccessKey: After the environment is installed, users need to access the AutoMQ environment console through a web browser, create a Service Account, and use the AccessKey of the Service Account. You can get these by creating a Service account; refer to [docs](https://docs.automq.com/automq-cloud/manage-identities-and-access).
+- Install the AutoMQ environment by following the [documentation](https://registry.terraform.io/modules/AutoMQ/automq-byoc-environmet/aws/latest).
+- Create a ServiceAccount and obtain an AccessKey: After the environment is installed, users need to access the AutoMQ environment console through a web browser, create a Service Account, and use the AccessKey of the Service Account. You can get these by creating a Service account; Refer to [documentation](https://docs.automq.com/automq-cloud/manage-identities-and-access/overview).
 
 
 ## Example Usage
@@ -42,9 +42,9 @@ provider "scaffolding" {
 
 ### Optional
 
-- `automq_byoc_access_key_id` (String) Set the Access Key Id of client. AutoMQ Cloud (BYOC) requires Access Keys to manage access and authentication to different parts of the service. An Access Key consists of an access key id and a secret key. You can create and manage Access Keys by using the AutoMQ Cloud BYOC Console. Learn more about AutoMQ Cloud BYOC Console access [here](https://docs.automq.com/automq-cloud/manage-identities-and-access).
+- `automq_byoc_access_key_id` (String) Set the Access Key Id of client. AutoMQ Cloud (BYOC) requires Access Keys to manage access and authentication to different parts of the service. An Access Key consists of an access key id and a secret key. You can create and manage Access Keys by using the AutoMQ Cloud BYOC Console. Learn more about AutoMQ Cloud BYOC Console access [here](https://docs.automq.com/automq-cloud/manage-identities-and-access/overview).
 - `automq_byoc_host` (String) Set the AutoMQ BYOC environment endpoint. The endpoint like http://{hostname}:8080. You can get this endpoint when deploy environment complete.
-- `automq_byoc_secret_key` (String) Set the Secret Access Key of client. AutoMQ Cloud (BYOC) requires Access Keys to manage access and authentication to different parts of the service. An Access Key consists of an access key id and a secret key. You can create and manage Access Keys by using the AutoMQ Cloud BYOC Console. Learn more about AutoMQ Cloud BYOC Console access [here](https://docs.automq.com/automq-cloud/manage-identities-and-access).
+- `automq_byoc_secret_key` (String) Set the Secret Access Key of client. AutoMQ Cloud (BYOC) requires Access Keys to manage access and authentication to different parts of the service. An Access Key consists of an access key id and a secret key. You can create and manage Access Keys by using the AutoMQ Cloud BYOC Console. Learn more about AutoMQ Cloud BYOC Console access [here](https://docs.automq.com/automq-cloud/manage-identities-and-access/overview).
 
 ## Helpful Links/Information
 

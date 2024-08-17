@@ -55,11 +55,11 @@ func (p *AutoMQProvider) Schema(ctx context.Context, req provider.SchemaRequest,
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"automq_byoc_access_key_id": schema.StringAttribute{
-				MarkdownDescription: "Set the Access Key Id of client. AutoMQ Cloud (BYOC) requires Access Keys to manage access and authentication to different parts of the service. An Access Key consists of an access key id and a secret key. You can create and manage Access Keys by using the AutoMQ Cloud BYOC Console. Learn more about AutoMQ Cloud BYOC Console access [here](https://docs.automq.com/automq-cloud/manage-identities-and-access).",
+				MarkdownDescription: "Set the Access Key Id of client. AutoMQ Cloud (BYOC) requires Access Keys to manage access and authentication to different parts of the service. An Access Key consists of an access key id and a secret key. You can create and manage Access Keys by using the AutoMQ Cloud BYOC Console. Learn more about AutoMQ Cloud BYOC Console access [here](https://docs.automq.com/automq-cloud/manage-identities-and-access/overview).",
 				Optional:            true,
 			},
 			"automq_byoc_secret_key": schema.StringAttribute{
-				MarkdownDescription: "Set the Secret Access Key of client. AutoMQ Cloud (BYOC) requires Access Keys to manage access and authentication to different parts of the service. An Access Key consists of an access key id and a secret key. You can create and manage Access Keys by using the AutoMQ Cloud BYOC Console. Learn more about AutoMQ Cloud BYOC Console access [here](https://docs.automq.com/automq-cloud/manage-identities-and-access).",
+				MarkdownDescription: "Set the Secret Access Key of client. AutoMQ Cloud (BYOC) requires Access Keys to manage access and authentication to different parts of the service. An Access Key consists of an access key id and a secret key. You can create and manage Access Keys by using the AutoMQ Cloud BYOC Console. Learn more about AutoMQ Cloud BYOC Console access [here](https://docs.automq.com/automq-cloud/manage-identities-and-access/overview).",
 				Optional:            true,
 			},
 			"automq_byoc_host": schema.StringAttribute{
