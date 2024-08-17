@@ -3,12 +3,12 @@
 page_title: "automq_kafka_instance Data Source - automq"
 subcategory: ""
 description: |-
-  Using the automq_kafka_instance resource type, you can create and manage Kafka instances, where each instance represents a physical cluster.
+  Using the automq_kafka_instance data source, you can manage kafka resoure within instance.
 ---
 
 # automq_kafka_instance (Data Source)
 
-![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>Using the `automq_kafka_instance` resource type, you can create and manage Kafka instances, where each instance represents a physical cluster.
+![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>Using the `automq_kafka_instance` data source, you can manage kafka resoure within instance.
 
 
 
@@ -24,9 +24,9 @@ description: |-
 ### Read-Only
 
 - `acl` (Boolean) The ACL status the Kafka instance.
-- `cloud_provider` (String) The cloud provider of kafka instance. Currently, 'aws' is supported.
+- `cloud_provider` (String) The cloud provider of kafka instance. Currently, `aws` is supported.
 - `compute_specs` (Attributes) The compute specs of the instance, contains aku and version. (see [below for nested schema](#nestedatt--compute_specs))
-- `configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/release-notes).
+- `configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
 - `created_at` (String)
 - `description` (String) The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.
 - `endpoints` (Attributes List) The bootstrap endpoints of instance. AutoMQ supports multiple access protocols; therefore, the Endpoint is a list. (see [below for nested schema](#nestedatt--endpoints))

@@ -68,7 +68,7 @@ func (r *KafkaAclResource) Schema(ctx context.Context, req resource.SchemaReques
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"resource_name": schema.StringAttribute{
-				MarkdownDescription: "The target resource name for Kafka ACL authorization, can be a specific resource name or a resource name prefix (when using prefix matching, only the prefix needs to be provided without ending with \"\\*\"). If only \"\\*\" is specified, it represents all resources.",
+				MarkdownDescription: "The target resource name for Kafka ACL authorization, can be a specific resource name or a resource name prefix (when using prefix matching, only the prefix needs to be provided without ending with `*`). If only `*` is specified, it represents all resources.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
@@ -81,12 +81,12 @@ func (r *KafkaAclResource) Schema(ctx context.Context, req resource.SchemaReques
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"principal": schema.StringAttribute{
-				MarkdownDescription: "Set the authorized target principal, which currently supports Kafka User type principals, i.e., User:xxxx. Specify the Kafka user name. Principal must start with `User:` and contact with kafka_username.",
+				MarkdownDescription: "Set the authorized target principal, which currently supports Kafka User type principals, i.e., `User:xxxx`. Specify the Kafka user name. Principal must start with `User:` and contact with `kafka_user`.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"operation_group": schema.StringAttribute{
-				MarkdownDescription: "Set the authorized operation group. For the Topic resource type, the supported operations are `ALL (all permissions)`, `PRODUCE (produce messages only)`, and `CONSUME (consume messages only)`. For other resource types, only `ALL (all permissions)` is supported.",
+				MarkdownDescription: "Set the authorized operation group. For the Topic resource type, the supported operations are `ALL` (all permissions), `PRODUCE` (produce messages only), and `CONSUME` (consume messages only). For other resource types, only `ALL` (all permissions) is supported.",
 				Required:            true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("ALL", "PRODUCE", "CONSUME"),
@@ -94,7 +94,7 @@ func (r *KafkaAclResource) Schema(ctx context.Context, req resource.SchemaReques
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"permission": schema.StringAttribute{
-				MarkdownDescription: "Set the permission type, which supports `ALLOW` and `DENY`. `ALLOW` grants permission to perform the operation, while `DENY` prohibits the operation. `DENY` takes precedence over `ALLOW`.",
+				MarkdownDescription: "Set the permission type, which supports `ALLOW` and `DENY`. Default value is `ALLOW`. `ALLOW` grants permission to perform the operation, while `DENY` prohibits the operation. `DENY` takes precedence over `ALLOW`.",
 				Optional:            true,
 				Computed:            true,
 				Default:             stringdefault.StaticString("ALLOW"),

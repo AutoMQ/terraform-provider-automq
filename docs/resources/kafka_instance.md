@@ -57,19 +57,19 @@ resource "automq_kafka_instance" "example" {
 
 ### Required
 
-- `cloud_provider` (String) To set up a Kafka instance, you need to specify the target cloud provider environment for deployment. Currently, 'aws' is supported.
+- `cloud_provider` (String) To set up a Kafka instance, you need to specify the target cloud provider environment for deployment. Currently, `aws` is supported. This parameter must match the cloud provider and region where the current environment is deployed.
 - `compute_specs` (Attributes) The compute specs of the instance, contains aku and version. (see [below for nested schema](#nestedatt--compute_specs))
 - `name` (String) The name of the Kafka instance. It can contain letters (a-z or A-Z), numbers (0-9), underscores (_), and hyphens (-), with a length limit of 3 to 64 characters.
 - `networks` (Attributes List) To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones. (see [below for nested schema](#nestedatt--networks))
-- `region` (String) To set up an instance, you need to specify the target region for deployment. Refer to the RegionId list provided by each cloud provider for available regions. Using AWS as an example, refer to this [documentation](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html) to set the correct `RegionId`.
+- `region` (String) To set up an instance, you need to specify the target region for deployment. This parameter must match the cloud provider and region where the current environment is deployed.
 
 ### Optional
 
 - `acl` (Boolean) Configure ACL enablement. Default is false (disabled).
-- `configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/release-notes).
+- `configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
 - `description` (String) The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.
 - `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
-- `integrations` (List of String) Configure integration settings. AutoMQ supports integration with external products like `prometheus` and `cloudwatch`, forwarding instance Metrics data to Prometheus and CloudWatch.
+- `integrations` (List of String) Configure integration setting. Set existed integration id. AutoMQ supports integration with external products like `prometheus` and `cloudwatch`, forwarding instance Metrics data to Prometheus and CloudWatch. Currently, only one integration is supported. Configuring multiple integrations simultaneously is not supported.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 
 ### Read-Only
@@ -85,7 +85,7 @@ resource "automq_kafka_instance" "example" {
 
 Required:
 
-- `aku` (Number) AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.
+- `aku` (Number) AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.
 
 Optional:
 
