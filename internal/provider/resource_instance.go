@@ -272,6 +272,9 @@ func (r *KafkaInstanceResource) Read(ctx context.Context, req resource.ReadReque
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	if !state.EnvironmentID.IsNull() {
+		ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
+	}
 
 	instanceId := state.InstanceID.ValueString()
 	instance, err := r.client.GetKafkaInstance(ctx, instanceId)
@@ -312,6 +315,9 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+	if !state.EnvironmentID.IsNull() {
+		ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
 	}
 
 	// check if the instance exists
@@ -505,10 +511,13 @@ func (r *KafkaInstanceResource) Delete(ctx context.Context, req resource.DeleteR
 
 	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	if !state.EnvironmentID.IsNull() {
+		ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
+	}
+
 	instanceId := state.InstanceID.ValueString()
 	instance, err := r.client.GetKafkaInstance(ctx, instanceId)
 	if err != nil {
