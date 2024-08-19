@@ -156,7 +156,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				CustomType: timetypes.RFC3339Type{},
 				Computed:   true,
 			},
-			"instance_status": schema.StringAttribute{
+			"status": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "The status of instance. Currently supports statuses: `Creating`, `Running`, `Deleting`, `Changing` and `Abnormal`. For definitions and limitations of each status, please refer to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/manage-instances#lifecycle).",
 				PlanModifiers: []planmodifier.String{

@@ -13,14 +13,13 @@ import (
 )
 
 const (
-	StateCreating   = "Creating"
-	StateAvailable  = "Available"
-	StateChanging   = "Changing"
-	StateDeleting   = "Deleting"
-	StateNotFound   = "NotFound"
-	StateError      = "Error"
-	StateUnexpected = "Unexpected"
-	StateUnknown    = "Unknown"
+	StateCreating  = "Creating"
+	StateAvailable = "Available"
+	StateChanging  = "Changing"
+	StateDeleting  = "Deleting"
+	StateNotFound  = "NotFound"
+	StateError     = "Error"
+	StateUnknown   = "Unknown"
 )
 
 // KafkaInstanceResourceModel describes the resource data model.
@@ -39,7 +38,7 @@ type KafkaInstanceResourceModel struct {
 	Endpoints      types.List         `tfsdk:"endpoints"`
 	CreatedAt      timetypes.RFC3339  `tfsdk:"created_at"`
 	LastUpdated    timetypes.RFC3339  `tfsdk:"last_updated"`
-	InstanceStatus types.String       `tfsdk:"instance_status"`
+	InstanceStatus types.String       `tfsdk:"status"`
 	Timeouts       timeouts.Value     `tfsdk:"timeouts"`
 }
 
@@ -58,7 +57,7 @@ type KafkaInstanceModel struct {
 	Endpoints      types.List         `tfsdk:"endpoints"`
 	CreatedAt      timetypes.RFC3339  `tfsdk:"created_at"`
 	LastUpdated    timetypes.RFC3339  `tfsdk:"last_updated"`
-	InstanceStatus types.String       `tfsdk:"instance_status"`
+	InstanceStatus types.String       `tfsdk:"status"`
 }
 
 type InstanceAccessInfo struct {
@@ -141,7 +140,7 @@ func FlattenKafkaInstanceModel(instance *client.KafkaInstanceResponse, resource 
 	resource.CreatedAt = timetypes.NewRFC3339TimePointerValue(&instance.GmtCreate)
 	resource.LastUpdated = timetypes.NewRFC3339TimePointerValue(&instance.GmtModified)
 
-	resource.InstanceStatus = types.StringValue(instance.Status)
+	resource.InstanceStatus = mapInstanceStatus(instance.Status)
 	if integrations != nil {
 		integrationIds := make([]attr.Value, 0, len(integrations))
 		for _, integration := range integrations {
@@ -231,5 +230,24 @@ func mapCloudProviderValue(provider types.String) string {
 		return "aliyun"
 	default:
 		return provider.ValueString()
+	}
+}
+
+func mapInstanceStatus(status string) types.String {
+	switch status {
+	case StateCreating:
+		return types.StringValue(StateCreating)
+	case StateAvailable:
+		return types.StringValue("Running")
+	case StateChanging:
+		return types.StringValue(StateChanging)
+	case StateDeleting:
+		return types.StringValue(StateDeleting)
+	case StateNotFound:
+		return types.StringValue(StateNotFound)
+	case StateError:
+		return types.StringValue("Abnormal")
+	default:
+		return types.StringValue(StateUnknown)
 	}
 }
