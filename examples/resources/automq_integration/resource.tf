@@ -1,7 +1,6 @@
 resource "automq_integration" "example-1" {
-  name     = "example-1"
-  type     = "cloudWatch"
-  endpoint = "http://xxxxx.xxx"
+  name = "example-1"
+  type = "cloudWatch"
   cloudwatch_config = {
     namespace = "example"
   }
