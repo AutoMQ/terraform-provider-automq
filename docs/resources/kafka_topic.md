@@ -36,7 +36,7 @@ resource "automq_kafka_topic" "example" {
 
 - `configs` (Map of String) Additional configuration for the Kafka topic. Please refer to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#topic-level-configuration) to set the current supported custom parameters.
 - `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
-- `partition` (Number) Number of partitions for the Kafka topic. The number of partitions must be at least greater than the number of consumers.
+- `partition` (Number) Number of partitions for the Kafka topic. The valid range is 1-1024. The number of partitions must be at least greater than the number of consumers.
 
 ### Read-Only
 

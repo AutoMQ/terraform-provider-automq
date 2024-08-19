@@ -31,16 +31,16 @@ resource "automq_kafka_acl" "example" {
 ### Required
 
 - `kafka_instance_id` (String) Target Kafka instance ID, each instance represents a kafka cluster. The instance id looks like kf-xxxxxxx.
-- `operation_group` (String) Set the authorized operation group. For the Topic resource type, the supported operations are `ALL (all permissions)`, `PRODUCE (produce messages only)`, and `CONSUME (consume messages only)`. For other resource types, only `ALL (all permissions)` is supported.
+- `operation_group` (String) Set the authorized operation group. For the Topic resource type, the supported operations are `ALL` (all permissions), `PRODUCE` (produce messages only), and `CONSUME` (consume messages only). For other resource types, only `ALL` (all permissions) is supported.
 - `pattern_type` (String) Set the resource name matching pattern, supporting `LITERAL` and `PREFIXED`. `LITERAL` represents exact matching, while `PREFIXED` represents prefix matching.
-- `principal` (String) Set the authorized target principal, which currently supports Kafka User type principals, i.e., User:xxxx. Specify the Kafka user name. Principal must start with `User:` and contact with kafka_username.
-- `resource_name` (String) The target resource name for Kafka ACL authorization, can be a specific resource name or a resource name prefix (when using prefix matching, only the prefix needs to be provided without ending with "\*"). If only "\*" is specified, it represents all resources.
+- `principal` (String) Set the authorized target principal, which currently supports Kafka User type principals, i.e., `User:xxxx`. Specify the Kafka user name. Principal must start with `User:` and contact with `kafka_user`.
+- `resource_name` (String) The target resource name for Kafka ACL authorization, can be a specific resource name or a resource name prefix (when using prefix matching, only the prefix needs to be provided without ending with `*`). If only `*` is specified, it represents all resources.
 - `resource_type` (String) The Kafka ACL authorized resource types, currently support `CLUSTER`, `TOPIC`, `CONSUMERGROUP` and `TRANSACTION_ID`.
 
 ### Optional
 
 - `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
-- `permission` (String) Set the permission type, which supports `ALLOW` and `DENY`. `ALLOW` grants permission to perform the operation, while `DENY` prohibits the operation. `DENY` takes precedence over `ALLOW`.
+- `permission` (String) Set the permission type, which supports `ALLOW` and `DENY`. Default value is `ALLOW`. `ALLOW` grants permission to perform the operation, while `DENY` prohibits the operation. `DENY` takes precedence over `ALLOW`.
 
 ### Read-Only
 
