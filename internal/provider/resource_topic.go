@@ -58,7 +58,7 @@ func (r *KafkaTopicResource) Schema(ctx context.Context, req resource.SchemaRequ
 				Validators:          []validator.String{stringvalidator.LengthBetween(1, 249)},
 			},
 			"partition": schema.Int64Attribute{
-				MarkdownDescription: "Number of partitions for the Kafka topic. The valid range is 1-1024. The number of partitions must be at least greater than the number of consumers.",
+				MarkdownDescription: "Number of partitions for the Kafka topic. The valid range is 1-1024. The number of partitions must be at least greater than the number of consumers. The default value is 16.",
 				Optional:            true,
 				Computed:            true,
 				Default:             int64default.StaticInt64(16),
