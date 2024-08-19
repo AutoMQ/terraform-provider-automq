@@ -30,11 +30,11 @@ description: |-
 - `created_at` (String)
 - `description` (String) The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.
 - `endpoints` (Attributes List) The bootstrap endpoints of instance. AutoMQ supports multiple access protocols; therefore, the Endpoint is a list. (see [below for nested schema](#nestedatt--endpoints))
-- `instance_status` (String) The status of instance. Currently supports statuses: `Creating`, `Running`, `Deleting`, `Changing` and `Abnormal`. For definitions and limitations of each status, please refer to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/manage-instances#lifecycle).
 - `integrations` (List of String) List of All Integrations Associated with the Current Instance. AutoMQ supports integration with external products like `prometheus` and `cloudWatch`, forwarding instance Metrics data to Prometheus and CloudWatch.
 - `last_updated` (String)
 - `networks` (Attributes List) The networks of the Kafka instance. Currently, you can get one availability zone or three availability zones. (see [below for nested schema](#nestedatt--networks))
 - `region` (String) The region of the Kafka instance
+- `status` (String) The status of instance. Currently supports statuses: `Creating`, `Running`, `Deleting`, `Changing` and `Abnormal`. For definitions and limitations of each status, please refer to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/manage-instances#lifecycle).
 
 <a id="nestedatt--compute_specs"></a>
 ### Nested Schema for `compute_specs`

@@ -68,8 +68,8 @@ variable "instance_deploy_subnet" {
 - `created_at` (String)
 - `endpoints` (Attributes List) The bootstrap endpoints of instance. AutoMQ supports multiple access protocols; therefore, the Endpoint is a list. (see [below for nested schema](#nestedatt--endpoints))
 - `id` (String) The ID of the Kafka instance.
-- `instance_status` (String) The status of instance. Currently supports statuses: `Creating`, `Running`, `Deleting`, `Changing` and `Abnormal`. For definitions and limitations of each status, please refer to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/manage-instances#lifecycle).
 - `last_updated` (String)
+- `status` (String) The status of instance. Currently supports statuses: `Creating`, `Running`, `Deleting`, `Changing` and `Abnormal`. For definitions and limitations of each status, please refer to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/manage-instances#lifecycle).
 
 <a id="nestedatt--compute_specs"></a>
 ### Nested Schema for `compute_specs`
