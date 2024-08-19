@@ -24,6 +24,14 @@ Refer to the following for specific operations:
 ### Example Provider Configuration
 
 ```terraform
+terraform {
+  required_providers {
+    automq = {
+      source = "automq/automq"
+    }
+  }
+}
+
 provider "automq" {
   automq_environment_id     = var.automq_environment_id
   automq_byoc_endpoint      = var.automq_byoc_endpoint
@@ -51,6 +59,14 @@ variable "automq_environment_id" {
 ### Example Usage for an AWS BYOC environment
 
 ```terraform
+terraform {
+  required_providers {
+    automq = {
+      source = "automq/automq"
+    }
+  }
+}
+
 provider "automq" {
   automq_environment_id     = var.automq_environment_id
   automq_byoc_endpoint      = var.automq_byoc_endpoint
