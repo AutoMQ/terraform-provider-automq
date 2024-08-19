@@ -105,7 +105,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 			},
 			"integrations": schema.ListAttribute{
 				Computed:    true,
-				Description: "List of All Integrations Associated with the Current Instance. AutoMQ supports integration with external products like `prometheus` and `cloudwatch`, forwarding instance Metrics data to Prometheus and CloudWatch.",
+				Description: "List of All Integrations Associated with the Current Instance. AutoMQ supports integration with external products like `prometheus` and `cloudWatch`, forwarding instance Metrics data to Prometheus and CloudWatch.",
 				ElementType: types.StringType,
 			},
 			"acl": schema.BoolAttribute{

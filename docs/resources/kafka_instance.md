@@ -13,42 +13,33 @@ description: |-
 ## Example Usage
 
 ```terraform
-terraform {
-  required_providers {
-    automq = {
-      source = "hashicorp.com/edu/automq"
-    }
-  }
-}
-
-locals {
-  env_id = "example"
-
-  automq_byoc_host          = "http://localhost:8081"
-  automq_byoc_access_key_id = "RSaIMzrFC0kAmS1x"
-  automq_byoc_secret_key    = "msnGqOuaV5gblXPvkWfxg7Ao7Nq2iyMo"
-}
-
-provider "automq" {
-  automq_byoc_host          = local.automq_byoc_host
-  automq_byoc_access_key_id = local.automq_byoc_access_key_id
-  automq_byoc_secret_key    = local.automq_byoc_secret_key
-}
-
 resource "automq_kafka_instance" "example" {
-  environment_id = local.env_id
-  name           = "example123"
+  name           = "automq-example-1"
   description    = "example"
-  cloud_provider = "aliyun"
-  region         = "cn-hangzhou"
-  networks = [{
-    zone   = "cn-hangzhou-b"
-    subnet = "vsw-bp14v5eikr8wrgoqje7hr"
-  }]
+  cloud_provider = "aws"
+  region         = local.instance_deploy_region
+  networks = [
+    {
+      zone    = var.instance_deploy_zone
+      subnets = [var.instance_deploy_subnet]
+    }
+  ]
   compute_specs = {
-    aku     = "12"
-    version = "1.1.0"
+    aku = "18"
   }
+  acl = true
+  configs = {
+    "auto.create.topics.enable" = "false"
+    "log.retention.ms"          = "3600000"
+  }
+}
+
+variable "instance_deploy_zone" {
+  type = string
+}
+
+variable "instance_deploy_subnet" {
+  type = string
 }
 ```
 
@@ -69,7 +60,7 @@ resource "automq_kafka_instance" "example" {
 - `configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
 - `description` (String) The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.
 - `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
-- `integrations` (List of String) Configure integration setting. Set existed integration id. AutoMQ supports integration with external products like `prometheus` and `cloudwatch`, forwarding instance Metrics data to Prometheus and CloudWatch. Currently, only one integration is supported. Configuring multiple integrations simultaneously is not supported.
+- `integrations` (List of String) Configure integration setting. Set existed integration id. AutoMQ supports integration with external products like `prometheus` and `cloudWatch`, forwarding instance Metrics data to Prometheus and CloudWatch. Currently, only one integration is supported. Configuring multiple integrations simultaneously is not supported.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 
 ### Read-Only

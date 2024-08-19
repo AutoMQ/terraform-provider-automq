@@ -134,7 +134,8 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 			},
 			"integrations": schema.ListAttribute{
 				Optional:    true,
-				Description: "Configure integration setting. Set existed integration id. AutoMQ supports integration with external products like `prometheus` and `cloudwatch`, forwarding instance Metrics data to Prometheus and CloudWatch. Currently, only one integration is supported. Configuring multiple integrations simultaneously is not supported.",
+				Description: "Configure integration setting. Set existed integration id. AutoMQ supports integration with external products like `prometheus` and `cloudWatch`, forwarding instance Metrics data to Prometheus and CloudWatch. Currently, only one integration is supported. Configuring multiple integrations simultaneously is not supported.",
+
 				ElementType: types.StringType,
 				Validators: []validator.List{
 					listvalidator.UniqueValues(),
