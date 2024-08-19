@@ -1,3 +1,11 @@
+terraform {
+  required_providers {
+    automq = {
+      source = "automq/automq"
+    }
+  }
+}
+
 provider "automq" {
   automq_environment_id     = var.automq_environment_id
   automq_byoc_endpoint      = var.automq_byoc_endpoint
