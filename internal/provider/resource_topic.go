@@ -166,6 +166,9 @@ func (r *KafkaTopicResource) Update(ctx context.Context, req resource.UpdateRequ
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	if !state.EnvironmentID.IsNull() {
+		ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
+	}
 
 	instanceId := plan.KafkaInstance.ValueString()
 	topicId := plan.TopicID.ValueString()
@@ -230,6 +233,9 @@ func (r *KafkaTopicResource) Delete(ctx context.Context, req resource.DeleteRequ
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+	if !state.EnvironmentID.IsNull() {
+		ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
 	}
 
 	topicId := state.TopicID.ValueString()
