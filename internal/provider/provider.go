@@ -2,6 +2,8 @@ package provider
 
 import (
 	"context"
+	"fmt"
+	"net/url"
 	"os"
 	"terraform-provider-automq/client"
 
@@ -41,7 +43,6 @@ type AutoMQProvider struct {
 
 // autoMQProviderModel describes the provider data model.
 type autoMQProviderModel struct {
-	EnvironmentID types.String `tfsdk:"automq_environment_id"`
 	BYOCAccessKey types.String `tfsdk:"automq_byoc_access_key_id"`
 	BYOCSecretKey types.String `tfsdk:"automq_byoc_secret_key"`
 	BYOCEndpoint  types.String `tfsdk:"automq_byoc_endpoint"`
@@ -55,10 +56,6 @@ func (p *AutoMQProvider) Metadata(ctx context.Context, req provider.MetadataRequ
 func (p *AutoMQProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"automq_environment_id": schema.StringAttribute{
-				MarkdownDescription: "Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.",
-				Optional:            true,
-			},
 			"automq_byoc_access_key_id": schema.StringAttribute{
 				MarkdownDescription: "Set the Access Key Id of Service Account. You can create and manage Access Keys by using the AutoMQ Cloud BYOC Console. Learn more about AutoMQ Cloud BYOC Console access [here](https://docs.automq.com/automq-cloud/manage-identities-and-access/service-accounts).",
 				Optional:            true,
@@ -120,7 +117,6 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	byoc_endpoint := os.Getenv("AUTOMQ_BYOC_HOST")
 	byoc_access_key := os.Getenv("AUTOMQ_BYOC_ACCESS_KEY")
 	byoc_secret_key := os.Getenv("AUTOMQ_BYOC_SECRET_KEY")
-	environmentID := ""
 
 	if !data.BYOCEndpoint.IsNull() {
 		byoc_endpoint = data.BYOCEndpoint.ValueString()
@@ -130,9 +126,6 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	}
 	if !data.BYOCSecretKey.IsNull() {
 		byoc_secret_key = data.BYOCSecretKey.ValueString()
-	}
-	if !data.EnvironmentID.IsNull() {
-		environmentID = data.EnvironmentID.ValueString()
 	}
 
 	// If any of the expected configurations are missing, return
@@ -181,7 +174,17 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		SecretAccessKey: data.BYOCSecretKey.ValueString(),
 	}
 
-	client, err := client.NewClient(ctx, byoc_endpoint, credential, environmentID)
+	parsedURL, err := url.Parse(byoc_endpoint)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Invalid AutoMQ API Host",
+			"The AutoMQ API host is not a valid URL. "+
+				"Please ensure the host is a valid URL and try again.",
+		)
+	}
+	baseURL := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
+
+	client, err := client.NewClient(ctx, baseURL, credential)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Create AutoMQ API Client",

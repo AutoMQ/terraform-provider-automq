@@ -41,7 +41,7 @@ func (r *KafkaUserResource) Schema(ctx context.Context, req resource.SchemaReque
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
 				MarkdownDescription: "Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.",
-				Optional:            true,
+				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"kafka_instance_id": schema.StringAttribute{
@@ -98,9 +98,7 @@ func (r *KafkaUserResource) Create(ctx context.Context, req resource.CreateReque
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !plan.EnvironmentID.IsNull() {
-		ctx = context.WithValue(ctx, client.EnvIdKey, plan.EnvironmentID.ValueString())
-	}
+	ctx = context.WithValue(ctx, client.EnvIdKey, plan.EnvironmentID.ValueString())
 	// Generate API request body from plan
 	instanceId := plan.KafkaInstanceID.ValueString()
 	in := client.InstanceUserCreateParam{
@@ -126,9 +124,7 @@ func (r *KafkaUserResource) Read(ctx context.Context, req resource.ReadRequest, 
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !data.EnvironmentID.IsNull() {
-		ctx = context.WithValue(ctx, client.EnvIdKey, data.EnvironmentID.ValueString())
-	}
+	ctx = context.WithValue(ctx, client.EnvIdKey, data.EnvironmentID.ValueString())
 
 	instanceId := data.KafkaInstanceID.ValueString()
 	userName := data.Username.ValueString()
@@ -159,9 +155,7 @@ func (r *KafkaUserResource) Delete(ctx context.Context, req resource.DeleteReque
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !data.EnvironmentID.IsNull() {
-		ctx = context.WithValue(ctx, client.EnvIdKey, data.EnvironmentID.ValueString())
-	}
+	ctx = context.WithValue(ctx, client.EnvIdKey, data.EnvironmentID.ValueString())
 
 	err := r.client.DeleteKafkaUser(ctx, data.KafkaInstanceID.ValueString(), data.Username.ValueString())
 	if err != nil {

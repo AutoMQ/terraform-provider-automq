@@ -7,10 +7,9 @@ terraform {
 }
 
 provider "automq" {
-  automq_environment_id     = var.automq_environment_id
-  automq_byoc_endpoint      = var.automq_byoc_endpoint
-  automq_byoc_access_key_id = var.automq_byoc_access_key_id
-  automq_byoc_secret_key    = var.automq_byoc_secret_key
+  automq_byoc_endpoint      = var.automq_byoc_endpoint      # optionally use AUTOMQ_BYOC_HOST environment variable
+  automq_byoc_access_key_id = var.automq_byoc_access_key_id # optionally use AUTOMQ_BYOC_ACCESS_KEY_ID environment variable
+  automq_byoc_secret_key    = var.automq_byoc_secret_key    # optionally use AUTOMQ_BYOC_SECRET_KEY environment variable
 }
 
 variable "automq_byoc_endpoint" {

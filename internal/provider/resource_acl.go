@@ -44,7 +44,7 @@ func (r *KafkaAclResource) Schema(ctx context.Context, req resource.SchemaReques
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
 				MarkdownDescription: "Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.",
-				Optional:            true,
+				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"kafka_instance_id": schema.StringAttribute{
@@ -130,9 +130,7 @@ func (r *KafkaAclResource) Create(ctx context.Context, req resource.CreateReques
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !plan.EnvironmentID.IsNull() {
-		ctx = context.WithValue(ctx, client.EnvIdKey, plan.EnvironmentID.ValueString())
-	}
+	ctx = context.WithValue(ctx, client.EnvIdKey, plan.EnvironmentID.ValueString())
 
 	instance := plan.KafkaInstance.ValueString()
 	param := client.KafkaAclBindingParam{}
@@ -161,9 +159,9 @@ func (r *KafkaAclResource) Read(ctx context.Context, req resource.ReadRequest, r
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !state.EnvironmentID.IsNull() {
-		ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
-	}
+
+	ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
+
 	aclId := state.ID.ValueString()
 	instance := state.KafkaInstance.ValueString()
 	out, err := r.client.GetKafkaAcls(ctx, instance, aclId)
@@ -194,9 +192,7 @@ func (r *KafkaAclResource) Delete(ctx context.Context, req resource.DeleteReques
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !data.EnvironmentID.IsNull() {
-		ctx = context.WithValue(ctx, client.EnvIdKey, data.EnvironmentID.ValueString())
-	}
+	ctx = context.WithValue(ctx, client.EnvIdKey, data.EnvironmentID.ValueString())
 	param := client.KafkaAclBindingParam{}
 	models.ExpandKafkaACLResource(data, &param)
 	in := client.KafkaAclBindingParams{Params: []client.KafkaAclBindingParam{param}}

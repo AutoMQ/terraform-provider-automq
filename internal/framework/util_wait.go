@@ -48,7 +48,7 @@ func KafkaClusterStatus(ctx context.Context, c *client.Client, clusterId string,
 			return nil, models.StateUnknown, err
 		}
 		if cluster == nil {
-			return nil, models.StateUnknown, fmt.Errorf("Kafka Cluster %q not found", cluster.InstanceID)
+			return nil, models.StateUnknown, fmt.Errorf("Kafka Cluster %q not found", clusterId)
 		}
 
 		tflog.Debug(ctx, fmt.Sprintf("Waiting for Kafka Cluster %q status to become %q: current status is %q", clusterId, targetState, cluster.Status))

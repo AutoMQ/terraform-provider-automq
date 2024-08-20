@@ -1,4 +1,5 @@
 resource "automq_kafka_instance" "example" {
+  environment_id = "env-example"
   name           = "automq-example-1"
   description    = "example"
   cloud_provider = "aws"

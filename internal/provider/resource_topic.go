@@ -45,7 +45,7 @@ func (r *KafkaTopicResource) Schema(ctx context.Context, req resource.SchemaRequ
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
 				MarkdownDescription: "Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.",
-				Optional:            true,
+				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"kafka_instance_id": schema.StringAttribute{
@@ -102,9 +102,7 @@ func (r *KafkaTopicResource) Create(ctx context.Context, req resource.CreateRequ
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !topic.EnvironmentID.IsNull() {
-		ctx = context.WithValue(ctx, client.EnvIdKey, topic.EnvironmentID.ValueString())
-	}
+	ctx = context.WithValue(ctx, client.EnvIdKey, topic.EnvironmentID.ValueString())
 	// Generate API request body from plan
 	in := client.TopicCreateParam{}
 	models.ExpandKafkaTopicResource(topic, &in)
@@ -133,9 +131,7 @@ func (r *KafkaTopicResource) Read(ctx context.Context, req resource.ReadRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !data.EnvironmentID.IsNull() {
-		ctx = context.WithValue(ctx, client.EnvIdKey, data.EnvironmentID.ValueString())
-	}
+	ctx = context.WithValue(ctx, client.EnvIdKey, data.EnvironmentID.ValueString())
 
 	topicId := data.TopicID.ValueString()
 	instanceId := data.KafkaInstance.ValueString()
@@ -166,9 +162,7 @@ func (r *KafkaTopicResource) Update(ctx context.Context, req resource.UpdateRequ
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !state.EnvironmentID.IsNull() {
-		ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
-	}
+	ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
 
 	instanceId := plan.KafkaInstance.ValueString()
 	topicId := plan.TopicID.ValueString()
@@ -234,9 +228,7 @@ func (r *KafkaTopicResource) Delete(ctx context.Context, req resource.DeleteRequ
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !state.EnvironmentID.IsNull() {
-		ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
-	}
+	ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
 
 	topicId := state.TopicID.ValueString()
 	instanceId := state.KafkaInstance.ValueString()

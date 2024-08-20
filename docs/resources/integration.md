@@ -14,17 +14,19 @@ description: |-
 
 ```terraform
 resource "automq_integration" "example-1" {
-  name = "example-1"
-  type = "cloudWatch"
+  environment_id = "env-example"
+  name           = "example-1"
+  type           = "cloudWatch"
   cloudwatch_config = {
     namespace = "example"
   }
 }
 
 resource "automq_integration" "example-2" {
-  name     = "example-2"
-  type     = "kafka"
-  endpoint = "http://xxxxx.xxx"
+  environment_id = "env-example"
+  name           = "example-2"
+  type           = "kafka"
+  endpoint       = "http://xxxxx.xxx"
   kafka_config = {
     security_protocol = "SASL_PLAINTEXT"
     sasl_mechanism    = "PLAIN"
@@ -34,9 +36,10 @@ resource "automq_integration" "example-2" {
 }
 
 resource "automq_integration" "example-3" {
-  name     = "example-3"
-  type     = "prometheus"
-  endpoint = "http://xxxxx.xxx"
+  environment_id = "env-example"
+  name           = "example-3"
+  type           = "prometheus"
+  endpoint       = "http://xxxxx.xxx"
 }
 ```
 
@@ -45,6 +48,7 @@ resource "automq_integration" "example-3" {
 
 ### Required
 
+- `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
 - `name` (String) The integrated name identifies different configurations and contains 3 to 64 characters, including letters a to z or a to z, digits 0 to 9, underscores (_), and hyphens (-).
 - `type` (String) Type of integration, currently support `kafka` and `cloudWatch`
 
@@ -52,7 +56,6 @@ resource "automq_integration" "example-3" {
 
 - `cloudwatch_config` (Attributes) CloudWatch integration configurations. When Type is `cloudwatch`, it must be set. (see [below for nested schema](#nestedatt--cloudwatch_config))
 - `endpoint` (String) Endpoint of integration. When selecting Prometheus and Kafka integration, you need to configure the corresponding endpoints. For detailed configuration instructions, please refer to the [documentation](https://docs.automq.com/automq-cloud/manage-environments/byoc-environment/manage-integrations).
-- `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
 - `kafka_config` (Attributes) Kafka integration configurations. When Type is `kafka`, it must be set. (see [below for nested schema](#nestedatt--kafka_config))
 
 ### Read-Only
