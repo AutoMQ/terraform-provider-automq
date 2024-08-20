@@ -121,7 +121,6 @@ provider "automq" {
   automq_byoc_endpoint  = "%s"
   automq_byoc_access_key_id = "VLaUIeNYndeOAXjaol32o4UAHvX8A7VE"
   automq_byoc_secret_key = "CHlRi0hOIA8pAnzW"
-  automq_environment_id = "env-1"
 }
 resource "automq_kafka_instance" "test" {
   environment_id = "env-1"
