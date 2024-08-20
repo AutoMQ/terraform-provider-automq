@@ -43,7 +43,6 @@ type AutoMQProvider struct {
 
 // autoMQProviderModel describes the provider data model.
 type autoMQProviderModel struct {
-	EnvironmentID types.String `tfsdk:"automq_environment_id"`
 	BYOCAccessKey types.String `tfsdk:"automq_byoc_access_key_id"`
 	BYOCSecretKey types.String `tfsdk:"automq_byoc_secret_key"`
 	BYOCEndpoint  types.String `tfsdk:"automq_byoc_endpoint"`
