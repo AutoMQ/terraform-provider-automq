@@ -60,6 +60,9 @@ func (e *ErrorResponse) Error() string {
 	if e.APIError.ErrorModel.Detail != "" {
 		errMsg.WriteString(fmt.Sprintf("Details: %s\n", e.APIError.ErrorModel.Detail))
 	}
+	if e.Err != nil {
+		errMsg.WriteString(fmt.Sprintf("Error: %s\n", e.Err.Error()))
+	}
 	return errMsg.String()
 }
 
