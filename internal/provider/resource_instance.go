@@ -354,7 +354,7 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 	// Check if the ACL has changed
 	if state.ACL.ValueBool() != plan.ACL.ValueBool() {
 
-		if state.ACL.ValueBool() && plan.ACL.ValueBool() {
+		if state.ACL.ValueBool() && !plan.ACL.ValueBool() {
 			resp.Diagnostics.AddError("Unsupported Operation", "Turning off ACL is not supported")
 			return
 		}
