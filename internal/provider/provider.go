@@ -2,6 +2,8 @@ package provider
 
 import (
 	"context"
+	"fmt"
+	"net/url"
 	"os"
 	"terraform-provider-automq/client"
 
@@ -181,7 +183,17 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		SecretAccessKey: data.BYOCSecretKey.ValueString(),
 	}
 
-	client, err := client.NewClient(ctx, byoc_endpoint, credential, environmentID)
+	parsedURL, err := url.Parse(byoc_endpoint)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Invalid AutoMQ API Host",
+			"The AutoMQ API host is not a valid URL. "+
+				"Please ensure the host is a valid URL and try again.",
+		)
+	}
+	baseURL := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
+
+	client, err := client.NewClient(ctx, baseURL, credential, environmentID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Create AutoMQ API Client",
