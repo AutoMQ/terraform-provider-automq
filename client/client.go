@@ -13,12 +13,11 @@ import (
 )
 
 type Client struct {
-	HostURL       string
-	HTTPClient    *http.Client
-	Token         string
-	Credentials   AuthCredentials
-	Signer        *signer.Signer
-	EnvironmentID string
+	HostURL     string
+	HTTPClient  *http.Client
+	Token       string
+	Credentials AuthCredentials
+	Signer      *signer.Signer
 }
 
 type EnvironmentID string
@@ -66,7 +65,7 @@ func (e *ErrorResponse) Error() string {
 	return errMsg.String()
 }
 
-func NewClient(ctx context.Context, host string, credentials AuthCredentials, envId string) (*Client, error) {
+func NewClient(ctx context.Context, host string, credentials AuthCredentials) (*Client, error) {
 	c := &Client{
 		HTTPClient:  &http.Client{Timeout: 0 * time.Second},
 		HostURL:     host,
@@ -75,7 +74,6 @@ func NewClient(ctx context.Context, host string, credentials AuthCredentials, en
 			AccessKeyID:     credentials.AccessKeyID,
 			SecretAccessKey: credentials.SecretAccessKey,
 		}),
-		EnvironmentID: envId,
 	}
 	return c, nil
 }
@@ -133,8 +131,6 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body io.Rea
 	environmentID, ok := ctx.Value(EnvIdKey).(string)
 	if ok {
 		req.Header.Set("X-automq-environment-id", environmentID)
-	} else if c.EnvironmentID != "" {
-		req.Header.Set("X-automq-environment-id", c.EnvironmentID)
 	} else {
 		return nil, &ErrorResponse{Code: 0, ErrorMessage: "Error getting environment ID from context"}
 	}

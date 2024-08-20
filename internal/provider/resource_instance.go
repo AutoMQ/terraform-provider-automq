@@ -56,7 +56,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
 				MarkdownDescription: "Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.",
-				Optional:            true,
+				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"id": schema.StringAttribute{
@@ -227,9 +227,7 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !instance.EnvironmentID.IsNull() {
-		ctx = context.WithValue(ctx, client.EnvIdKey, instance.EnvironmentID.ValueString())
-	}
+	ctx = context.WithValue(ctx, client.EnvIdKey, instance.EnvironmentID.ValueString())
 
 	// Generate API request body from plan
 	in := client.KafkaInstanceRequest{}
@@ -272,10 +270,7 @@ func (r *KafkaInstanceResource) Read(ctx context.Context, req resource.ReadReque
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !state.EnvironmentID.IsNull() {
-		ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
-	}
-
+	ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
 	instanceId := state.InstanceID.ValueString()
 	instance, err := r.client.GetKafkaInstance(ctx, instanceId)
 	if err != nil {
@@ -316,9 +311,7 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !state.EnvironmentID.IsNull() {
-		ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
-	}
+	ctx = context.WithValue(ctx, client.EnvIdKey, plan.EnvironmentID.ValueString())
 
 	// check if the instance exists
 	instanceId := plan.InstanceID.ValueString()
@@ -514,9 +507,7 @@ func (r *KafkaInstanceResource) Delete(ctx context.Context, req resource.DeleteR
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !state.EnvironmentID.IsNull() {
-		ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
-	}
+	ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
 
 	instanceId := state.InstanceID.ValueString()
 	instance, err := r.client.GetKafkaInstance(ctx, instanceId)

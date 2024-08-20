@@ -44,7 +44,7 @@ func (r *IntegrationResource) Schema(ctx context.Context, req resource.SchemaReq
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
 				MarkdownDescription: "Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.",
-				Optional:            true,
+				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"name": schema.StringAttribute{
@@ -146,9 +146,9 @@ func (r *IntegrationResource) Create(ctx context.Context, req resource.CreateReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !integration.EnvironmentID.IsNull() {
-		ctx = context.WithValue(ctx, client.EnvIdKey, integration.EnvironmentID.ValueString())
-	}
+
+	ctx = context.WithValue(ctx, client.EnvIdKey, integration.EnvironmentID.ValueString())
+
 	// Generate API request to create the integration.
 	in := client.IntegrationParam{}
 	resp.Diagnostics.Append(models.ExpandIntergationResource(&in, integration))
@@ -175,9 +175,9 @@ func (r *IntegrationResource) Read(ctx context.Context, req resource.ReadRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !data.EnvironmentID.IsNull() {
-		ctx = context.WithValue(ctx, client.EnvIdKey, data.EnvironmentID.ValueString())
-	}
+
+	ctx = context.WithValue(ctx, client.EnvIdKey, data.EnvironmentID.ValueString())
+
 	intergationId := data.ID.ValueString()
 	out, err := r.client.GetIntergration(ctx, intergationId)
 	if err != nil {
@@ -201,9 +201,8 @@ func (r *IntegrationResource) Update(ctx context.Context, req resource.UpdateReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !state.EnvironmentID.IsNull() {
-		ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
-	}
+
+	ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
 
 	// Generate API request to update the integration.
 	intergationId := state.ID.ValueString()
@@ -230,9 +229,9 @@ func (r *IntegrationResource) Delete(ctx context.Context, req resource.DeleteReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !data.EnvironmentID.IsNull() {
-		ctx = context.WithValue(ctx, client.EnvIdKey, data.EnvironmentID.ValueString())
-	}
+
+	ctx = context.WithValue(ctx, client.EnvIdKey, data.EnvironmentID.ValueString())
+
 	IntegrationId := data.ID.ValueString()
 	err := r.client.DeleteIntergration(ctx, IntegrationId)
 	if err != nil {

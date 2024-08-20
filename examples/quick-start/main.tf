@@ -7,13 +7,13 @@ terraform {
 }
 
 provider "automq" {
-  automq_environment_id     = var.automq_environment_id
   automq_byoc_endpoint      = var.automq_byoc_endpoint
   automq_byoc_access_key_id = var.automq_byoc_access_key_id
   automq_byoc_secret_key    = var.automq_byoc_secret_key
 }
 
 resource "automq_kafka_instance" "example" {
+  environment_id = var.automq_environment_id
   name           = "automq-example-1"
   description    = "example"
   cloud_provider = "aws"
@@ -35,6 +35,7 @@ resource "automq_kafka_instance" "example" {
 }
 
 resource "automq_kafka_topic" "example" {
+  environment_id    = var.automq_environment_id
   kafka_instance_id = automq_kafka_instance.example.id
   name              = "topic-example"
   partition         = 16
@@ -46,12 +47,14 @@ resource "automq_kafka_topic" "example" {
 }
 
 resource "automq_kafka_user" "example" {
+  environment_id    = var.automq_environment_id
   kafka_instance_id = automq_kafka_instance.example.id
   username          = "kafka_user-example"
   password          = "user_password-example"
 }
 
 resource "automq_kafka_acl" "example" {
+  environment_id    = var.automq_environment_id
   kafka_instance_id = automq_kafka_instance.example.id
 
   resource_type   = "TOPIC"
