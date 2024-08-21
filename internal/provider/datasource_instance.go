@@ -195,6 +195,7 @@ func (r *KafkaInstanceDataSource) Read(ctx context.Context, req datasource.ReadR
 				return
 			}
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", instanceId, err))
+			return
 		}
 		if out == nil {
 			resp.Diagnostics.AddError(fmt.Sprintf("Kafka instance %q not found", instanceId), err.Error())

@@ -284,6 +284,7 @@ func (r *KafkaInstanceResource) Read(ctx context.Context, req resource.ReadReque
 			return
 		}
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", state.InstanceID.ValueString(), err))
+		return
 	}
 	// Get instance integrations
 	integrations, err := r.client.ListInstanceIntegrations(ctx, instanceId)
@@ -354,6 +355,9 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		}
 		// Save updated data into Terraform state
 		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 	// Check if the ACL has changed
 	if state.ACL.ValueBool() != plan.ACL.ValueBool() {
@@ -375,6 +379,9 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		}
 		// Save updated data into Terraform state
 		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 
 	// Check if the Integrations has changed
@@ -409,6 +416,9 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		}
 		// Save updated data into Terraform state
 		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 
 	updateTimeout := r.UpdateTimeout(ctx, state.Timeouts)
@@ -434,6 +444,7 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		_, err := r.client.UpdateKafkaInstanceConfig(ctx, instanceId, in)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update Kafka instance %q, got error: %s", instanceId, err))
+			return
 		}
 
 		// wait for version update
@@ -447,6 +458,9 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 			return
 		}
 		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 
 	// Check if the compute specs (version) has changed
@@ -470,6 +484,9 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		}
 		// Save updated data into Terraform state
 		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 
 	stateAKU := state.ComputeSpecs.Aku.ValueInt64()
@@ -500,6 +517,9 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		}
 		// Save updated data into Terraform state
 		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 }
 

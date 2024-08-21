@@ -114,6 +114,7 @@ func (r *KafkaTopicResource) Create(ctx context.Context, req resource.CreateRequ
 	out, err := r.client.CreateKafkaTopic(ctx, instanceId, in)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create Kafka topic %q, got error: %s", topic.Name.ValueString(), err))
+		return
 	}
 
 	resp.Diagnostics.Append(models.FlattenKafkaTopic(out, &topic)...)
@@ -144,9 +145,11 @@ func (r *KafkaTopicResource) Read(ctx context.Context, req resource.ReadRequest,
 			return
 		}
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka topic %q, got error: %s", topicId, err))
+		return
 	}
 	if out == nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka topic %q, got nil response", topicId))
+		return
 	}
 
 	resp.Diagnostics.Append(models.FlattenKafkaTopic(out, &data)...)
@@ -182,6 +185,7 @@ func (r *KafkaTopicResource) Update(ctx context.Context, req resource.UpdateRequ
 		err := r.client.UpdateKafkaTopicPartition(ctx, instanceId, topicId, in)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update Kafka topic %q, got error: %s", topicId, err))
+			return
 		}
 
 		resp.Diagnostics.Append(ReadKafkaTopic(ctx, r, instanceId, topicId, &plan)...)
@@ -212,6 +216,7 @@ func (r *KafkaTopicResource) Update(ctx context.Context, req resource.UpdateRequ
 		_, err := r.client.UpdateKafkaTopicConfig(ctx, instanceId, topicId, in)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update Kafka topic %q, got error: %s", topicId, err))
+			return
 		}
 
 		resp.Diagnostics.Append(ReadKafkaTopic(ctx, r, instanceId, topicId, &plan)...)
@@ -238,6 +243,7 @@ func (r *KafkaTopicResource) Delete(ctx context.Context, req resource.DeleteRequ
 	err := r.client.DeleteKafkaTopic(ctx, instanceId, topicId)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete Kafka topic %q, got error: %s", topicId, err))
+		return
 	}
 }
 
