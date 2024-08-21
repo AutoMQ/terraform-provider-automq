@@ -51,11 +51,13 @@ func (r *KafkaTopicResource) Schema(ctx context.Context, req resource.SchemaRequ
 			"kafka_instance_id": schema.StringAttribute{
 				MarkdownDescription: "Target Kafka instance ID, each instance represents a kafka cluster. The instance id looks like kf-xxxxxxx.",
 				Required:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"name": schema.StringAttribute{
 				MarkdownDescription: "Name is the unique identifier of a topic. It can only contain letters a to z or A to z, digits 0 to 9, underscores (_), hyphens (-), and dots (.). The value contains 1 to 249 characters.",
 				Required:            true,
 				Validators:          []validator.String{stringvalidator.LengthBetween(1, 249)},
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"partition": schema.Int64Attribute{
 				MarkdownDescription: "Number of partitions for the Kafka topic. The valid range is 1-1024. The number of partitions must be at least greater than the number of consumers. The default value is 16.",
