@@ -11,7 +11,7 @@ resource "automq_kafka_instance" "example" {
     }
   ]
   compute_specs = {
-    aku = "18"
+    aku = "6"
   }
   acl = true
   configs = {

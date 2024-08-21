@@ -326,7 +326,7 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 	}
 	// check if the instance is in available state
 	if instance.Status != models.StateAvailable {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Kafka instance %q is not in available state", instanceId))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Kafka instance %q is Currently in %q state, only instances in 'Running' state can be updated", instanceId, instance.Status))
 		return
 	}
 
@@ -417,7 +417,7 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		for name := range stateConfig.Elements() {
 			if _, ok := planConfig.Elements()[name]; !ok {
 				resp.Diagnostics.AddError("Config Update Error", fmt.Sprintf("Error occurred while updating Kafka Instance %q. "+
-					" At present, we don't support the removal of topic settings from the 'configs' block, "+
+					" At present, we don't support the removal of instance settings from the 'configs' block, "+
 					"meaning you can't reset to the instance's default settings. "+
 					"As a workaround, you can find the default value and manually set the current value to match the default.", instanceId))
 				return
