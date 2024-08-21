@@ -177,8 +177,8 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	parsedURL, err := url.Parse(byoc_endpoint)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Invalid AutoMQ API Host",
-			"The AutoMQ API host is not a valid URL. "+
+			"Invalid AutoMQ API Endpoint",
+			"The AutoMQ API endpoint is not a valid URL. "+
 				"Please ensure the host is a valid URL and try again.",
 		)
 	}
