@@ -58,10 +58,10 @@ func (r *KafkaUserResource) Schema(ctx context.Context, req resource.SchemaReque
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"password": schema.StringAttribute{
-				MarkdownDescription: "Password for the Kafka user, limited to 8-24 characters.",
+				MarkdownDescription: "Password for the Kafka user, limited to 4-64 characters.",
 				Required:            true,
 				Validators: []validator.String{
-					stringvalidator.LengthBetween(8, 24),
+					stringvalidator.LengthBetween(4, 64),
 				},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
