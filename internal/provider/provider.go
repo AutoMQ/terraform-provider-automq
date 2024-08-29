@@ -114,7 +114,7 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	// Default values to environment variables, but override
 	// with Terraform configuration value if set.
 
-	byoc_endpoint := os.Getenv("AUTOMQ_BYOC_HOST")
+	byoc_endpoint := os.Getenv("AUTOMQ_BYOC_ENDPOINT")
 	byoc_access_key := os.Getenv("AUTOMQ_BYOC_ACCESS_KEY")
 	byoc_secret_key := os.Getenv("AUTOMQ_BYOC_SECRET_KEY")
 
