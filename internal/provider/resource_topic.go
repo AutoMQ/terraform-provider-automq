@@ -40,7 +40,7 @@ func (r *KafkaTopicResource) Metadata(ctx context.Context, req resource.Metadata
 
 func (r *KafkaTopicResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>`automq_kafka_topic` provides a Kafka Topic resource that enables creating and deleting Kafka Topics on a Kafka cluster on AutoMQ BYOC environment.",
+		MarkdownDescription: "![General_Availability](https://img.shields.io/badge/Lifecycle_Stage-General_Availability(GA)-green?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>`automq_kafka_topic` provides a Kafka Topic resource that enables creating and deleting Kafka Topics on a Kafka cluster on AutoMQ BYOC environment.",
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
