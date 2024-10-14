@@ -467,7 +467,7 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 	planVersion := plan.ComputeSpecs.Version.ValueString()
 	stateVersion := state.ComputeSpecs.Version.ValueString()
 	if planVersion != "" && planVersion != stateVersion {
-		_, err = r.client.UpdateKafkaInstanceVersion(ctx, state.InstanceID.ValueString(), planVersion)
+		err = r.client.UpdateKafkaInstanceVersion(ctx, state.InstanceID.ValueString(), planVersion)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update Kafka instance %q, got error: %s", instanceId, err))
 			return

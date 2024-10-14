@@ -122,13 +122,17 @@ func (c *Client) GetInstanceConfigs(ctx context.Context, instanceId string) ([]C
 	return instance.List, nil
 }
 
-func (c *Client) UpdateKafkaInstanceBasicInfo(ctx context.Context, instanceId string, updateParam InstanceBasicParam) (*KafkaInstanceResponse, error) {
-	return c.updateInstance(ctx, instanceId, updateParam, UpdateInstanceBasicInfoPath)
+func (c *Client) UpdateKafkaInstanceVersion(ctx context.Context, instanceId string, version string) error {
+	updateParam := InstanceVersionUpgradeParam{Version: version}
+	_, err := c.Put(ctx, fmt.Sprintf(UpdateInstanceVersionPath, instanceId, version), updateParam)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func (c *Client) UpdateKafkaInstanceVersion(ctx context.Context, instanceId string, version string) (*KafkaInstanceResponse, error) {
-	updateParam := InstanceVersionUpgradeParam{Version: version}
-	return c.updateInstance(ctx, instanceId, updateParam, UpdateInstanceVersionPath)
+func (c *Client) UpdateKafkaInstanceBasicInfo(ctx context.Context, instanceId string, updateParam InstanceBasicParam) (*KafkaInstanceResponse, error) {
+	return c.updateInstance(ctx, instanceId, updateParam, UpdateInstanceBasicInfoPath)
 }
 
 func (c *Client) UpdateKafkaInstanceConfig(ctx context.Context, instanceId string, updateParam InstanceConfigParam) (*KafkaInstanceResponse, error) {
