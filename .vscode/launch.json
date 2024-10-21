@@ -1,17 +1,25 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Debug Terraform Provider",
-            "type": "go",
-            "request": "launch",
-            "mode": "debug",
-            // this assumes your workspace is the root of the repo
-            "program": "${workspaceFolder}",
-            "env": {},
-            "args": [
-                "-debug",
-            ]
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Selected Test",
+      "request": "launch",
+      "type": "go",
+      "args": ["-test.v", "-test.run", "^${selectedText}$"],
+      "mode": "auto",
+      "program": "${fileDirname}",
+      "env": { "PKG_NAME": "${relativeFileDirname}" , "TF_ACC": "1" },
+      "showLog": true
+    },
+    {
+      "name": "Debug Terraform Provider",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      // this assumes your workspace is the root of the repo
+      "program": "${workspaceFolder}",
+      "env": {},
+      "args": ["-debug"]
+    }
+  ]
 }

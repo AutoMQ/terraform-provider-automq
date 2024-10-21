@@ -205,7 +205,9 @@ func flattenComputeSpecs(spec client.Spec) *ComputeSpecsModel {
 	var aku types.Int64
 	for _, value := range spec.Values {
 		if value.Key == "aku" {
-			aku = types.Int64Value(int64(value.Value))
+			if intValue, ok := value.Value.(float64); ok {
+				aku = types.Int64Value(int64(intValue))
+			}
 			break
 		}
 	}
