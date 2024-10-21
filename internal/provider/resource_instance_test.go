@@ -179,7 +179,7 @@ func newInstanceResponse() client.KafkaInstanceResponse {
 	instanceResponse.Spec.PaymentPlan.PaymentType = "ON_DEMAND"
 	instanceResponse.Spec.PaymentPlan.Period = 1
 	instanceResponse.Spec.PaymentPlan.Unit = "MONTH"
-	instanceResponse.Spec.Values = []client.Value{{Key: "aku", Value: 6}}
+	instanceResponse.Spec.Values = []client.Value{{Key: "aku", Value: 6}, {Key: "walMode", Value: "block"}}
 	instanceResponse.Networks = []client.Network{{Zone: "ap-southeast-1a", Subnets: []client.Subnet{{Subnet: "vsw-bp14v5eikr8wrgoqje7hr"}}}}
 	return instanceResponse
 }

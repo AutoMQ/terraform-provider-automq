@@ -81,10 +81,10 @@ type PaymentPlan struct {
 }
 
 type Value struct {
-	Key          string `json:"key"`
-	Name         string `json:"name"`
-	Value        int    `json:"value"`
-	DisplayValue string `json:"displayValue"`
+	Key          string      `json:"key"`
+	Name         string      `json:"name"`
+	Value        interface{} `json:"value"`
+	DisplayValue string      `json:"displayValue"`
 }
 
 type Network struct {

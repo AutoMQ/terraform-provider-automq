@@ -20,7 +20,8 @@ func TestFlattenComputeSpecs(t *testing.T) {
 			input: client.Spec{
 				Version: "1.0.0",
 				Values: []client.Value{
-					{Key: "aku", Value: 4},
+					{Key: "aku", Value: 4.0},
+					{Key: "other", Value: "value"},
 				},
 			},
 			expected: ComputeSpecsModel{
