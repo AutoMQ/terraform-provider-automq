@@ -35,6 +35,9 @@ type KafkaInstanceResourceModel struct {
 	Configs        types.Map          `tfsdk:"configs"`
 	ACL            types.Bool         `tfsdk:"acl"`
 	Integrations   types.List         `tfsdk:"integrations"`
+	DeployProfile  types.String       `tfsdk:"deploy_profile"`
+	K8SNodeGroups  types.String       `tfsdk:"k8s_node_groups"`
+	SecurityGroup  types.String       `tfsdk:"security_group"`
 	Endpoints      types.List         `tfsdk:"endpoints"`
 	CreatedAt      timetypes.RFC3339  `tfsdk:"created_at"`
 	LastUpdated    timetypes.RFC3339  `tfsdk:"last_updated"`
@@ -54,6 +57,9 @@ type KafkaInstanceModel struct {
 	Configs        types.Map          `tfsdk:"configs"`
 	ACL            types.Bool         `tfsdk:"acl"`
 	Integrations   types.List         `tfsdk:"integrations"`
+	DeployProfile  types.String       `tfsdk:"deploy_profile"`
+	K8SNodeGroups  types.String       `tfsdk:"k8s_node_groups"`
+	SecurityGroup  types.String       `tfsdk:"security_group"`
 	Endpoints      types.List         `tfsdk:"endpoints"`
 	CreatedAt      timetypes.RFC3339  `tfsdk:"created_at"`
 	LastUpdated    timetypes.RFC3339  `tfsdk:"last_updated"`
@@ -103,6 +109,9 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 	request.InstanceConfig.Configs = ExpandStringValueMap(instance.Configs)
 	request.Integrations = ExpandStringValueList(instance.Integrations)
 	request.AclEnabled = instance.ACL.ValueBool()
+	request.DeployProfile = instance.DeployProfile.ValueString()
+	request.K8SNodeGroups = instance.K8SNodeGroups.ValueString()
+	request.SecurityGroup = instance.SecurityGroup.ValueString()
 }
 
 func ConvertKafkaInstanceModel(resource *KafkaInstanceResourceModel, model *KafkaInstanceModel) {
@@ -121,6 +130,9 @@ func ConvertKafkaInstanceModel(resource *KafkaInstanceResourceModel, model *Kafk
 	model.CreatedAt = resource.CreatedAt
 	model.LastUpdated = resource.LastUpdated
 	model.InstanceStatus = resource.InstanceStatus
+	model.DeployProfile = resource.DeployProfile
+	model.K8SNodeGroups = resource.K8SNodeGroups
+	model.SecurityGroup = resource.SecurityGroup
 }
 
 func FlattenKafkaInstanceModel(instance *client.KafkaInstanceResponse, resource *KafkaInstanceResourceModel, integrations []client.IntegrationVO, endpoints []client.InstanceAccessInfoVO) diag.Diagnostics {
@@ -136,6 +148,10 @@ func FlattenKafkaInstanceModel(instance *client.KafkaInstanceResponse, resource 
 	}
 	resource.Networks = networks
 	resource.ComputeSpecs = flattenComputeSpecs(instance.Spec)
+
+	resource.DeployProfile = types.StringValue(instance.DeployProfile)
+	resource.K8SNodeGroups = types.StringValue(instance.K8SNodeGroups)
+	resource.SecurityGroup = types.StringValue(instance.SecurityGroup)
 
 	resource.CreatedAt = timetypes.NewRFC3339TimePointerValue(&instance.GmtCreate)
 	resource.LastUpdated = timetypes.NewRFC3339TimePointerValue(&instance.GmtModified)

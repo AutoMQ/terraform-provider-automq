@@ -152,6 +152,16 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				Default:     booldefault.StaticBool(false),
 				Description: "Configure ACL enablement. Default is false (disabled).",
 			},
+			"k8s_node_groups": schema.ListAttribute{
+				Required:    true,
+				ElementType: types.StringType,
+				Validators: []validator.List{
+					listvalidator.UniqueValues(),
+					listvalidator.SizeAtLeast(1),
+					listvalidator.SizeAtMost(1),
+				},
+				PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplace()},
+			},
 			"created_at": schema.StringAttribute{
 				CustomType: timetypes.RFC3339Type{},
 				Computed:   true,

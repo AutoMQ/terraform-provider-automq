@@ -12,6 +12,9 @@ type KafkaInstanceRequest struct {
 	AclEnabled     bool                          `json:"aclEnabled"`
 	Integrations   []string                      `json:"integrations"`
 	InstanceConfig InstanceConfigParam           `json:"instanceConfig"`
+	DeployProfile  string                        `json:"deployProfile"`
+	K8SNodeGroups  string                        `json:"k8sNodeGroups"`
+	SecurityGroup  string                        `json:"securityGroup"`
 }
 
 type InstanceBasicParam struct {
@@ -50,19 +53,22 @@ type KafkaInstanceRequestNetwork struct {
 }
 
 type KafkaInstanceResponse struct {
-	InstanceID   string        `json:"instanceId"`
-	GmtCreate    time.Time     `json:"gmtCreate"`
-	GmtModified  time.Time     `json:"gmtModified"`
-	DisplayName  string        `json:"displayName"`
-	Description  string        `json:"description"`
-	Status       string        `json:"status"`
-	Provider     string        `json:"provider"`
-	Region       string        `json:"region"`
-	Spec         Spec          `json:"spec"`
-	Networks     []Network     `json:"networks"`
-	Metrics      []interface{} `json:"metrics"`
-	AclSupported bool          `json:"aclSupported"`
-	AclEnabled   bool          `json:"aclEnabled"`
+	InstanceID    string        `json:"instanceId"`
+	GmtCreate     time.Time     `json:"gmtCreate"`
+	GmtModified   time.Time     `json:"gmtModified"`
+	DisplayName   string        `json:"displayName"`
+	Description   string        `json:"description"`
+	Status        string        `json:"status"`
+	Provider      string        `json:"provider"`
+	Region        string        `json:"region"`
+	Spec          Spec          `json:"spec"`
+	Networks      []Network     `json:"networks"`
+	Metrics       []interface{} `json:"metrics"`
+	AclSupported  bool          `json:"aclSupported"`
+	AclEnabled    bool          `json:"aclEnabled"`
+	DeployProfile string        `json:"deployProfile"`
+	K8SNodeGroups string        `json:"k8sNodeGroups"`
+	SecurityGroup string        `json:"securityGroup"`
 }
 
 type Spec struct {
