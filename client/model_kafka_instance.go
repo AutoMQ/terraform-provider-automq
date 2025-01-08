@@ -71,7 +71,7 @@ type Spec struct {
 	PaymentPlan PaymentPlan `json:"paymentPlan"`
 	Template    string      `json:"template"`
 	Version     string      `json:"version"`
-	Values      []Value     `json:"values"`
+	Values      []Value     `json:"currentValues"`
 }
 
 type PaymentPlan struct {
