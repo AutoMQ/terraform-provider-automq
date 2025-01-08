@@ -141,7 +141,7 @@ func FlattenKafkaInstanceModel(instance *client.KafkaInstanceResponse, resource 
 	resource.LastUpdated = timetypes.NewRFC3339TimePointerValue(&instance.GmtModified)
 
 	resource.InstanceStatus = mapInstanceStatus(instance.Status)
-	if integrations != nil {
+	if integrations != nil && len(integrations) > 0 {
 		integrationIds := make([]attr.Value, 0, len(integrations))
 		for _, integration := range integrations {
 			integrationIds = append(integrationIds, types.StringValue(integration.Code))
