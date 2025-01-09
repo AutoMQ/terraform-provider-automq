@@ -170,9 +170,6 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 			"endpoints": schema.ListNestedAttribute{
 				Computed:    true,
 				Description: "The bootstrap endpoints of instance. AutoMQ supports multiple access protocols; therefore, the Endpoint is a list.",
-				PlanModifiers: []planmodifier.List{
-					listplanmodifier.UseStateForUnknown(),
-				},
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"display_name": schema.StringAttribute{
