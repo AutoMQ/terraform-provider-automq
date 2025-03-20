@@ -37,7 +37,7 @@ resource "automq_kafka_acl" "example" {
 - `pattern_type` (String) Set the resource name matching pattern, supporting `LITERAL` and `PREFIXED`. `LITERAL` represents exact matching, while `PREFIXED` represents prefix matching.
 - `principal` (String) Set the authorized target principal, which currently supports Kafka User type principals, i.e., `User:xxxx`. Specify the Kafka user name. Principal must start with `User:` and contact with `kafka_user`.
 - `resource_name` (String) The target resource name for Kafka ACL authorization, can be a specific resource name or a resource name prefix (when using prefix matching, only the prefix needs to be provided without ending with `*`). If only `*` is specified, it represents all resources.
-- `resource_type` (String) The Kafka ACL authorized resource types, currently support `CLUSTER`, `TOPIC`, `CONSUMERGROUP` and `TRANSACTION_ID`.
+- `resource_type` (String) The Kafka ACL authorized resource types, currently support `CLUSTER`, `TOPIC`, `GROUP` and `TRANSACTION_ID`.
 
 ### Optional
 

@@ -60,10 +60,10 @@ func (r *KafkaAclResource) Schema(ctx context.Context, req resource.SchemaReques
 				},
 			},
 			"resource_type": schema.StringAttribute{
-				MarkdownDescription: "The Kafka ACL authorized resource types, currently support `CLUSTER`, `TOPIC`, `CONSUMERGROUP` and `TRANSACTION_ID`.",
+				MarkdownDescription: "The Kafka ACL authorized resource types, currently support `CLUSTER`, `TOPIC`, `GROUP` and `TRANSACTION_ID`.",
 				Required:            true,
 				Validators: []validator.String{
-					stringvalidator.OneOf("TOPIC", "CONSUMERGROUP", "CLUSTER", "TRANSACTION_ID"),
+					stringvalidator.OneOf("TOPIC", "GROUP", "CLUSTER", "TRANSACTION_ID"),
 				},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
