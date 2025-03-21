@@ -177,3 +177,4 @@ variable "automq_environment_id" {
 
 * [Documents](https://docs.automq.com/automq/what-is-automq/overview)
 
+* [Request Features](https://www.automq.com/contact)
