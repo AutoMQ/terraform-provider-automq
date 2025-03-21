@@ -175,6 +175,6 @@ variable "automq_environment_id" {
 
 * [Report Bugs](https://github.com/AutoMQ/terraform-provider-automq/issues)
 
-* [Documents](https://docs.automq.com/automq-cloud/overview)
+* [Documents](https://www.automq.com)
 
-* [Request Features](https://automq66.feishu.cn/share/base/form/shrcn7qXbb5aKiYbKqbJtPlGWXc)
+* [Request Features](https://www.automq.com/contact)
