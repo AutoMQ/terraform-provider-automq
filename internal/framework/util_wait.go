@@ -30,7 +30,7 @@ func WaitForKafkaClusterState(ctx context.Context, c *client.Client, clusterId, 
 }
 
 func WaitForKafkaClusterToProvision(ctx context.Context, c *client.Client, clusterId, pendingState string, timeout time.Duration) error {
-	return WaitForKafkaClusterState(ctx, c, clusterId, pendingState, models.StateAvailable, timeout, KafkaClusterStatus(ctx, c, clusterId, models.StateAvailable))
+	return WaitForKafkaClusterState(ctx, c, clusterId, pendingState, models.StateRunning, timeout, KafkaClusterStatus(ctx, c, clusterId, models.StateRunning))
 }
 
 func WaitForKafkaClusterToDeleted(ctx context.Context, c *client.Client, clusterId string, timeout time.Duration) error {
@@ -51,10 +51,10 @@ func KafkaClusterStatus(ctx context.Context, c *client.Client, clusterId string,
 			return nil, models.StateUnknown, fmt.Errorf("Kafka Cluster %q not found", clusterId)
 		}
 
-		tflog.Debug(ctx, fmt.Sprintf("Waiting for Kafka Cluster %q status to become %q: current status is %q", clusterId, targetState, cluster.Status))
-		if cluster.Status == models.StateError {
+		tflog.Debug(ctx, fmt.Sprintf("Waiting for Kafka Cluster %q status to become %q: current status is %q", clusterId, targetState, cluster.State))
+		if *cluster.State == models.StateError {
 			return nil, models.StateError, fmt.Errorf("Kafka Cluster %q status is %q", clusterId, models.StateError)
 		}
-		return cluster, cluster.Status, nil
+		return cluster, *cluster.State, nil
 	}
 }

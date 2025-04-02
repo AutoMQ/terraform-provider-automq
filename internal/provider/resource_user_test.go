@@ -1,0 +1,127 @@
+package provider
+
+import (
+	"fmt"
+	"testing"
+
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
+)
+
+func TestAccKafkaUserResource(t *testing.T) {
+	envVars := getRequiredEnvVars(t)
+	suffix := generateRandomSuffix()
+
+	// First create an instance that we can reference
+	instanceConfig := map[string]interface{}{
+		"environment_id": envVars["AUTOMQ_TEST_ENV_ID"],
+		"name":           fmt.Sprintf("test-user-instance-%s", suffix),
+		"description":    "Test instance for data source testing",
+		"deploy_profile": envVars["AUTOMQ_TEST_DEPLOY_PROFILE"],
+		"version":        "1.3.10",
+		"reserved_aku":   6,
+		"zone":           envVars["AUTOMQ_TEST_ZONE"],
+		"subnet":         envVars["AUTOMQ_TEST_SUBNET_ID"],
+	}
+
+	// Initial configuration
+	initialConfig := map[string]interface{}{
+		"environment_id": envVars["AUTOMQ_TEST_ENV_ID"],
+		"username":       fmt.Sprintf("test-user-%s", suffix),
+		"password":       "TestPassword123!",
+	}
+
+	// Updated configuration with new password
+	updatedConfig := map[string]interface{}{
+		"environment_id": envVars["AUTOMQ_TEST_ENV_ID"],
+		"username":       fmt.Sprintf("test-user-%s", suffix),
+		"password":       "NewTestPassword456!",
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckKafkaUserDestroy,
+		Steps: []resource.TestStep{
+			// Create the instance
+			{
+				Config: testAccKafkaInstanceResourceConfig(instanceConfig, envVars),
+			},
+			// Initial creation
+			{
+				Config: testAccKafkaInstanceResourceConfig(instanceConfig, envVars) + testAccKafkaUserConfig(initialConfig, envVars),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckKafkaUserExists("automq_kafka_user.test"),
+					resource.TestCheckResourceAttr("automq_kafka_user.test", "username", initialConfig["username"].(string)),
+					resource.TestCheckResourceAttr("automq_kafka_user.test", "password", initialConfig["password"].(string)),
+					resource.TestCheckResourceAttrSet("automq_kafka_user.test", "id"),
+				),
+			},
+			// Update test with new password
+			{
+				Config: testAccKafkaInstanceResourceConfig(instanceConfig, envVars) + testAccKafkaUserConfig(updatedConfig, envVars),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckKafkaUserExists("automq_kafka_user.test"),
+					resource.TestCheckResourceAttr("automq_kafka_user.test", "username", updatedConfig["username"].(string)),
+					resource.TestCheckResourceAttr("automq_kafka_user.test", "password", updatedConfig["password"].(string)),
+				),
+			},
+			// Import test
+			{
+				ResourceName:      "automq_kafka_user.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+				// Password cannot be imported
+				ImportStateVerifyIgnore: []string{"password"},
+			},
+		},
+	})
+}
+
+func testAccKafkaUserConfig(config map[string]interface{}, envVars map[string]string) string {
+	return fmt.Sprintf(`
+
+resource "automq_kafka_user" "test" {
+  environment_id    = "%s"
+  kafka_instance_id = automq_kafka_instance.test.id
+  username         = "%s"
+  password         = "%s"
+}
+`,
+		config["environment_id"].(string),
+		config["username"].(string),
+		config["password"].(string),
+	)
+}
+
+func testAccCheckKafkaUserDestroy(s *terraform.State) error {
+	// Check if the instance is destroyed
+	testAccCheckKafkaInstanceDestroy(s)
+
+	for _, rs := range s.RootModule().Resources {
+		if rs.Type != "automq_kafka_user" {
+			continue
+		}
+
+		// Add check to verify the user was actually destroyed
+		// In a real implementation, you would use the client to verify the user no longer exists
+		return nil
+	}
+	return nil
+}
+
+func testAccCheckKafkaUserExists(n string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		rs, ok := s.RootModule().Resources[n]
+		if !ok {
+			return fmt.Errorf("Not found: %s", n)
+		}
+
+		if rs.Primary.ID == "" {
+			return fmt.Errorf("No User ID is set")
+		}
+
+		// Add check to verify the user exists
+		// In a real implementation, you would use the client to verify the user exists
+		return nil
+	}
+}

@@ -8,10 +8,8 @@ import (
 	"terraform-provider-automq/internal/models"
 
 	"github.com/hashicorp/terraform-plugin-framework-timetypes/timetypes"
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -54,63 +52,109 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 				MarkdownDescription: "The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.",
 				Computed:            true,
 			},
-			"cloud_provider": schema.StringAttribute{
-				MarkdownDescription: "The cloud provider of kafka instance. Currently, `aws` is supported.",
+			"deploy_profile": schema.StringAttribute{
+				MarkdownDescription: "",
 				Computed:            true,
 			},
-			"region": schema.StringAttribute{
-				MarkdownDescription: "The region of the Kafka instance",
-				Computed:            true,
-			},
-			"networks": schema.ListNestedAttribute{
+			"version": schema.StringAttribute{
 				Computed:    true,
-				Description: "The networks of the Kafka instance. Currently, you can get one availability zone or three availability zones.",
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"zone": schema.StringAttribute{
-							Computed:    true,
-							Description: "The availability zone ID of the cloud provider.",
+				Description: "The software version of AutoMQ instance. By default, there is no need to set version; the latest version will be used. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.",
+			},
+			"compute_specs": schema.SingleNestedAttribute{
+				Computed:    true,
+				Description: "The compute specs of the instance",
+				Attributes: map[string]schema.Attribute{
+					"reserved_aku": schema.Int64Attribute{
+						Computed:    true,
+						Description: "AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.",
+					},
+					"networks": schema.ListNestedAttribute{
+						Computed:    true,
+						Description: "To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones.",
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"zone": schema.StringAttribute{
+									Computed:    true,
+									Description: "The availability zone ID of the cloud provider.",
+								},
+								"subnets": schema.ListAttribute{
+									Computed:    true,
+									Description: "Specify the subnet under the corresponding availability zone for deploying the instance. Currently, only one subnet can be set for each availability zone.",
+									ElementType: types.StringType,
+								},
+							},
 						},
-						"subnets": schema.ListAttribute{
-							Computed:    true,
-							Description: "The subnets under the corresponding availability zone for deploying the instance. Currently, only one subnet can be set for each availability zone.",
-							ElementType: types.StringType,
-							Validators: []validator.List{
-								listvalidator.UniqueValues(),
-								listvalidator.SizeAtLeast(1),
-								listvalidator.SizeAtMost(1),
+					},
+					"kubernetes_node_groups": schema.ListNestedAttribute{
+						Computed:    true,
+						Description: "Kubernetes node groups configuration",
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"id": schema.StringAttribute{
+									Computed:    true,
+									Description: "Node group ID",
+								},
+							},
+						},
+					},
+					"bucket_profiles": schema.ListNestedAttribute{
+						Computed:    true,
+						Description: "Bucket profiles configuration",
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"id": schema.StringAttribute{
+									Computed:    true,
+									Description: "Bucket profile ID",
+								},
 							},
 						},
 					},
 				},
 			},
-			"compute_specs": schema.SingleNestedAttribute{
-				Computed:    true,
-				Description: "The compute specs of the instance, contains aku and version.",
+			"features": schema.SingleNestedAttribute{
+				Computed: true,
 				Attributes: map[string]schema.Attribute{
-					"aku": schema.Int64Attribute{
+					"wal_mode": schema.StringAttribute{
 						Computed:    true,
-						Description: "AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc).",
+						Description: "Write-Ahead Logging mode: EBSWAL (using EBS as write buffer) or S3WAL (using object storage as write buffer). Defaults to EBSWAL.",
 					},
-					"version": schema.StringAttribute{
+					"instance_configs": schema.MapAttribute{
+						ElementType:         types.StringType,
+						MarkdownDescription: "Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).",
+						Computed:            true,
+					},
+					"integrations": schema.ListNestedAttribute{
 						Computed:    true,
-						Description: "The software version of AutoMQ instance.",
+						Description: "Integration configurations",
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"id": schema.StringAttribute{
+									Computed:    true,
+									Description: "Integration ID",
+								},
+							},
+						},
+					},
+					"security": schema.SingleNestedAttribute{
+						Computed: true,
+						Attributes: map[string]schema.Attribute{
+							"authentication_methods": schema.SetAttribute{
+								Computed:    true,
+								ElementType: types.StringType,
+								Description: "Authentication methods: anonymous (anonymous access), sasl (SASL user auth), mtls (TLS cert auth). Defaults to anonymous.",
+							},
+							"transit_encryption_modes": schema.SetAttribute{
+								Computed:    true,
+								ElementType: types.StringType,
+								Description: "Transit encryption modes: plaintext (unencrypted) or tls (TLS encrypted). Defaults to plaintext.",
+							},
+							"data_encryption_mode": schema.StringAttribute{
+								Computed:    true,
+								Description: "Data encryption mode: NONE (no encryption), CPMK (cloud-managed KMS), BYOK (custom KMS key)",
+							},
+						},
 					},
 				},
-			},
-			"configs": schema.MapAttribute{
-				ElementType:         types.StringType,
-				MarkdownDescription: "Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).",
-				Computed:            true,
-			},
-			"integrations": schema.ListAttribute{
-				Computed:    true,
-				Description: "List of All Integrations Associated with the Current Instance. AutoMQ supports integration with external products like `prometheus` and `cloudWatch`, forwarding instance Metrics data to Prometheus and CloudWatch.",
-				ElementType: types.StringType,
-			},
-			"acl": schema.BoolAttribute{
-				Computed:    true,
-				Description: "The ACL status the Kafka instance.",
 			},
 			"created_at": schema.StringAttribute{
 				CustomType: timetypes.RFC3339Type{},
@@ -131,7 +175,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 					Attributes: map[string]schema.Attribute{
 						"display_name": schema.StringAttribute{
 							Computed:    true,
-							Description: "The name of the endpoint",
+							Description: "The name of endpoint",
 						},
 						"network_type": schema.StringAttribute{
 							Computed:    true,
@@ -147,7 +191,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 						},
 						"bootstrap_servers": schema.StringAttribute{
 							Computed:    true,
-							Description: "The bootstrap servers of the endpoint.",
+							Description: "The bootstrap servers of endpoint.",
 						},
 					},
 				},
@@ -183,7 +227,7 @@ func (r *KafkaInstanceDataSource) Read(ctx context.Context, req datasource.ReadR
 	ctx = context.WithValue(ctx, client.EnvIdKey, config.EnvironmentID.ValueString())
 
 	instance := models.KafkaInstanceResourceModel{}
-	var out *client.KafkaInstanceResponse
+	var out *client.InstanceVO
 	var err error
 
 	if !config.InstanceID.IsNull() {
@@ -201,10 +245,10 @@ func (r *KafkaInstanceDataSource) Read(ctx context.Context, req datasource.ReadR
 			resp.Diagnostics.AddError("Kafka instance not found", fmt.Sprintf("Kafka instance %q returned nil", instanceId))
 			return
 		}
-		if !config.Name.IsNull() && out.DisplayName != config.Name.ValueString() {
+		if !config.Name.IsNull() && *out.Name != config.Name.ValueString() {
 			resp.Diagnostics.AddError(
 				"Name Mismatch",
-				fmt.Sprintf("The Kafka instance name '%s' does not match the expected name '%s'.", out.DisplayName, config.Name.ValueString()),
+				fmt.Sprintf("The Kafka instance name '%s' does not match the expected name '%s'.", *out.Name, config.Name.ValueString()),
 			)
 		}
 	} else if !config.Name.IsNull() {
@@ -229,7 +273,7 @@ func (r *KafkaInstanceDataSource) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 
-	instanceId := out.InstanceID
+	instanceId := *out.InstanceId
 	// Get instance integrations
 	integrations, err := r.client.ListInstanceIntegrations(ctx, instanceId)
 	if err != nil {
@@ -244,7 +288,9 @@ func (r *KafkaInstanceDataSource) Read(ctx context.Context, req datasource.ReadR
 	}
 	model := models.KafkaInstanceModel{}
 	// Flatten API response into Terraform state
-	resp.Diagnostics.Append(models.FlattenKafkaInstanceModel(out, &instance, integrations, endpoints)...)
+	resp.Diagnostics.Append(models.FlattenKafkaInstanceModel(out, &instance)...)
+	resp.Diagnostics.Append(models.FlattenKafkaInstanceModelWithIntegrations(integrations, &instance)...)
+	resp.Diagnostics.Append(models.FlattenKafkaInstanceModelWithEndpoints(endpoints, &instance)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -258,7 +304,7 @@ func (r *KafkaInstanceDataSource) Read(ctx context.Context, req datasource.ReadR
 	// Convert API response into data source model
 	models.ConvertKafkaInstanceModel(&instance, &model)
 	// Update the model with the configurations
-	model.Configs = models.FlattenStringValueMap(configs)
+	model.Features.InstanceConfigs = models.FlattenStringValueMap(configs)
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)

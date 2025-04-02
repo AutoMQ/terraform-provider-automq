@@ -17,14 +17,16 @@ const (
 	UpdateInstanceBasicInfoPath    = "/api/v1/instances/%s/basic"
 	UpdateInstanceVersionPath      = "/api/v1/instances/%s/versions/%s"
 	UpdateInstanceComputeSpecsPath = "/api/v1/instances/%s/spec"
+	UpdateInstancePath             = "/api/v1/instances/%s"
+	UpdateInstanceCertificatePath  = "/api/v1/instances/%s/certificate"
 )
 
-func (c *Client) CreateKafkaInstance(ctx context.Context, kafka KafkaInstanceRequest) (*KafkaInstanceResponse, error) {
+func (c *Client) CreateKafkaInstance(ctx context.Context, kafka InstanceCreateParam) (*InstanceSummaryVO, error) {
 	body, err := c.Post(ctx, InstancePath, kafka)
 	if err != nil {
 		return nil, err
 	}
-	newkafka := KafkaInstanceResponse{}
+	newkafka := InstanceSummaryVO{}
 	err = json.Unmarshal(body, &newkafka)
 	if err != nil {
 		return nil, err
@@ -32,12 +34,12 @@ func (c *Client) CreateKafkaInstance(ctx context.Context, kafka KafkaInstanceReq
 	return &newkafka, nil
 }
 
-func (c *Client) GetKafkaInstance(ctx context.Context, instanceId string) (*KafkaInstanceResponse, error) {
+func (c *Client) GetKafkaInstance(ctx context.Context, instanceId string) (*InstanceVO, error) {
 	body, err := c.Get(ctx, fmt.Sprintf(GetInstancePath, instanceId), nil)
 	if err != nil {
 		return nil, err
 	}
-	instance := KafkaInstanceResponse{}
+	instance := InstanceVO{}
 	err = json.Unmarshal(body, &instance)
 	if err != nil {
 		return nil, err
@@ -45,21 +47,21 @@ func (c *Client) GetKafkaInstance(ctx context.Context, instanceId string) (*Kafk
 	return &instance, nil
 }
 
-func (c *Client) GetKafkaInstanceByName(ctx context.Context, name string) (*KafkaInstanceResponse, error) {
+func (c *Client) GetKafkaInstanceByName(ctx context.Context, name string) (*InstanceVO, error) {
 	queryParams := make(map[string]string)
 	queryParams["keyword"] = name
 	body, err := c.Get(ctx, InstancePath, queryParams)
 	if err != nil {
 		return nil, err
 	}
-	instances := KafkaInstanceResponseList{}
+	instances := PageNumResultInstanceVO{}
 	err = json.Unmarshal(body, &instances)
 	if err != nil {
 		return nil, err
 	}
 	if len(instances.List) > 0 {
 		for _, item := range instances.List {
-			if item.DisplayName == name {
+			if *item.Name == name {
 				return &item, nil
 			}
 		}
@@ -131,27 +133,31 @@ func (c *Client) UpdateKafkaInstanceVersion(ctx context.Context, instanceId stri
 	return nil
 }
 
-func (c *Client) UpdateKafkaInstanceBasicInfo(ctx context.Context, instanceId string, updateParam InstanceBasicParam) (*KafkaInstanceResponse, error) {
+func (c *Client) UpdateKafkaInstanceBasicInfo(ctx context.Context, instanceId string, updateParam InstanceBasicParam) error {
 	return c.updateInstance(ctx, instanceId, updateParam, UpdateInstanceBasicInfoPath)
 }
 
-func (c *Client) UpdateKafkaInstanceConfig(ctx context.Context, instanceId string, updateParam InstanceConfigParam) (*KafkaInstanceResponse, error) {
+func (c *Client) UpdateKafkaInstanceConfig(ctx context.Context, instanceId string, updateParam InstanceConfigParam) error {
 	return c.updateInstance(ctx, instanceId, updateParam, InstanceConfigPath)
 }
 
-func (c *Client) UpdateKafkaInstanceComputeSpecs(ctx context.Context, instanceId string, updateParam SpecificationUpdateParam) (*KafkaInstanceResponse, error) {
-	return c.updateInstance(ctx, instanceId, updateParam, UpdateInstanceComputeSpecsPath)
+func (c *Client) UpdateKafkaInstanceComputeSpecs(ctx context.Context, instanceId string, updateParam InstanceUpdateParam) error {
+	return c.updateInstance(ctx, instanceId, updateParam, UpdateInstancePath)
 }
 
-func (c *Client) updateInstance(ctx context.Context, instanceId string, updateParam interface{}, path string) (*KafkaInstanceResponse, error) {
-	body, err := c.Patch(ctx, fmt.Sprintf(path, instanceId), updateParam)
+func (c *Client) UpdateKafkaInstanCertificate(ctx context.Context, instanceId string, updateParam InstanceCertificateParam) error {
+	_, err := c.Put(ctx, fmt.Sprintf(UpdateInstanceCertificatePath, instanceId), updateParam)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	instance := KafkaInstanceResponse{}
-	err = json.Unmarshal(body, &instance)
+	return nil
+}
+
+func (c *Client) updateInstance(ctx context.Context, instanceId string, updateParam interface{}, path string) error {
+	_, err := c.Patch(ctx, fmt.Sprintf(path, instanceId), updateParam)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return &instance, nil
+
+	return nil
 }

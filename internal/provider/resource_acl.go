@@ -60,10 +60,10 @@ func (r *KafkaAclResource) Schema(ctx context.Context, req resource.SchemaReques
 				},
 			},
 			"resource_type": schema.StringAttribute{
-				MarkdownDescription: "The Kafka ACL authorized resource types, currently support `CLUSTER`, `TOPIC`, `GROUP` and `TRANSACTION_ID`.",
+				MarkdownDescription: "The Kafka ACL authorized resource types, currently support `CLUSTER`, `TOPIC`, `GROUP` and `TRANSACTIONAL_ID`.",
 				Required:            true,
 				Validators: []validator.String{
-					stringvalidator.OneOf("TOPIC", "GROUP", "CLUSTER", "TRANSACTION_ID"),
+					stringvalidator.OneOf("TOPIC", "GROUP", "CLUSTER", "TRANSACTIONAL_ID"),
 				},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
@@ -131,6 +131,14 @@ func (r *KafkaAclResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 	ctx = context.WithValue(ctx, client.EnvIdKey, plan.EnvironmentID.ValueString())
+
+	// check Param
+	if plan.PatternType.ValueString() == "CLUSTER" {
+		if plan.ResourceName.ValueString() != "kafka-cluster" {
+			resp.Diagnostics.AddError("Invalid Resource Name", "When resource type is CLUSTER, the resource name must be kafka-cluster.")
+			return
+		}
+	}
 
 	instance := plan.KafkaInstance.ValueString()
 	param := client.KafkaAclBindingParam{}

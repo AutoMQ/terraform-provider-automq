@@ -49,20 +49,17 @@ variable "instance_deploy_subnet" {
 
 ### Required
 
-- `cloud_provider` (String) To set up a Kafka instance, you need to specify the target cloud provider environment for deployment. Currently, `aws` is supported. This parameter must match the cloud provider and region where the current environment is deployed.
-- `compute_specs` (Attributes) The compute specs of the instance, contains aku and version. (see [below for nested schema](#nestedatt--compute_specs))
+- `compute_specs` (Attributes) The compute specs of the instance (see [below for nested schema](#nestedatt--compute_specs))
+- `deploy_profile` (String)
 - `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
+- `features` (Attributes) (see [below for nested schema](#nestedatt--features))
 - `name` (String) The name of the Kafka instance. It can contain letters (a-z or A-Z), numbers (0-9), underscores (_), and hyphens (-), with a length limit of 3 to 64 characters.
-- `networks` (Attributes List) To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones. (see [below for nested schema](#nestedatt--networks))
-- `region` (String) To set up an instance, you need to specify the target region for deployment. This parameter must match the cloud provider and region where the current environment is deployed.
 
 ### Optional
 
-- `acl` (Boolean) Configure ACL enablement. Default is false (disabled).
-- `configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
 - `description` (String) The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.
-- `integrations` (List of String) Configure integration setting. Set existed integration id. AutoMQ supports integration with external products like `prometheus` and `cloudWatch`, forwarding instance Metrics data to Prometheus and CloudWatch. Currently, only one integration is supported. Configuring multiple integrations simultaneously is not supported.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
+- `version` (String) The software version of AutoMQ instance. By default, there is no need to set version; the latest version will be used. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.
 
 ### Read-Only
 
@@ -77,20 +74,76 @@ variable "instance_deploy_subnet" {
 
 Required:
 
-- `aku` (Number) AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.
+- `bucket_profiles` (Attributes List) Bucket profiles configuration (see [below for nested schema](#nestedatt--compute_specs--bucket_profiles))
+- `networks` (Attributes List) To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones. (see [below for nested schema](#nestedatt--compute_specs--networks))
+- `reserved_aku` (Number) AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.
 
 Optional:
 
-- `version` (String) The software version of AutoMQ instance. By default, there is no need to set version; the latest version will be used. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.
+- `kubernetes_node_groups` (Attributes List) Kubernetes node groups configuration (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
+
+<a id="nestedatt--compute_specs--bucket_profiles"></a>
+### Nested Schema for `compute_specs.bucket_profiles`
+
+Required:
+
+- `id` (String) Bucket profile ID
 
 
-<a id="nestedatt--networks"></a>
-### Nested Schema for `networks`
+<a id="nestedatt--compute_specs--networks"></a>
+### Nested Schema for `compute_specs.networks`
 
 Required:
 
 - `subnets` (List of String) Specify the subnet under the corresponding availability zone for deploying the instance. Currently, only one subnet can be set for each availability zone.
 - `zone` (String) The availability zone ID of the cloud provider.
+
+
+<a id="nestedatt--compute_specs--kubernetes_node_groups"></a>
+### Nested Schema for `compute_specs.kubernetes_node_groups`
+
+Required:
+
+- `id` (String) Node group ID
+
+
+
+<a id="nestedatt--features"></a>
+### Nested Schema for `features`
+
+Required:
+
+- `security` (Attributes) (see [below for nested schema](#nestedatt--features--security))
+- `wal_mode` (String) Write-Ahead Logging mode: EBSWAL (using EBS as write buffer) or S3WAL (using object storage as write buffer). Defaults to EBSWAL.
+
+Optional:
+
+- `instance_configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
+- `integrations` (Attributes List) Integration configurations (see [below for nested schema](#nestedatt--features--integrations))
+
+<a id="nestedatt--features--security"></a>
+### Nested Schema for `features.security`
+
+Required:
+
+- `authentication_methods` (Set of String) Authentication methods: anonymous (anonymous access), sasl (SASL user auth), mtls (TLS cert auth). Defaults to anonymous.
+- `transit_encryption_modes` (Set of String) Transit encryption modes: plaintext (unencrypted) or tls (TLS encrypted). Defaults to plaintext.
+
+Optional:
+
+- `certificate_authority` (String) CA certificate for mTLS authentication
+- `certificate_chain` (String) Certificate chain for mTLS authentication
+- `data_encryption_mode` (String) Data encryption mode: NONE (no encryption), CPMK (cloud-managed KMS), BYOK (custom KMS key)
+- `private_key` (String) Private key for mTLS authentication
+
+
+<a id="nestedatt--features--integrations"></a>
+### Nested Schema for `features.integrations`
+
+Required:
+
+- `id` (String) Integration ID
+
 
 
 <a id="nestedblock--timeouts"></a>
