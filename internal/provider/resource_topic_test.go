@@ -87,6 +87,15 @@ func TestAccKafkaTopicResource(t *testing.T) {
 				ResourceName:      "automq_kafka_topic.test",
 				ImportState:       true,
 				ImportStateVerify: true,
+				ImportStateIdFunc: func(s *terraform.State) (string, error) {
+					rs, ok := s.RootModule().Resources["automq_kafka_topic.test"]
+					if !ok {
+						return "", fmt.Errorf("Not found: %s", "automq_kafka_topic.test")
+					}
+					id := fmt.Sprintf("%s@%s@%s", rs.Primary.Attributes["environment_id"], rs.Primary.Attributes["kafka_instance_id"], rs.Primary.Attributes["topic_id"])
+					return id, nil
+				},
+				ImportStateVerifyIgnore: []string{"id"},
 			},
 		},
 	})

@@ -53,10 +53,10 @@ func (r *IntegrationResource) Schema(ctx context.Context, req resource.SchemaReq
 				Validators:          []validator.String{stringvalidator.LengthBetween(1, 64)},
 			},
 			"type": schema.StringAttribute{
-				MarkdownDescription: "Type of integration, currently support `kafka` and `cloudWatch`",
+				MarkdownDescription: "Type of integration, currently supports `prometheus`, `prometheus_remote_write`, and `cloudwatch`.",
 				Required:            true,
 				Validators: []validator.String{
-					stringvalidator.OneOf("prometheus", "kafka", "cloudWatch"),
+					stringvalidator.OneOf("prometheus", "prometheus_remote_write", "cloudwatch"),
 				},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
@@ -67,40 +67,38 @@ func (r *IntegrationResource) Schema(ctx context.Context, req resource.SchemaReq
 					stringvalidator.LengthBetween(1, 256),
 				},
 			},
-			"kafka_config": schema.SingleNestedAttribute{
-				MarkdownDescription: "Kafka integration configurations. When Type is `kafka`, it must be set.",
-				Optional:            true,
-				Attributes: map[string]schema.Attribute{
-					"security_protocol": schema.StringAttribute{
-						MarkdownDescription: "Security protocol for external kafka cluster, currently support `PLAINTEXT` and `SASL_PLAINTEXT`",
-						Required:            true,
-						Validators: []validator.String{
-							stringvalidator.OneOf("PLAINTEXT", "SASL_PLAINTEXT"),
-						},
-					},
-					"sasl_mechanism": schema.StringAttribute{
-						MarkdownDescription: "SASL mechanism for external kafka cluster, currently support `PLAIN`, `SCRAM-SHA-256` and `SCRAM-SHA-512`",
-						Required:            true,
-						Validators: []validator.String{
-							stringvalidator.OneOf("PLAIN", "SCRAM-SHA-256", "SCRAM-SHA-512"),
-						},
-					},
-					"sasl_username": schema.StringAttribute{
-						MarkdownDescription: "SASL username for Kafka, The username and password are declared and returned when creating the kafka_user resource in AutoMQ.",
-						Required:            true,
-					},
-					"sasl_password": schema.StringAttribute{
-						MarkdownDescription: "SASL password for Kafka, The username and password are declared and returned when creating the kafka_user resource in AutoMQ.",
-						Required:            true,
-					},
-				},
-			},
 			"cloudwatch_config": schema.SingleNestedAttribute{
 				MarkdownDescription: "CloudWatch integration configurations. When Type is `cloudwatch`, it must be set.",
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"namespace": schema.StringAttribute{
 						MarkdownDescription: "Set cloudwatch namespace, AutoMQ will write all Metrics data under this namespace. The namespace name must contain 1 to 255 valid ASCII characters and may be alphanumeric, periods, hyphens, underscores, forward slashes, pound signs, colons, and spaces, but not all spaces.",
+						Optional:            true,
+					},
+				},
+			},
+			"prometheus_remote_write_config": schema.SingleNestedAttribute{
+				MarkdownDescription: "Prometheus remote write integration configurations. When Type is `prometheus_remote_write`, it must be set.",
+				Optional:            true,
+				Attributes: map[string]schema.Attribute{
+					"auth_type": schema.StringAttribute{
+						MarkdownDescription: "Authentication type, currently supports `noauth`, `basic`, `bearer`, and `sigv4`.",
+						Optional:            true,
+						Validators: []validator.String{
+							stringvalidator.OneOf("noauth", "basic", "bearer", "sigv4"),
+						},
+						PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+					},
+					"username": schema.StringAttribute{
+						MarkdownDescription: "Username for basic authentication. When authType is `basic`, it must be set.",
+						Optional:            true,
+					},
+					"password": schema.StringAttribute{
+						MarkdownDescription: "Password for basic authentication. When authType is `basic`, it must be set.",
+						Optional:            true,
+					},
+					"bearer_token": schema.StringAttribute{
+						MarkdownDescription: "Bearer token for bearer authentication. When authType is `bearer`, it must be set.",
 						Optional:            true,
 					},
 				},

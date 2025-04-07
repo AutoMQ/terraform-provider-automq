@@ -90,13 +90,6 @@ func TestAccKafkaAclResource(t *testing.T) {
 		})
 	}
 
-	// Import test
-	// steps = append(steps, resource.TestStep{
-	// 	ResourceName:      "automq_kafka_acl.test",
-	// 	ImportState:       true,
-	// 	ImportStateVerify: true,
-	// })
-
 	resource.Test(t, resource.TestCase{
 		// PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,

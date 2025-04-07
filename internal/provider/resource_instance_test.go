@@ -18,12 +18,12 @@ import (
 
 func getRequiredEnvVars(t *testing.T) map[string]string {
 	envVars := map[string]string{
-		"AUTOMQ_BYOC_ENDPOINT":       "http://34.225.242.115:8080",       // os.Getenv("AUTOMQ_BYOC_ENDPOINT"),
-		"AUTOMQ_BYOC_ACCESS_KEY_ID":  "AzHHs6H4JP0Svw6M",                 // os.Getenv("AUTOMQ_BYOC_ACCESS_KEY_ID"),
-		"AUTOMQ_BYOC_SECRET_KEY":     "61G8ZwMogbecCPwPzybaqVwX0jWcGH7I", // os.Getenv("AUTOMQ_BYOC_SECRET_KEY"),
-		"AUTOMQ_TEST_ENV_ID":         "env-ljhhrogphquqvtn1",             // os.Getenv("AUTOMQ_TEST_ENV_ID"),
-		"AUTOMQ_TEST_SUBNET_ID":      "subnet-0dc3b89c7e570990b",         //os.Getenv("AUTOMQ_TEST_SUBNET_ID"),
-		"AUTOMQ_TEST_ZONE":           "us-east-1",                        // os.Getenv("AUTOMQ_TEST_ZONE"),
+		"AUTOMQ_BYOC_ENDPOINT":       "http://44.207.11.83:8080",         // os.Getenv("AUTOMQ_BYOC_ENDPOINT"),
+		"AUTOMQ_BYOC_ACCESS_KEY_ID":  "TeDaXnaRASROF9AZ",                 // os.Getenv("AUTOMQ_BYOC_ACCESS_KEY_ID"),
+		"AUTOMQ_BYOC_SECRET_KEY":     "Lj41KSn5WciTS9UNc5cf4k3MRcIbs0D4", // os.Getenv("AUTOMQ_BYOC_SECRET_KEY"),
+		"AUTOMQ_TEST_ENV_ID":         "env-vstohprknxupims1",             // os.Getenv("AUTOMQ_TEST_ENV_ID"),
+		"AUTOMQ_TEST_SUBNET_ID":      "subnet-0005ed305e0891752",         //os.Getenv("AUTOMQ_TEST_SUBNET_ID"),
+		"AUTOMQ_TEST_ZONE":           "us-east-1a",                       // os.Getenv("AUTOMQ_TEST_ZONE"),
 		"AUTOMQ_TEST_DEPLOY_PROFILE": "default",                          // os.Getenv("AUTOMQ_TEST_DEPLOY_PROFILE"),
 	}
 
@@ -332,6 +332,27 @@ func TestAccKafkaInstanceResource(t *testing.T) {
 					resource.TestCheckResourceAttrSet("automq_kafka_instance.test", "features.security.certificate_chain"),
 					resource.TestCheckResourceAttrSet("automq_kafka_instance.test", "features.security.private_key"),
 				),
+			},
+			// import test
+			{
+				ResourceName:      "automq_kafka_instance.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateIdFunc: func(s *terraform.State) (string, error) {
+					rs, ok := s.RootModule().Resources["automq_kafka_instance.test"]
+					if !ok {
+						return "", fmt.Errorf("Not found: %s", "automq_kafka_instance.test")
+					}
+					id := fmt.Sprintf("%s@%s", rs.Primary.Attributes["environment_id"], rs.Primary.Attributes["id"])
+					// The import ID format is <environment_id>@<kafka_instance_id>
+					return id, nil
+				},
+				ImportStateVerifyIgnore: []string{
+					"features.security.certificate_authority",
+					"features.security.certificate_chain",
+					"features.security.private_key",
+					"features.instance_configs",
+				},
 			},
 		},
 	})

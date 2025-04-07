@@ -20,5 +20,6 @@ func FlattenKafkaUserResource(user *client.KafkaUserVO, resource *KafkaUserResou
 	if user.Password != "" {
 		resource.Password = types.StringValue(user.Password)
 	}
-	resource.ID = types.StringValue(user.Name)
+	// id: {environment_id}@{instance_id}@{username}
+	resource.ID = types.StringValue(resource.EnvironmentID.String() + "@" + resource.KafkaInstanceID.String() + "@" + resource.Username.String())
 }

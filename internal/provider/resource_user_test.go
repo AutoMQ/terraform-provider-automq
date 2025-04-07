@@ -70,6 +70,15 @@ func TestAccKafkaUserResource(t *testing.T) {
 				ResourceName:      "automq_kafka_user.test",
 				ImportState:       true,
 				ImportStateVerify: true,
+				ImportStateIdFunc: func(s *terraform.State) (string, error) {
+					rs, ok := s.RootModule().Resources["automq_kafka_user.test"]
+					if !ok {
+						return "", fmt.Errorf("Not found: %s", "automq_kafka_user.test")
+					}
+					id := fmt.Sprintf("%s@%s@%s", rs.Primary.Attributes["environment_id"], rs.Primary.Attributes["kafka_instance_id"], rs.Primary.Attributes["username"])
+					// The import ID format is <environment_id>@<kafka_instance_id>@<username>
+					return id, nil
+				},
 				// Password cannot be imported
 				ImportStateVerifyIgnore: []string{"password"},
 			},

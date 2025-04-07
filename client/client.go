@@ -66,8 +66,18 @@ func (e *ErrorResponse) Error() string {
 }
 
 func NewClient(ctx context.Context, host string, credentials AuthCredentials) (*Client, error) {
+	transport := &http.Transport{
+		MaxIdleConns:        100,
+		IdleConnTimeout:     90 * time.Second,
+		DisableCompression:  true,
+		TLSHandshakeTimeout: 10 * time.Second,
+	}
+
 	c := &Client{
-		HTTPClient:  &http.Client{Timeout: 0 * time.Second},
+		HTTPClient: &http.Client{
+			Timeout:   30 * time.Second,
+			Transport: transport,
+		},
 		HostURL:     host,
 		Credentials: credentials,
 		Signer: signer.NewSigner(signer.Credentials{
