@@ -91,39 +91,6 @@ func (d *DeployProfileDataSource) Schema(_ context.Context, _ datasource.SchemaR
 					},
 				},
 			},
-			"data_buckets": schema.ListNestedAttribute{
-				Computed: true,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"id": schema.StringAttribute{
-							MarkdownDescription: "The ID of the data bucket.",
-							Computed:            true,
-						},
-						"bucket_name": schema.StringAttribute{
-							MarkdownDescription: "The name of the data bucket.",
-							Computed:            true,
-						},
-						"gmt_create": schema.StringAttribute{
-							CustomType:          timetypes.RFC3339Type{},
-							MarkdownDescription: "Creation time of the data bucket.",
-							Computed:            true,
-						},
-						"gmt_modified": schema.StringAttribute{
-							CustomType:          timetypes.RFC3339Type{},
-							MarkdownDescription: "Last modification time of the data bucket.",
-							Computed:            true,
-						},
-						"provider": schema.StringAttribute{
-							MarkdownDescription: "The cloud provider of the data bucket.",
-							Computed:            true,
-						},
-						"region": schema.StringAttribute{
-							MarkdownDescription: "The region of the data bucket.",
-							Computed:            true,
-						},
-					},
-				},
-			},
 			"dns_zone": schema.StringAttribute{
 				MarkdownDescription: "The DNS zone ID.",
 				Computed:            true,

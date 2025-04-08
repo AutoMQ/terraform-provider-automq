@@ -18,6 +18,8 @@ type Client struct {
 	Token       string
 	Credentials AuthCredentials
 	Signer      *signer.Signer
+	MaxRetries  int
+	RetryDelay  time.Duration
 }
 
 type EnvironmentID string
@@ -66,17 +68,9 @@ func (e *ErrorResponse) Error() string {
 }
 
 func NewClient(ctx context.Context, host string, credentials AuthCredentials) (*Client, error) {
-	transport := &http.Transport{
-		MaxIdleConns:        100,
-		IdleConnTimeout:     90 * time.Second,
-		DisableCompression:  true,
-		TLSHandshakeTimeout: 10 * time.Second,
-	}
-
 	c := &Client{
 		HTTPClient: &http.Client{
-			Timeout:   30 * time.Second,
-			Transport: transport,
+			Timeout: 30 * time.Second,
 		},
 		HostURL:     host,
 		Credentials: credentials,
@@ -84,8 +78,33 @@ func NewClient(ctx context.Context, host string, credentials AuthCredentials) (*
 			AccessKeyID:     credentials.AccessKeyID,
 			SecretAccessKey: credentials.SecretAccessKey,
 		}),
+		MaxRetries: 3,
+		RetryDelay: 500 * time.Millisecond,
 	}
 	return c, nil
+}
+
+func (c *Client) retryOperation(operation func() ([]byte, error)) ([]byte, error) {
+	var lastErr error
+	for i := 0; i <= c.MaxRetries; i++ {
+		if i > 0 {
+			time.Sleep(c.RetryDelay)
+		}
+
+		result, err := operation()
+		if err == nil {
+			return result, nil
+		}
+
+		lastErr = err
+		// only retry on server errors (5xx) or network errors
+		if e, ok := err.(*ErrorResponse); ok {
+			if e.Code < 500 && e.Code != 0 {
+				return nil, err
+			}
+		}
+	}
+	return nil, fmt.Errorf("after %d retries: %v", c.MaxRetries, lastErr)
 }
 
 func (c *Client) Post(ctx context.Context, path string, body interface{}) ([]byte, error) {
@@ -100,7 +119,11 @@ func (c *Client) Get(ctx context.Context, path string, queryParams map[string]st
 	if queryParams != nil {
 		path += "?" + buildQueryParams(queryParams)
 	}
-	return c.doRequest(ctx, "GET", path, nil)
+
+	operation := func() ([]byte, error) {
+		return c.doRequest(ctx, "GET", path, nil)
+	}
+	return c.retryOperation(operation)
 }
 
 func (c *Client) Delete(ctx context.Context, path string) ([]byte, error) {

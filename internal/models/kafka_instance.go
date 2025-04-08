@@ -148,7 +148,17 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 		// ignore Node Configs
 
 		// Networks
-		if len(instance.ComputeSpecs.Networks) > 0 {
+		// Kubernetes Node Groups
+		if len(instance.ComputeSpecs.KubernetesNodeGroups) > 0 {
+			nodeGroups := make([]client.KubernetesNodeGroupParam, 0, len(instance.ComputeSpecs.KubernetesNodeGroups))
+			for _, ng := range instance.ComputeSpecs.KubernetesNodeGroups {
+				id := ng.ID.ValueString()
+				nodeGroups = append(nodeGroups, client.KubernetesNodeGroupParam{
+					Id: &id,
+				})
+			}
+			request.Spec.KubernetesNodeGroups = nodeGroups
+		} else if len(instance.ComputeSpecs.Networks) > 0 {
 			networks := make([]client.InstanceNetworkParam, 0, len(instance.ComputeSpecs.Networks))
 			for _, network := range instance.ComputeSpecs.Networks {
 				subnet := ""
@@ -165,19 +175,6 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 			}
 			request.Spec.Networks = networks
 		}
-
-		// Kubernetes Node Groups
-		if len(instance.ComputeSpecs.KubernetesNodeGroups) > 0 {
-			nodeGroups := make([]client.KubernetesNodeGroupParam, 0, len(instance.ComputeSpecs.KubernetesNodeGroups))
-			for _, ng := range instance.ComputeSpecs.KubernetesNodeGroups {
-				id := ng.ID.ValueString()
-				nodeGroups = append(nodeGroups, client.KubernetesNodeGroupParam{
-					Id: &id,
-				})
-			}
-			request.Spec.KubernetesNodeGroups = nodeGroups
-		}
-
 		// Bucket Profiles
 		if len(instance.ComputeSpecs.BucketProfiles) > 0 {
 			bucketProfiles := make([]client.BucketProfileBindParam, 0, len(instance.ComputeSpecs.BucketProfiles))
@@ -413,16 +410,6 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 			resource.ComputeSpecs.ReservedAku = types.Int64Value(int64(*instance.Spec.ReservedAku))
 		}
 
-		// Networks
-		if instance.Spec.Networks != nil {
-			networks, networkDiags := flattenNetworks(instance.Spec.Networks)
-			if networkDiags.HasError() {
-				diags.Append(networkDiags...)
-			} else {
-				resource.ComputeSpecs.Networks = networks
-			}
-		}
-
 		// Kubernetes Node Groups
 		if instance.Spec.KubernetesNodeGroups != nil {
 			nodeGroups := make([]NodeGroupModel, 0, len(instance.Spec.KubernetesNodeGroups))
@@ -434,6 +421,14 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 				}
 			}
 			resource.ComputeSpecs.KubernetesNodeGroups = nodeGroups
+			// Networks
+		} else if instance.Spec.Networks != nil {
+			networks, networkDiags := flattenNetworks(instance.Spec.Networks)
+			if networkDiags.HasError() {
+				diags.Append(networkDiags...)
+			} else {
+				resource.ComputeSpecs.Networks = networks
+			}
 		}
 
 		// Bucket Profiles

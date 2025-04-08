@@ -85,8 +85,13 @@ provider "automq" {
 }
 
 data "automq_deploy_profile" "test" {
-  environment_id = "`+envVars["AUTOMQ_TEST_ENV_ID"]+`"
-  name          = "`+envVars["AUTOMQ_TEST_DEPLOY_PROFILE"]+`"
+  environment_id = "%[4]s"
+  name          = "%[11]s"
+}
+
+data "automq_data_bucket_profiles" "test" {
+  environment_id = "%[4]s"
+  profile_name = data.automq_deploy_profile.test.name
 }
 
 resource "automq_kafka_instance" "test" {
@@ -106,7 +111,7 @@ resource "automq_kafka_instance" "test" {
 	]
 	bucket_profiles = [
 		{
-			id = data.automq_deploy_profile.test.data_buckets[0].id
+			id = data.automq_data_bucket_profiles.test.data_buckets[0].id
 		}
 	]
   }
@@ -119,16 +124,17 @@ resource "automq_kafka_instance" "test" {
   }
 }
 `,
-		envVars["AUTOMQ_BYOC_ENDPOINT"],
-		envVars["AUTOMQ_BYOC_ACCESS_KEY_ID"],
-		envVars["AUTOMQ_BYOC_SECRET_KEY"],
-		config["environment_id"].(string),
-		config["name"].(string),
-		config["description"].(string),
-		config["version"].(string),
-		config["reserved_aku"].(int),
-		config["zone"].(string),
-		config["subnet"].(string),
+		envVars["AUTOMQ_BYOC_ENDPOINT"],       // 1
+		envVars["AUTOMQ_BYOC_ACCESS_KEY_ID"],  // 2
+		envVars["AUTOMQ_BYOC_SECRET_KEY"],     // 3
+		config["environment_id"].(string),     // 4
+		config["name"].(string),               // 5
+		config["description"].(string),        // 6
+		config["version"].(string),            // 7
+		config["reserved_aku"].(int),          // 8
+		config["zone"].(string),               // 9
+		config["subnet"].(string),             // 10
+		envVars["AUTOMQ_TEST_DEPLOY_PROFILE"], // 11
 	)
 }
 

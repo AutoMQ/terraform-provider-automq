@@ -87,9 +87,8 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				Required:            true,
 			},
 			"version": schema.StringAttribute{
-				Optional:    true,
-				Computed:    true,
-				Description: "The software version of AutoMQ instance. By default, there is no need to set version; the latest version will be used. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.",
+				Required:    true,
+				Description: "The software version of AutoMQ instance. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.",
 			},
 			"compute_specs": schema.SingleNestedAttribute{
 				Required:    true,
@@ -99,11 +98,11 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						Required:    true,
 						Description: "AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.",
 						Validators: []validator.Int64{
-							int64validator.Between(6, 24),
+							int64validator.Between(3, 24),
 						},
 					},
 					"networks": schema.ListNestedAttribute{
-						Required:    true,
+						Optional:    true,
 						Description: "To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones.",
 						Validators: []validator.List{
 							listvalidator.UniqueValues(),
@@ -274,6 +273,9 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 			"endpoints": schema.ListNestedAttribute{
 				Computed:    true,
 				Description: "The bootstrap endpoints of instance. AutoMQ supports multiple access protocols; therefore, the Endpoint is a list.",
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"display_name": schema.StringAttribute{
@@ -333,6 +335,12 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 	ctx = context.WithValue(ctx, client.EnvIdKey, instance.EnvironmentID.ValueString())
+
+	// network or kubernetes node group must be set
+	if len(instance.ComputeSpecs.Networks) == 0 && len(instance.ComputeSpecs.KubernetesNodeGroups) == 0 {
+		resp.Diagnostics.AddError("Invalid Configuration", "At least one of the network or kubernetes node group must be set.")
+		return
+	}
 
 	// Generate API request body from plan
 	in := client.InstanceCreateParam{}

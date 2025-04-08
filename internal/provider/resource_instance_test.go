@@ -139,6 +139,11 @@ data "automq_deploy_profile" "default" {
   name = "default"
 }
 
+data "automq_data_bucket_profiles" "test" {
+  environment_id = "%[4]s"
+  profile_name = data.automq_deploy_profile.default.name
+}
+
 resource "automq_kafka_instance" "test" {
     environment_id = "%[4]s"
     name          = "%[5]s"
@@ -156,7 +161,7 @@ resource "automq_kafka_instance" "test" {
         ]
         bucket_profiles = [
             {
-                id = data.automq_deploy_profile.default.data_buckets.0.id
+                id = data.automq_data_bucket_profiles.test.data_buckets[0].id
             }
         ]
     }

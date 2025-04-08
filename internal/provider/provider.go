@@ -217,6 +217,7 @@ func (p *AutoMQProvider) DataSources(ctx context.Context) []func() datasource.Da
 	return []func() datasource.DataSource{
 		NewKafkaInstanceDataSource,
 		NewDeployProfileDataSource,
+		NewDataBucketProfilesDataSource,
 	}
 }
 
