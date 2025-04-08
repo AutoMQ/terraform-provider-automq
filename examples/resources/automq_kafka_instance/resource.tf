@@ -1,23 +1,38 @@
-resource "automq_kafka_instance" "example" {
+
+data "automq_deploy_profile" "default" {
   environment_id = "env-example"
-  name           = "automq-example-1"
-  description    = "example"
-  cloud_provider = "aws"
-  region         = local.instance_deploy_region
-  networks = [
-    {
-      zone    = var.instance_deploy_zone
-      subnets = [var.instance_deploy_subnet]
+  name = "default"
+}
+
+resource "automq_kafka_instance" "test" {
+    environment_id = "env-example"
+    name          = "example-1"
+    description   = "example"
+    deploy_profile = data.automq_deploy_profile.default.name
+    version       = "1.4.0"
+
+    compute_specs = {
+        reserved_aku = 6
+        networks = [
+            {
+                zone    = "us-east-1a"
+                subnets = ["subnet-xxxxxx"]
+            }
+        ]
+        bucket_profiles = [
+            {
+                id = data.automq_deploy_profile.default.data_buckets.0.id
+            }
+        ]
     }
-  ]
-  compute_specs = {
-    aku = "6"
-  }
-  acl = true
-  configs = {
-    "auto.create.topics.enable" = "false"
-    "log.retention.ms"          = "3600000"
-  }
+
+    features = {
+        wal_mode = "EBSWAL"
+        security = {
+          authentication_methods = ["anonymous"]
+          transit_encryption_modes = ["plaintext"]
+        }
+    }
 }
 
 variable "instance_deploy_zone" {

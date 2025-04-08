@@ -10,19 +10,18 @@ resource "automq_integration" "example-1" {
 resource "automq_integration" "example-2" {
   environment_id = "env-example"
   name           = "example-2"
-  type           = "kafka"
+  type           = "prometheus"
   endpoint       = "http://xxxxx.xxx"
-  kafka_config = {
-    security_protocol = "SASL_PLAINTEXT"
-    sasl_mechanism    = "PLAIN"
-    sasl_username     = "example"
-    sasl_password     = "example"
-  }
 }
 
 resource "automq_integration" "example-3" {
   environment_id = "env-example"
   name           = "example-3"
-  type           = "prometheus"
+  type           = "prometheus_remote_write"
   endpoint       = "http://xxxxx.xxx"
+  prometheus_remote_write_config = {
+    auth_type = "basic"
+    username = "username"
+    password = "password"
+  }
 }
