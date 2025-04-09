@@ -8,7 +8,7 @@ description: |-
 
 # automq_kafka_user (Resource)
 
-![General_Availability](https://img.shields.io/badge/Lifecycle_Stage-General_Availability(GA)-green?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>`automq_kafka_user` provides acl user identity information for more secure access to kafka clusters.
+![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>`automq_kafka_user` provides acl user identity information for more secure access to kafka clusters.
 
 ## Example Usage
 

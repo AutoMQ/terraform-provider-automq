@@ -33,7 +33,7 @@ func (r *KafkaInstanceDataSource) Metadata(ctx context.Context, req datasource.M
 func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		// This description is used by the documentation generator and the language server.
-		MarkdownDescription: "![General_Availability](https://img.shields.io/badge/Lifecycle_Stage-General_Availability(GA)-green?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>Using the `automq_kafka_instance` data source, you can manage kafka resoure within instance.",
+		MarkdownDescription: "![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>Using the `automq_kafka_instance` data source, you can manage kafka resoure within instance.",
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{

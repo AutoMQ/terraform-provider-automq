@@ -8,7 +8,7 @@ description: |-
 
 # automq_kafka_topic (Resource)
 
-![General_Availability](https://img.shields.io/badge/Lifecycle_Stage-General_Availability(GA)-green?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>`automq_kafka_topic` provides a Kafka Topic resource that enables creating and deleting Kafka Topics on a Kafka cluster on AutoMQ BYOC environment.
+![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>`automq_kafka_topic` provides a Kafka Topic resource that enables creating and deleting Kafka Topics on a Kafka cluster on AutoMQ BYOC environment.
 
 ## Example Usage
 

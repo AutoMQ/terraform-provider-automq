@@ -8,7 +8,7 @@ description: |-
 
 # automq_deploy_profile (Data Source)
 
-![General_Availability](https://img.shields.io/badge/Lifecycle_Stage-General_Availability(GA)-green?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>Using the `automq_deploy_profile` data source, you can retrieve deployment profile information.
+![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>Using the `automq_deploy_profile` data source, you can retrieve deployment profile information.
 
 ## Example Usage
 
