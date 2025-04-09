@@ -59,7 +59,7 @@ variable "automq_environment_id" {
 terraform {
   required_providers {
     automq = {
-      source = "automq/automq"
+      source = "hashicorp.com/edu/automq"
     }
     aws = {
       source = "hashicorp/aws"
@@ -68,9 +68,9 @@ terraform {
 }
 
 locals {
-  vpc_id = "vpc-0xxxxxxxxxxxf"
+  vpc_id = "vpc-03d6cb79151dbdfa3"
   region = "us-east-1"
-  az     = "us-east-1b"
+  az     = "us-east-1a"
 }
 
 provider "automq" {
@@ -91,25 +91,48 @@ data "aws_subnets" "aws_subnets_example" {
   }
 }
 
+data "automq_deploy_profile" "test" {
+  environment_id = var.automq_environment_id
+  name           = "default"
+}
+
+data "automq_data_bucket_profiles" "test" {
+  environment_id = var.automq_environment_id
+  profile_name   = data.automq_deploy_profile.test.name
+}
+
 resource "automq_kafka_instance" "example" {
   environment_id = var.automq_environment_id
-  name           = "automq-example-1"
+  name           = "automq-example"
   description    = "example"
-  cloud_provider = "aws"
-  region         = local.region
-  networks = [
-    {
-      zone    = local.az
-      subnets = [data.aws_subnets.aws_subnets_example.ids[0]]
-    }
-  ]
+  version        = "1.4.0"
+  deploy_profile = data.automq_deploy_profile.test.name
+
   compute_specs = {
-    aku = "12"
+    reserved_aku = 3
+    networks = [
+      {
+        zone    = local.az
+        subnets = [data.aws_subnets.aws_subnets_example.ids[0]]
+      }
+    ]
+    bucket_profiles = [
+      {
+        id = data.automq_data_bucket_profiles.test.data_buckets[0].id
+      }
+    ]
   }
-  acl = true
-  configs = {
-    "auto.create.topics.enable" = "false"
-    "log.retention.ms"          = "3600000"
+
+  features = {
+    wal_mode = "EBSWAL"
+    security = {
+      authentication_methods   = ["sasl"]
+      transit_encryption_modes = ["plaintext"]
+    }
+    instance_configs = {
+      "auto.create.topics.enable" = "false"
+      "log.retention.ms"          = "3600000"
+    }
   }
 }
 

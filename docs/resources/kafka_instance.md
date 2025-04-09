@@ -13,25 +13,39 @@ description: |-
 ## Example Usage
 
 ```terraform
-resource "automq_kafka_instance" "example" {
+data "automq_deploy_profile" "default" {
   environment_id = "env-example"
-  name           = "automq-example-1"
+  name           = "default"
+}
+
+resource "automq_kafka_instance" "test" {
+  environment_id = "env-example"
+  name           = "example-1"
   description    = "example"
-  cloud_provider = "aws"
-  region         = local.instance_deploy_region
-  networks = [
-    {
-      zone    = var.instance_deploy_zone
-      subnets = [var.instance_deploy_subnet]
-    }
-  ]
+  deploy_profile = data.automq_deploy_profile.default.name
+  version        = "1.4.0"
+
   compute_specs = {
-    aku = "6"
+    reserved_aku = 6
+    networks = [
+      {
+        zone    = "us-east-1a"
+        subnets = ["subnet-xxxxxx"]
+      }
+    ]
+    bucket_profiles = [
+      {
+        id = data.automq_deploy_profile.default.data_buckets.0.id
+      }
+    ]
   }
-  acl = true
-  configs = {
-    "auto.create.topics.enable" = "false"
-    "log.retention.ms"          = "3600000"
+
+  features = {
+    wal_mode = "EBSWAL"
+    security = {
+      authentication_methods   = ["anonymous"]
+      transit_encryption_modes = ["plaintext"]
+    }
   }
 }
 
@@ -54,12 +68,12 @@ variable "instance_deploy_subnet" {
 - `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
 - `features` (Attributes) (see [below for nested schema](#nestedatt--features))
 - `name` (String) The name of the Kafka instance. It can contain letters (a-z or A-Z), numbers (0-9), underscores (_), and hyphens (-), with a length limit of 3 to 64 characters.
+- `version` (String) The software version of AutoMQ instance. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.
 
 ### Optional
 
 - `description` (String) The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
-- `version` (String) The software version of AutoMQ instance. By default, there is no need to set version; the latest version will be used. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.
 
 ### Read-Only
 
@@ -75,12 +89,12 @@ variable "instance_deploy_subnet" {
 Required:
 
 - `bucket_profiles` (Attributes List) Bucket profiles configuration (see [below for nested schema](#nestedatt--compute_specs--bucket_profiles))
-- `networks` (Attributes List) To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones. (see [below for nested schema](#nestedatt--compute_specs--networks))
 - `reserved_aku` (Number) AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.
 
 Optional:
 
 - `kubernetes_node_groups` (Attributes List) Kubernetes node groups configuration (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
+- `networks` (Attributes List) To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones. (see [below for nested schema](#nestedatt--compute_specs--networks))
 
 <a id="nestedatt--compute_specs--bucket_profiles"></a>
 ### Nested Schema for `compute_specs.bucket_profiles`
@@ -90,6 +104,14 @@ Required:
 - `id` (String) Bucket profile ID
 
 
+<a id="nestedatt--compute_specs--kubernetes_node_groups"></a>
+### Nested Schema for `compute_specs.kubernetes_node_groups`
+
+Required:
+
+- `id` (String) Node group ID
+
+
 <a id="nestedatt--compute_specs--networks"></a>
 ### Nested Schema for `compute_specs.networks`
 
@@ -97,14 +119,6 @@ Required:
 
 - `subnets` (List of String) Specify the subnet under the corresponding availability zone for deploying the instance. Currently, only one subnet can be set for each availability zone.
 - `zone` (String) The availability zone ID of the cloud provider.
-
-
-<a id="nestedatt--compute_specs--kubernetes_node_groups"></a>
-### Nested Schema for `compute_specs.kubernetes_node_groups`
-
-Required:
-
-- `id` (String) Node group ID
 
 
 
