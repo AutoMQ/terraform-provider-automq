@@ -25,21 +25,20 @@ resource "automq_integration" "example-1" {
 resource "automq_integration" "example-2" {
   environment_id = "env-example"
   name           = "example-2"
-  type           = "kafka"
+  type           = "prometheus"
   endpoint       = "http://xxxxx.xxx"
-  kafka_config = {
-    security_protocol = "SASL_PLAINTEXT"
-    sasl_mechanism    = "PLAIN"
-    sasl_username     = "example"
-    sasl_password     = "example"
-  }
 }
 
 resource "automq_integration" "example-3" {
   environment_id = "env-example"
   name           = "example-3"
-  type           = "prometheus"
+  type           = "prometheus_remote_write"
   endpoint       = "http://xxxxx.xxx"
+  prometheus_remote_write_config = {
+    auth_type = "basic"
+    username  = "username"
+    password  = "password"
+  }
 }
 ```
 
@@ -50,13 +49,13 @@ resource "automq_integration" "example-3" {
 
 - `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
 - `name` (String) The integrated name identifies different configurations and contains 3 to 64 characters, including letters a to z or a to z, digits 0 to 9, underscores (_), and hyphens (-).
-- `type` (String) Type of integration, currently support `kafka` and `cloudWatch`
+- `type` (String) Type of integration, currently supports `prometheus`, `prometheus_remote_write`, and `cloudwatch`.
 
 ### Optional
 
 - `cloudwatch_config` (Attributes) CloudWatch integration configurations. When Type is `cloudwatch`, it must be set. (see [below for nested schema](#nestedatt--cloudwatch_config))
 - `endpoint` (String) Endpoint of integration. When selecting Prometheus and Kafka integration, you need to configure the corresponding endpoints. For detailed configuration instructions, please refer to the [documentation](https://docs.automq.com/automq-cloud/manage-environments/byoc-environment/manage-integrations).
-- `kafka_config` (Attributes) Kafka integration configurations. When Type is `kafka`, it must be set. (see [below for nested schema](#nestedatt--kafka_config))
+- `prometheus_remote_write_config` (Attributes) Prometheus remote write integration configurations. When Type is `prometheus_remote_write`, it must be set. (see [below for nested schema](#nestedatt--prometheus_remote_write_config))
 
 ### Read-Only
 
@@ -72,12 +71,12 @@ Optional:
 - `namespace` (String) Set cloudwatch namespace, AutoMQ will write all Metrics data under this namespace. The namespace name must contain 1 to 255 valid ASCII characters and may be alphanumeric, periods, hyphens, underscores, forward slashes, pound signs, colons, and spaces, but not all spaces.
 
 
-<a id="nestedatt--kafka_config"></a>
-### Nested Schema for `kafka_config`
+<a id="nestedatt--prometheus_remote_write_config"></a>
+### Nested Schema for `prometheus_remote_write_config`
 
-Required:
+Optional:
 
-- `sasl_mechanism` (String) SASL mechanism for external kafka cluster, currently support `PLAIN`, `SCRAM-SHA-256` and `SCRAM-SHA-512`
-- `sasl_password` (String) SASL password for Kafka, The username and password are declared and returned when creating the kafka_user resource in AutoMQ.
-- `sasl_username` (String) SASL username for Kafka, The username and password are declared and returned when creating the kafka_user resource in AutoMQ.
-- `security_protocol` (String) Security protocol for external kafka cluster, currently support `PLAINTEXT` and `SASL_PLAINTEXT`
+- `auth_type` (String) Authentication type, currently supports `noauth`, `basic`, `bearer`, and `sigv4`.
+- `bearer_token` (String) Bearer token for bearer authentication. When authType is `bearer`, it must be set.
+- `password` (String) Password for basic authentication. When authType is `basic`, it must be set.
+- `username` (String) Username for basic authentication. When authType is `basic`, it must be set.
