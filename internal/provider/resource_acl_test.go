@@ -140,7 +140,9 @@ resource "automq_kafka_acl" "test" {
 }
 
 func testAccCheckKafkaAclDestroy(s *terraform.State) error {
-	testAccCheckKafkaInstanceDestroy(s)
+	if err := testAccCheckKafkaInstanceDestroy(s); err != nil {
+		return err
+	}
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "automq_kafka_acl" {

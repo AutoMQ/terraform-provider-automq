@@ -193,8 +193,9 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			request := &client.InstanceCreateParam{}
-			ExpandKafkaInstanceResource(tt.input, request)
+			err := ExpandKafkaInstanceResource(tt.input, request)
 			assert.Equal(t, tt.expected, *request)
+			assert.NoError(t, err)
 		})
 	}
 }
@@ -376,7 +377,10 @@ func TestFlattenKafkaInstanceModelWithEndpoints(t *testing.T) {
 			assert.False(t, diags.HasError())
 
 			for i, endpoint := range endpoints {
-				expectedObj := tt.expected[i].(types.Object)
+				expectedObj, ok := tt.expected[i].(types.Object)
+				if !ok {
+					t.Fatalf("expected[%d] is not of type types.Object", i)
+				}
 				assert.Equal(t, expectedObj.Attributes()["display_name"], endpoint.DisplayName)
 				assert.Equal(t, expectedObj.Attributes()["network_type"], endpoint.NetworkType)
 				assert.Equal(t, expectedObj.Attributes()["protocol"], endpoint.Protocol)

@@ -35,15 +35,15 @@ func TestAccKafkaInstanceDataSource(t *testing.T) {
 				Config: testAccKafkaInstanceDataSourceConfigById(instanceConfig, envVars),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify basic attributes
-					resource.TestCheckResourceAttr("data.automq_kafka_instance.test", "name", instanceConfig["name"].(string)),
-					resource.TestCheckResourceAttr("data.automq_kafka_instance.test", "description", instanceConfig["description"].(string)),
-					resource.TestCheckResourceAttr("data.automq_kafka_instance.test", "deploy_profile", instanceConfig["deploy_profile"].(string)),
-					resource.TestCheckResourceAttr("data.automq_kafka_instance.test", "version", instanceConfig["version"].(string)),
+					resource.TestCheckResourceAttr("data.automq_kafka_instance.test", "name", instanceConfig["name"].(string)),                     //nolint:forcetypeassert
+					resource.TestCheckResourceAttr("data.automq_kafka_instance.test", "description", instanceConfig["description"].(string)),       //nolint:forcetypeassert
+					resource.TestCheckResourceAttr("data.automq_kafka_instance.test", "deploy_profile", instanceConfig["deploy_profile"].(string)), //nolint:forcetypeassert
+					resource.TestCheckResourceAttr("data.automq_kafka_instance.test", "version", instanceConfig["version"].(string)),               //nolint:forcetypeassert
 
 					// Verify compute specs
 					resource.TestCheckResourceAttr("data.automq_kafka_instance.test", "compute_specs.reserved_aku", fmt.Sprintf("%d", instanceConfig["reserved_aku"])),
-					resource.TestCheckResourceAttr("data.automq_kafka_instance.test", "compute_specs.networks.0.zone", instanceConfig["zone"].(string)),
-					resource.TestCheckResourceAttr("data.automq_kafka_instance.test", "compute_specs.networks.0.subnets.0", instanceConfig["subnet"].(string)),
+					resource.TestCheckResourceAttr("data.automq_kafka_instance.test", "compute_specs.networks.0.zone", instanceConfig["zone"].(string)),        //nolint:forcetypeassert
+					resource.TestCheckResourceAttr("data.automq_kafka_instance.test", "compute_specs.networks.0.subnets.0", instanceConfig["subnet"].(string)), //nolint:forcetypeassert
 
 					// Verify computed fields are set
 					resource.TestCheckResourceAttrSet("data.automq_kafka_instance.test", "status"),
@@ -68,7 +68,7 @@ func TestAccKafkaInstanceDataSource(t *testing.T) {
 			{
 				Config: testAccKafkaInstanceDataSourceConfigByName(instanceConfig, envVars),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.automq_kafka_instance.test", "name", instanceConfig["name"].(string)),
+					resource.TestCheckResourceAttr("data.automq_kafka_instance.test", "name", instanceConfig["name"].(string)), //nolint:forcetypeassert
 					resource.TestCheckResourceAttrSet("data.automq_kafka_instance.test", "id"),
 				),
 			},
@@ -77,6 +77,14 @@ func TestAccKafkaInstanceDataSource(t *testing.T) {
 }
 
 func testAccKafkaInstanceResourceConfig(config map[string]interface{}, envVars map[string]string) string {
+	environmentID, _ := config["environment_id"].(string)
+	name, _ := config["name"].(string)
+	description, _ := config["description"].(string)
+	version, _ := config["version"].(string)
+	reservedAku, _ := config["reserved_aku"].(int)
+	zone, _ := config["zone"].(string)
+	subnet, _ := config["subnet"].(string)
+
 	return fmt.Sprintf(`
 provider "automq" {
   automq_byoc_endpoint      = "%[1]s"
@@ -124,21 +132,22 @@ resource "automq_kafka_instance" "test" {
   }
 }
 `,
-		envVars["AUTOMQ_BYOC_ENDPOINT"],       // 1
-		envVars["AUTOMQ_BYOC_ACCESS_KEY_ID"],  // 2
-		envVars["AUTOMQ_BYOC_SECRET_KEY"],     // 3
-		config["environment_id"].(string),     // 4
-		config["name"].(string),               // 5
-		config["description"].(string),        // 6
-		config["version"].(string),            // 7
-		config["reserved_aku"].(int),          // 8
-		config["zone"].(string),               // 9
-		config["subnet"].(string),             // 10
-		envVars["AUTOMQ_TEST_DEPLOY_PROFILE"], // 11
+		envVars["AUTOMQ_BYOC_ENDPOINT"],
+		envVars["AUTOMQ_BYOC_ACCESS_KEY_ID"],
+		envVars["AUTOMQ_BYOC_SECRET_KEY"],
+		environmentID,
+		name,
+		description,
+		version,
+		reservedAku,
+		zone,
+		subnet,
+		envVars["AUTOMQ_TEST_DEPLOY_PROFILE"],
 	)
 }
 
 func testAccKafkaInstanceDataSourceConfigById(config map[string]interface{}, envVars map[string]string) string {
+	environmentID, _ := config["environment_id"].(string)
 	return fmt.Sprintf(`
 %s
 
@@ -148,11 +157,13 @@ data "automq_kafka_instance" "test" {
 }
 `,
 		testAccKafkaInstanceResourceConfig(config, envVars),
-		config["environment_id"].(string),
+		environmentID,
 	)
 }
 
 func testAccKafkaInstanceDataSourceConfigByName(config map[string]interface{}, envVars map[string]string) string {
+	environmentID, _ := config["environment_id"].(string)
+	name, _ := config["name"].(string)
 	return fmt.Sprintf(`
 %s
 
@@ -162,7 +173,7 @@ data "automq_kafka_instance" "test" {
 }
 `,
 		testAccKafkaInstanceResourceConfig(config, envVars),
-		config["environment_id"].(string),
-		config["name"].(string),
+		environmentID,
+		name,
 	)
 }

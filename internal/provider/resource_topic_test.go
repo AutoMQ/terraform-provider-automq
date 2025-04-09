@@ -65,7 +65,7 @@ func TestAccKafkaTopicResource(t *testing.T) {
 				Config: testAccKafkaInstanceResourceConfig(instanceConfig, envVars) + testAccKafkaTopicConfig(initialConfig),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckKafkaTopicExists("automq_kafka_topic.test"),
-					resource.TestCheckResourceAttr("automq_kafka_topic.test", "name", initialConfig["name"].(string)),
+					resource.TestCheckResourceAttr("automq_kafka_topic.test", "name", initialConfig["name"].(string)), //nolint:forcetypeassert
 					resource.TestCheckResourceAttr("automq_kafka_topic.test", "partition", fmt.Sprintf("%d", initialConfig["partition"])),
 					resource.TestCheckResourceAttr("automq_kafka_topic.test", "configs.cleanup.policy", "delete"),
 					resource.TestCheckResourceAttr("automq_kafka_topic.test", "configs.retention.ms", "86400000"),
@@ -112,16 +112,18 @@ resource "automq_kafka_topic" "test" {
   configs          = %s
 }
 `,
-		config["environment_id"].(string),
-		config["name"].(string),
-		config["partition"].(int),
-		config["configs_str"].(string),
+		config["environment_id"].(string), //nolint:forcetypeassert
+		config["name"].(string),           //nolint:forcetypeassert
+		config["partition"].(int),         //nolint:forcetypeassert
+		config["configs_str"].(string),    //nolint:forcetypeassert
 	)
 }
 
 func testAccCheckKafkaTopicDestroy(s *terraform.State) error {
 	// Check if the instance is destroyed
-	testAccCheckKafkaInstanceDestroy(s)
+	if err := testAccCheckKafkaInstanceDestroy(s); err != nil {
+		return err
+	}
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "automq_kafka_topic" {

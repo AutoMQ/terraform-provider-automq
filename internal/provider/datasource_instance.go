@@ -302,7 +302,10 @@ func (r *KafkaInstanceDataSource) Read(ctx context.Context, req datasource.ReadR
 	}
 
 	// Convert API response into data source model
-	models.ConvertKafkaInstanceModel(&instance, &model)
+	if err := models.ConvertKafkaInstanceModel(&instance, &model); err != nil {
+		resp.Diagnostics.AddError("Conversion Error", fmt.Sprintf("Failed to convert Kafka instance model: %s", err))
+		return
+	}
 	// Update the model with the configurations
 	model.Features.InstanceConfigs = models.FlattenStringValueMap(configs)
 

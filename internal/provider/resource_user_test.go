@@ -48,21 +48,21 @@ func TestAccKafkaUserResource(t *testing.T) {
 			},
 			// Initial creation
 			{
-				Config: testAccKafkaInstanceResourceConfig(instanceConfig, envVars) + testAccKafkaUserConfig(initialConfig, envVars),
+				Config: testAccKafkaInstanceResourceConfig(instanceConfig, envVars) + testAccKafkaUserConfig(initialConfig),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckKafkaUserExists("automq_kafka_user.test"),
-					resource.TestCheckResourceAttr("automq_kafka_user.test", "username", initialConfig["username"].(string)),
-					resource.TestCheckResourceAttr("automq_kafka_user.test", "password", initialConfig["password"].(string)),
+					resource.TestCheckResourceAttr("automq_kafka_user.test", "username", initialConfig["username"].(string)), //nolint:forcetypeassert
+					resource.TestCheckResourceAttr("automq_kafka_user.test", "password", initialConfig["password"].(string)), //nolint:forcetypeassert
 					resource.TestCheckResourceAttrSet("automq_kafka_user.test", "id"),
 				),
 			},
 			// Update test with new password
 			{
-				Config: testAccKafkaInstanceResourceConfig(instanceConfig, envVars) + testAccKafkaUserConfig(updatedConfig, envVars),
+				Config: testAccKafkaInstanceResourceConfig(instanceConfig, envVars) + testAccKafkaUserConfig(updatedConfig),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckKafkaUserExists("automq_kafka_user.test"),
-					resource.TestCheckResourceAttr("automq_kafka_user.test", "username", updatedConfig["username"].(string)),
-					resource.TestCheckResourceAttr("automq_kafka_user.test", "password", updatedConfig["password"].(string)),
+					resource.TestCheckResourceAttr("automq_kafka_user.test", "username", updatedConfig["username"].(string)), //nolint:forcetypeassert
+					resource.TestCheckResourceAttr("automq_kafka_user.test", "password", updatedConfig["password"].(string)), //nolint:forcetypeassert
 				),
 			},
 			// Import test
@@ -86,7 +86,7 @@ func TestAccKafkaUserResource(t *testing.T) {
 	})
 }
 
-func testAccKafkaUserConfig(config map[string]interface{}, envVars map[string]string) string {
+func testAccKafkaUserConfig(config map[string]interface{}) string {
 	return fmt.Sprintf(`
 
 resource "automq_kafka_user" "test" {
@@ -96,15 +96,17 @@ resource "automq_kafka_user" "test" {
   password         = "%s"
 }
 `,
-		config["environment_id"].(string),
-		config["username"].(string),
-		config["password"].(string),
+		config["environment_id"].(string), //nolint:forcetypeassert
+		config["username"].(string),       //nolint:forcetypeassert
+		config["password"].(string),       //nolint:forcetypeassert
 	)
 }
 
 func testAccCheckKafkaUserDestroy(s *terraform.State) error {
 	// Check if the instance is destroyed
-	testAccCheckKafkaInstanceDestroy(s)
+	if err := testAccCheckKafkaInstanceDestroy(s); err != nil {
+		return err
+	}
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "automq_kafka_user" {

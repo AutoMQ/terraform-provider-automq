@@ -344,7 +344,10 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 
 	// Generate API request body from plan
 	in := client.InstanceCreateParam{}
-	models.ExpandKafkaInstanceResource(instance, &in)
+	if err := models.ExpandKafkaInstanceResource(instance, &in); err != nil {
+		resp.Diagnostics.AddError("Model Expansion Error", fmt.Sprintf("Failed to expand Kafka instance resource: %s", err))
+		return
+	}
 	tflog.Debug(ctx, fmt.Sprintf("Creating new Kafka Cluster: %s", fmt.Sprintf("%v", in)))
 
 	out, err := r.client.CreateKafkaInstance(ctx, in)
