@@ -197,13 +197,6 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 								Required:    true,
 								ElementType: types.StringType,
 								Description: "Authentication methods: anonymous (anonymous access), sasl (SASL user auth), mtls (TLS cert auth). Defaults to anonymous.",
-								// Computed:    true,
-								// Default: setdefault.StaticValue(
-								// 	types.SetValueMust(
-								// 		types.StringType,
-								// 		[]attr.Value{types.StringValue("anonymous")},
-								// 	),
-								// ),
 								Validators: []validator.Set{
 									setvalidator.ValueStringsAre(
 										stringvalidator.OneOf("anonymous", "sasl", "mtls"),
@@ -215,13 +208,6 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 								Required:    true,
 								ElementType: types.StringType,
 								Description: "Transit encryption modes: plaintext (unencrypted) or tls (TLS encrypted). Defaults to plaintext.",
-								// Computed:    true,
-								// Default: setdefault.StaticValue(
-								// 	types.SetValueMust(
-								// 		types.StringType,
-								// 		[]attr.Value{types.StringValue("plaintext")},
-								// 	),
-								// ),
 								Validators: []validator.Set{
 									setvalidator.ValueStringsAre(
 										stringvalidator.OneOf("plaintext", "tls"),
