@@ -6,5 +6,5 @@ provider "automq" {
 
 data "automq_deploy_profile" "test" {
   environment_id = "env-example"
-  name          = "default"
+  name           = "default"
 }

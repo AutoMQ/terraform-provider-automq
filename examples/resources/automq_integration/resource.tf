@@ -21,7 +21,7 @@ resource "automq_integration" "example-3" {
   endpoint       = "http://xxxxx.xxx"
   prometheus_remote_write_config = {
     auth_type = "basic"
-    username = "username"
-    password = "password"
+    username  = "username"
+    password  = "password"
   }
 }

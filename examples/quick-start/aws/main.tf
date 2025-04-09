@@ -35,21 +35,21 @@ data "aws_subnets" "aws_subnets_example" {
 
 data "automq_deploy_profile" "test" {
   environment_id = var.automq_environment_id
-  name          = "default"
+  name           = "default"
 }
 
 data "automq_data_bucket_profiles" "test" {
   environment_id = var.automq_environment_id
-  profile_name = data.automq_deploy_profile.test.name
+  profile_name   = data.automq_deploy_profile.test.name
 }
 
 resource "automq_kafka_instance" "example" {
   environment_id = var.automq_environment_id
-  name          = "automq-example"
-  description   = "example"
-  version       = "1.4.0"
+  name           = "automq-example"
+  description    = "example"
+  version        = "1.4.0"
   deploy_profile = data.automq_deploy_profile.test.name
-  
+
   compute_specs = {
     reserved_aku = 3
     networks = [
@@ -68,7 +68,7 @@ resource "automq_kafka_instance" "example" {
   features = {
     wal_mode = "EBSWAL"
     security = {
-      authentication_methods = ["sasl"]
+      authentication_methods   = ["sasl"]
       transit_encryption_modes = ["plaintext"]
     }
     instance_configs = {
