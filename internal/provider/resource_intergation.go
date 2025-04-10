@@ -56,9 +56,14 @@ func (r *IntegrationResource) Schema(ctx context.Context, req resource.SchemaReq
 				MarkdownDescription: "Type of integration, currently supports `prometheus`, `prometheus_remote_write`, and `cloudwatch`.",
 				Required:            true,
 				Validators: []validator.String{
-					stringvalidator.OneOf("prometheus", "prometheus_remote_write", "cloudwatch"),
+					stringvalidator.OneOf("prometheus", "prometheusRemoteWrite", "cloudWatch"),
 				},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+			"deploy_profile": schema.StringAttribute{
+				MarkdownDescription: "Deploy profile.",
+				Required:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"endpoint": schema.StringAttribute{
 				MarkdownDescription: "Endpoint of integration. When selecting Prometheus and Kafka integration, you need to configure the corresponding endpoints. For detailed configuration instructions, please refer to the [documentation](https://docs.automq.com/automq-cloud/manage-environments/byoc-environment/manage-integrations).",

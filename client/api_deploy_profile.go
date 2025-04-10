@@ -8,7 +8,7 @@ import (
 
 const (
 	GetDeployProfilePath = "/api/v1/profiles/%s"
-	GetBucketProfilePath = "/api/v1/deploy-profiles/%s/data-buckets"
+	GetBucketProfilePath = "/api/v1/deploy-profiles/%s/data-bucket-profiles"
 )
 
 // GetDeployProfile retrieves a deployment profile by name

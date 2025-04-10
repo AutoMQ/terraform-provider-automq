@@ -9,9 +9,9 @@ import (
 )
 
 const (
-	IntegrationTypeCloudWatch            = "cloudwatch"
+	IntegrationTypeCloudWatch            = "cloudWatch"
 	IntegrationTypePrometheus            = "prometheus"
-	IntegrationTypePrometheusRemoteWrite = "prometheus_remote_write"
+	IntegrationTypePrometheusRemoteWrite = "prometheusRemoteWrite"
 )
 
 // IntegrationResourceModel describes the resource data model.
@@ -21,8 +21,9 @@ type IntegrationResourceModel struct {
 	Type                        types.String                            `tfsdk:"type"`
 	EndPoint                    types.String                            `tfsdk:"endpoint"`
 	ID                          types.String                            `tfsdk:"id"`
+	DeployProfile               types.String                            `tfsdk:"deploy_profile"`
 	CloudWatchConfig            *CloudWatchIntegrationConfig            `tfsdk:"cloudwatch_config"`
-	PrometheusRemoteWriteConfig *PrometheusRemoteWriteIntegrationConfig `tfsdk:"prometheus_config"`
+	PrometheusRemoteWriteConfig *PrometheusRemoteWriteIntegrationConfig `tfsdk:"prometheus_remote_write_config"`
 	CreatedAt                   timetypes.RFC3339                       `tfsdk:"created_at"`
 	LastUpdated                 timetypes.RFC3339                       `tfsdk:"last_updated"`
 }
@@ -50,7 +51,7 @@ type CloudWatchConfigHandler struct{}
 
 func (h *CloudWatchConfigHandler) Validate(model *IntegrationResourceModel) diag.Diagnostic {
 	if model.CloudWatchConfig == nil {
-		return diag.NewErrorDiagnostic("Missing required field", "cloud_watch_config is required for CloudWatch integration")
+		return diag.NewErrorDiagnostic("Missing required field", "cloudwatch_config is required for CloudWatch integration")
 	}
 	if model.CloudWatchConfig.NameSpace.ValueString() == "" {
 		return diag.NewErrorDiagnostic("Missing required field", "namespace is required for CloudWatch integration")
@@ -167,6 +168,7 @@ func ExpandIntergationResource(in *client.IntegrationParam, integration Integrat
 	in.Name = integration.Name.ValueString()
 	in.Type = &integrationType
 	in.EndPoint = integration.EndPoint.ValueString()
+	in.Profile = integration.DeployProfile.ValueString()
 
 	handler := getConfigHandler(integrationType)
 	if handler == nil {
@@ -185,6 +187,7 @@ func FlattenIntergrationResource(integration *client.IntegrationVO, resource *In
 	resource.ID = types.StringValue(integration.Code)
 	resource.Name = types.StringValue(integration.Name)
 	resource.Type = types.StringValue(integration.Type)
+	resource.DeployProfile = types.StringValue(integration.Profile)
 	resource.CreatedAt = timetypes.NewRFC3339TimePointerValue(&integration.GmtCreate)
 	resource.LastUpdated = timetypes.NewRFC3339TimePointerValue(&integration.GmtModified)
 	flattenIntergrationTypeConfig(integration.Type, integration.Config, resource)

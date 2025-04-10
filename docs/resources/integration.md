@@ -47,6 +47,7 @@ resource "automq_integration" "example-3" {
 
 ### Required
 
+- `deploy_profile` (String) Deploy profile.
 - `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
 - `name` (String) The integrated name identifies different configurations and contains 3 to 64 characters, including letters a to z or a to z, digits 0 to 9, underscores (_), and hyphens (-).
 - `type` (String) Type of integration, currently supports `prometheus`, `prometheus_remote_write`, and `cloudwatch`.
