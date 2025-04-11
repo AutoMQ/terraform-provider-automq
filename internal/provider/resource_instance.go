@@ -178,17 +178,10 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						MarkdownDescription: "Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).",
 						Optional:            true,
 					},
-					"integrations": schema.ListNestedAttribute{
+					"integrations": schema.SetAttribute{
 						Optional:    true,
-						Description: "Integration configurations",
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"id": schema.StringAttribute{
-									Required:    true,
-									Description: "Integration ID",
-								},
-							},
-						},
+						ElementType: types.StringType,
+						Description: "Integration Identifier.",
 					},
 					"security": schema.SingleNestedAttribute{
 						Required: true,
@@ -460,36 +453,56 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		}
 	}
 
+	updateTimeout := r.UpdateTimeout(ctx, state.Timeouts)
+
 	// Check if the Integrations has changed
-	var isIntegrationChanged bool
-	for _, i := range plan.Features.Integrations {
-		found := false
-		for _, integration := range state.Features.Integrations {
-			if integration == i {
-				found = true
-				break
-			}
-		}
-		if !found {
-			isIntegrationChanged = true
-			break
+	planIntegration := models.ExpandSetValueList(plan.Features.Integrations)
+	stateIntegration := models.ExpandSetValueList(state.Features.Integrations)
+
+	// Initialize slices to track integration changes
+	needAddIntegration := []string{}
+	needRemoveIntegration := []string{}
+
+	// Convert plan and state integrations to map for efficient lookup
+	planMap := make(map[string]bool)
+	stateMap := make(map[string]bool)
+
+	for _, v := range planIntegration {
+		planMap[v] = true
+	}
+	for _, v := range stateIntegration {
+		stateMap[v] = true
+	}
+
+	// Find integrations that need to be added
+	for integration := range planMap {
+		if !stateMap[integration] {
+			needAddIntegration = append(needAddIntegration, integration)
 		}
 	}
-	if isIntegrationChanged {
-		codes := make([]string, 0, len(plan.Features.Integrations))
-		for _, integration := range plan.Features.Integrations {
-			codes = append(codes, integration.ID.ValueString())
+
+	// Find integrations that need to be removed
+	for integration := range stateMap {
+		if !planMap[integration] {
+			needRemoveIntegration = append(needRemoveIntegration, integration)
 		}
+	}
+
+	if len(needAddIntegration) > 0 {
 		// Generate API request body from plan
-		param := client.IntegrationInstanceParam{
-			Codes: codes,
+		param := client.IntegrationInstanceAddParam{
+			Codes: needAddIntegration,
 		}
-		err = r.client.ReplaceInstanceIntergation(ctx, instanceId, param)
+		err = r.client.AddInstanceIntergation(ctx, instanceId, &param)
 		if err != nil {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update integrations for Kafka instance %q intergations, got error: %s", instanceId, err))
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to add integrations for Kafka instance %q intergations, got error: %s", instanceId, err))
 			return
 		}
-
+		// wait for version update
+		if err := framework.WaitForKafkaClusterToProvision(ctx, r.client, instanceId, models.StateChanging, updateTimeout); err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error waiting for Kafka Cluster %q to provision: %s", instanceId, err))
+			return
+		}
 		resp.Diagnostics.Append(ReadKafkaInstance(ctx, r, instanceId, &state)...)
 		if resp.Diagnostics.HasError() {
 			return
@@ -501,7 +514,30 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		}
 	}
 
-	updateTimeout := r.UpdateTimeout(ctx, state.Timeouts)
+	if len(needRemoveIntegration) > 0 {
+		// Generate API request body from plan
+		for _, integration := range needRemoveIntegration {
+			err = r.client.RemoveInstanceIntergation(ctx, instanceId, integration)
+			if err != nil {
+				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to remove integrations for Kafka instance %q intergations, got error: %s", instanceId, err))
+				return
+			}
+			// wait for version update
+			if err := framework.WaitForKafkaClusterToProvision(ctx, r.client, instanceId, models.StateChanging, updateTimeout); err != nil {
+				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error waiting for Kafka Cluster %q to provision: %s", instanceId, err))
+				return
+			}
+			resp.Diagnostics.Append(ReadKafkaInstance(ctx, r, instanceId, &state)...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			// Save updated data into Terraform state
+			resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+		}
+	}
 
 	planConfig := plan.Features.InstanceConfigs
 	stateConfig := state.Features.InstanceConfigs

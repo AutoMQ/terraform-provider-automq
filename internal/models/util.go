@@ -20,6 +20,18 @@ func ExpandStringValueList(v basetypes.ListValuable) []string {
 	return output
 }
 
+func ExpandSetValueList(v basetypes.SetValuable) []string {
+	var output []string
+	if listValue, ok := v.(basetypes.SetValue); ok {
+		for _, value := range listValue.Elements() {
+			if stringValue, ok := value.(types.String); ok {
+				output = append(output, stringValue.ValueString())
+			}
+		}
+	}
+	return output
+}
+
 func ExpandStringValueMap(planConfig basetypes.MapValue) []client.ConfigItemParam {
 	configs := make([]client.ConfigItemParam, len(planConfig.Elements()))
 	i := 0

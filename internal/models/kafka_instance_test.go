@@ -34,11 +34,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 							Subnets: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
 						},
 					},
-					KubernetesNodeGroups: []NodeGroupModel{
-						{
-							ID: types.StringValue("node-group-1"),
-						},
-					},
 					BucketProfiles: []BucketProfileIDModel{
 						{
 							ID: types.StringValue("bucket-1"),
@@ -53,11 +48,9 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 						CertificateChain:     types.StringValue("chain-1"),
 						PrivateKey:           types.StringValue("key-1"),
 					},
-					Integrations: []IntegrationModel{
-						{
-							ID: types.StringValue("integration-1"),
-						},
-					},
+					Integrations: types.SetValueMust(types.StringType, []attr.Value{
+						types.StringValue("integration-1"),
+					}),
 					InstanceConfigs: types.MapValueMust(types.StringType, map[string]attr.Value{
 						"config-key": types.StringValue("config-value"),
 					}),
@@ -75,11 +68,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 						{
 							Zone:   "zone-1",
 							Subnet: stringPtr("subnet-1"),
-						},
-					},
-					KubernetesNodeGroups: []client.KubernetesNodeGroupParam{
-						{
-							Id: stringPtr("node-group-1"),
 						},
 					},
 					BucketProfiles: []client.BucketProfileBindParam{
@@ -144,7 +132,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				},
 				Features: &FeaturesModel{
 					WalMode:         types.StringValue(""),
-					Integrations:    []IntegrationModel{},
+					Integrations:    types.SetValueMust(types.StringType, []attr.Value{}),
 					InstanceConfigs: types.MapValueMust(types.StringType, map[string]attr.Value{}),
 				},
 			},
@@ -267,7 +255,7 @@ func TestFlattenKafkaInstanceModelWithIntegrations(t *testing.T) {
 	tests := []struct {
 		name         string
 		integrations []client.IntegrationVO
-		expected     []IntegrationModel
+		expected     types.Set
 	}{
 		{
 			name: "normal case",
@@ -275,15 +263,18 @@ func TestFlattenKafkaInstanceModelWithIntegrations(t *testing.T) {
 				{Code: "integration1"},
 				{Code: "integration2"},
 			},
-			expected: []IntegrationModel{
-				{ID: types.StringValue("integration1")},
-				{ID: types.StringValue("integration2")},
-			},
+			expected: types.SetValueMust(
+				types.StringType,
+				[]attr.Value{
+					types.StringValue("integration1"),
+					types.StringValue("integration2"),
+				},
+			),
 		},
 		{
 			name:         "empty integrations",
 			integrations: []client.IntegrationVO{},
-			expected:     nil,
+			expected:     types.SetValueMust(types.StringType, []attr.Value{}),
 		},
 	}
 
@@ -293,14 +284,12 @@ func TestFlattenKafkaInstanceModelWithIntegrations(t *testing.T) {
 			diags := FlattenKafkaInstanceModelWithIntegrations(tt.integrations, resource)
 
 			assert.False(t, diags.HasError())
-			if tt.expected == nil {
-				assert.Nil(t, resource.Features)
-				return
-			}
 
-			assert.Equal(t, len(tt.expected), len(resource.Features.Integrations))
-			for i, expected := range tt.expected {
-				assert.Equal(t, expected.ID, resource.Features.Integrations[i].ID)
+			assert.Equal(t, len(tt.expected.Elements()), len(resource.Features.Integrations.Elements()))
+			expectedElements := tt.expected.Elements()
+			integrationElements := resource.Features.Integrations.Elements()
+			for i, expected := range expectedElements {
+				assert.Equal(t, expected, integrationElements[i])
 			}
 		})
 	}

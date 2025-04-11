@@ -79,21 +79,17 @@ type NodeGroupModel struct {
 }
 
 type FeaturesModel struct {
-	WalMode         types.String       `tfsdk:"wal_mode"`
-	InstanceConfigs types.Map          `tfsdk:"instance_configs"`
-	Integrations    []IntegrationModel `tfsdk:"integrations"`
-	Security        *SecurityModel     `tfsdk:"security"`
+	WalMode         types.String   `tfsdk:"wal_mode"`
+	InstanceConfigs types.Map      `tfsdk:"instance_configs"`
+	Integrations    types.Set      `tfsdk:"integrations"`
+	Security        *SecurityModel `tfsdk:"security"`
 }
 
 type FeaturesSummaryModel struct {
 	WalMode         types.String          `tfsdk:"wal_mode"`
 	InstanceConfigs types.Map             `tfsdk:"instance_configs"`
-	Integrations    []IntegrationModel    `tfsdk:"integrations"`
+	Integrations    types.Set             `tfsdk:"integrations"`
 	Security        *SecuritySummaryModel `tfsdk:"security"`
-}
-
-type IntegrationModel struct {
-	ID types.String `tfsdk:"id"`
 }
 
 type BucketProfileIDModel struct {
@@ -255,12 +251,13 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 		}
 
 		// Integrations
-		if len(instance.Features.Integrations) > 0 {
-			integrations := make([]client.IntegrationBindParam, 0, len(instance.Features.Integrations))
-			for _, integration := range instance.Features.Integrations {
-				id := integration.ID.ValueString()
+		if !instance.Features.Integrations.IsNull() && len(instance.Features.Integrations.Elements()) > 0 {
+			ids := ExpandSetValueList(instance.Features.Integrations)
+			integrations := make([]client.IntegrationBindParam, 0, len(ids))
+			for _, id := range ids {
+				integrationID := id
 				integrations = append(integrations, client.IntegrationBindParam{
-					Id: &id,
+					Id: &integrationID,
 				})
 			}
 			request.Features.Integrations = integrations
@@ -519,18 +516,14 @@ func FlattenKafkaInstanceModelWithIntegrations(integrations []client.Integration
 
 	// Handle integrations if present
 	if len(integrations) > 0 {
-		integrationModels := make([]IntegrationModel, 0, len(integrations))
+		integrationIds := make([]attr.Value, 0, len(integrations))
 		for _, integration := range integrations {
-			if integration.Code != "" {
-				integrationModels = append(integrationModels, IntegrationModel{
-					ID: types.StringValue(integration.Code),
-				})
-			}
+			integrationIds = append(integrationIds, types.StringValue(integration.Code))
 		}
 		if resource.Features == nil {
 			resource.Features = &FeaturesModel{}
 		}
-		resource.Features.Integrations = integrationModels
+		resource.Features.Integrations = types.SetValueMust(types.StringType, integrationIds)
 	}
 	return diags
 }
