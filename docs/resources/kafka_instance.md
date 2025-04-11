@@ -147,7 +147,7 @@ Optional:
 
 - `certificate_authority` (String) CA certificate for mTLS authentication
 - `certificate_chain` (String) Certificate chain for mTLS authentication
-- `data_encryption_mode` (String) Data encryption mode: NONE (no encryption), CPMK (cloud-managed KMS), BYOK (custom KMS key)
+- `data_encryption_mode` (String) Data encryption mode: NONE (no encryption), CPMK (cloud-managed KMS)
 - `private_key` (String) Private key for mTLS authentication
 
 

@@ -218,10 +218,10 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							"data_encryption_mode": schema.StringAttribute{
 								Optional:    true,
 								Computed:    true,
-								Description: "Data encryption mode: NONE (no encryption), CPMK (cloud-managed KMS), BYOK (custom KMS key)",
+								Description: "Data encryption mode: NONE (no encryption), CPMK (cloud-managed KMS)",
 								Default:     stringdefault.StaticString("NONE"),
 								Validators: []validator.String{
-									stringvalidator.OneOf("NONE", "CPMK", "BYOK"),
+									stringvalidator.OneOf("NONE", "CPMK"),
 								},
 								PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 							},
