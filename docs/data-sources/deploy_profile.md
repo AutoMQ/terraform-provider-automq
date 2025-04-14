@@ -4,11 +4,16 @@ page_title: "automq_deploy_profile Data Source - automq"
 subcategory: ""
 description: |-
   Using the automq_deploy_profile data source, you can retrieve deployment profile information.
+  Note: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
 ---
 
 # automq_deploy_profile (Data Source)
 
-![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>Using the `automq_deploy_profile` data source, you can retrieve deployment profile information.
+![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)
+
+Using the `automq_deploy_profile` data source, you can retrieve deployment profile information.
+
+> **Note**: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
 
 ## Example Usage
 

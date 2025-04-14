@@ -29,7 +29,10 @@ func (d *DataBucketProfilesDataSource) Metadata(ctx context.Context, req datasou
 
 func (d *DataBucketProfilesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>Data source for AutoMQ data bucket profiles. This allows you to query information about data buckets that are associated with a specific deployment profile. Data buckets are used to store Kafka message data in object storage.",
+		MarkdownDescription: "![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)\n\n" +
+			"Using the `automq_data_bucket_profiles` data source, you can query information about data buckets that are associated with a specific deployment profile. " +
+			"Data buckets are used to store Kafka message data in object storage.\n\n" +
+			"> **Note**: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.",
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{

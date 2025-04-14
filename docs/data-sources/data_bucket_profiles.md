@@ -3,12 +3,17 @@
 page_title: "automq_data_bucket_profiles Data Source - automq"
 subcategory: ""
 description: |-
-  Data source for AutoMQ data bucket profiles. This allows you to query information about data buckets that are associated with a specific deployment profile. Data buckets are used to store Kafka message data in object storage.
+  Using the automq_data_bucket_profiles data source, you can query information about data buckets that are associated with a specific deployment profile. Data buckets are used to store Kafka message data in object storage.
+  Note: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
 ---
 
 # automq_data_bucket_profiles (Data Source)
 
-![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>Data source for AutoMQ data bucket profiles. This allows you to query information about data buckets that are associated with a specific deployment profile. Data buckets are used to store Kafka message data in object storage.
+![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)
+
+Using the `automq_data_bucket_profiles` data source, you can query information about data buckets that are associated with a specific deployment profile. Data buckets are used to store Kafka message data in object storage.
+
+> **Note**: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
 
 
 

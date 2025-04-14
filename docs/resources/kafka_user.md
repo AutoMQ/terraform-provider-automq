@@ -3,12 +3,17 @@
 page_title: "automq_kafka_user Resource - automq"
 subcategory: ""
 description: |-
-  automq_kafka_user provides acl user identity information for more secure access to kafka clusters.
+  Using the automq_kafka_user resource type, you can create and manage Kafka users for authentication.
+  Note: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
 ---
 
 # automq_kafka_user (Resource)
 
-![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>`automq_kafka_user` provides acl user identity information for more secure access to kafka clusters.
+![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)
+
+Using the `automq_kafka_user` resource type, you can create and manage Kafka users for authentication.
+
+> **Note**: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
 
 ## Example Usage
 

@@ -29,7 +29,9 @@ func (d *DeployProfileDataSource) Metadata(ctx context.Context, req datasource.M
 
 func (d *DeployProfileDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>Using the `automq_deploy_profile` data source, you can retrieve deployment profile information.",
+		MarkdownDescription: "![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)\n\n" +
+			"Using the `automq_deploy_profile` data source, you can retrieve deployment profile information.\n\n" +
+			"> **Note**: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.",
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{

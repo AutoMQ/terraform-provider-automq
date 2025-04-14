@@ -17,7 +17,6 @@ Refer to the following for specific operations:
 - Install the AutoMQ environment by following the [documentation](https://registry.terraform.io/modules/AutoMQ/automq-byoc-environment/aws/latest).
 - Create a ServiceAccount and obtain an AccessKey: After the environment is installed, users need to access the AutoMQ environment console through web browser, create a Service Account, and use the Access Key of the Service Account. Please refer to [document](https://docs.automq.com/automq-cloud/manage-identities-and-access/service-accounts).
 
-> **Note**: This provider version is only compatible with AutoMQ control plane versions 7.3.0 and later.
 
 ## Example Usage
 ### Example Provider Configuration

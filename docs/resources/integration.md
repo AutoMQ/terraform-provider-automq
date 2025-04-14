@@ -3,12 +3,17 @@
 page_title: "automq_integration Resource - automq"
 subcategory: ""
 description: |-
-  AutoMQ uses automq_integration to describe external third-party data transmission. By creating integrations and associating them with AutoMQ instances, you can forward instance Metrics and other data to external systems. Currently supported integration types are Prometheus and CloudWatch.
+  Using the automq_integration resource type, you can describe external third-party data transmission. By creating integrations and associating them with AutoMQ instances, you can forward instance Metrics and other data to external systems. Currently supported integration types are Prometheus and CloudWatch.
+  Note: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
 ---
 
 # automq_integration (Resource)
 
-![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>AutoMQ uses `automq_integration` to describe external third-party data transmission. By creating integrations and associating them with AutoMQ instances, you can forward instance Metrics and other data to external systems. Currently supported integration types are Prometheus and CloudWatch.
+![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)
+
+Using the `automq_integration` resource type, you can describe external third-party data transmission. By creating integrations and associating them with AutoMQ instances, you can forward instance Metrics and other data to external systems. Currently supported integration types are Prometheus and CloudWatch.
+
+> **Note**: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
 
 ## Example Usage
 

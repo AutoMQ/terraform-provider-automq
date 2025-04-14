@@ -3,12 +3,17 @@
 page_title: "automq_kafka_topic Resource - automq"
 subcategory: ""
 description: |-
-  automq_kafka_topic provides a Kafka Topic resource that enables creating and deleting Kafka Topics on a Kafka cluster on AutoMQ BYOC environment.
+  Using the automq_kafka_topic resource type, you can create and manage Kafka topics.
+  Note: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
 ---
 
 # automq_kafka_topic (Resource)
 
-![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>`automq_kafka_topic` provides a Kafka Topic resource that enables creating and deleting Kafka Topics on a Kafka cluster on AutoMQ BYOC environment.
+![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)
+
+Using the `automq_kafka_topic` resource type, you can create and manage Kafka topics.
+
+> **Note**: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
 
 ## Example Usage
 

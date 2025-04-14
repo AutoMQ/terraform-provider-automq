@@ -38,7 +38,11 @@ func (r *KafkaUserResource) Metadata(ctx context.Context, req resource.MetadataR
 
 func (r *KafkaUserResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>`automq_kafka_user` provides acl user identity information for more secure access to kafka clusters.",
+		MarkdownDescription: "![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)\n" +
+			"\n" +
+			"Using the `automq_kafka_user` resource type, you can create and manage Kafka users for authentication.\n" +
+			"\n" +
+			"> **Note**: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.",
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
