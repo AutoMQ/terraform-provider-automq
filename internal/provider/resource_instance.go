@@ -204,8 +204,8 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							"transit_encryption_modes": schema.SetAttribute{
 								Required:    true,
 								ElementType: types.StringType,
-								MarkdownDescription: "Configure data transmission encryption. Supported values:\n\n" +
-									"* `plaintext` - No encryption. Only supported in VPC networks. Compatible with PLAINTEXT and SASL authentication protocols\n" +
+								MarkdownDescription: "Configure data transmission encryption. Supported values:\n\n	" +
+									"* `plaintext` - No encryption. Only supported in VPC networks. Compatible with PLAINTEXT and SASL authentication protocols\n	" +
 									"* `tls` - TLS encrypted transmission. Requires trusted CA certificates and server certificates\n\n" +
 									"Changes to encryption modes require instance replacement.",
 								Validators: []validator.Set{
@@ -218,8 +218,8 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							"data_encryption_mode": schema.StringAttribute{
 								Optional: true,
 								Computed: true,
-								MarkdownDescription: "The encryption mode used to protect data stored in AutoMQ using cloud provider's storage encryption capabilities. Supported values:\n\n" +
-									"* `NONE` - No encryption (default)\n" +
+								MarkdownDescription: "The encryption mode used to protect data stored in AutoMQ using cloud provider's storage encryption capabilities. Supported values:\n\n	" +
+									"* `NONE` - No encryption (default)\n	" +
 									"* `CPMK` - Cloud Provider Managed Key encryption using cloud provider's KMS service\n\n" +
 									"Changes to encryption mode require instance replacement.",
 								Default: stringdefault.StaticString("NONE"),

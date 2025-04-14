@@ -178,8 +178,8 @@ Required:
 Changes to authentication methods require instance replacement.
 - `transit_encryption_modes` (Set of String) Configure data transmission encryption. Supported values:
 
-* `plaintext` - No encryption. Only supported in VPC networks. Compatible with PLAINTEXT and SASL authentication protocols
-* `tls` - TLS encrypted transmission. Requires trusted CA certificates and server certificates
+	* `plaintext` - No encryption. Only supported in VPC networks. Compatible with PLAINTEXT and SASL authentication protocols
+	* `tls` - TLS encrypted transmission. Requires trusted CA certificates and server certificates
 
 Changes to encryption modes require instance replacement.
 
@@ -189,8 +189,8 @@ Optional:
 - `certificate_chain` (String) The server certificate chain in PEM format issued by the CA. AutoMQ will deploy the instance with this certificate. Required when `mtls` authentication method is enabled.
 - `data_encryption_mode` (String) The encryption mode used to protect data stored in AutoMQ using cloud provider's storage encryption capabilities. Supported values:
 
-* `NONE` - No encryption (default)
-* `CPMK` - Cloud Provider Managed Key encryption using cloud provider's KMS service
+	* `NONE` - No encryption (default)
+	* `CPMK` - Cloud Provider Managed Key encryption using cloud provider's KMS service
 
 Changes to encryption mode require instance replacement.
 - `private_key` (String) The private key in PEM format corresponding to the server certificate. AutoMQ will deploy the instance with this key. Required when `mtls` authentication method is enabled.
