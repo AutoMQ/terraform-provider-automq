@@ -13,32 +13,48 @@ description: |-
 ## Example Usage
 
 ```terraform
-resource "automq_integration" "example-1" {
-  environment_id = "env-example"
+resource "automq_integration" "prometheus_remote_write_example_1" {
+  environment_id = var.automq_environment_id
   name           = "example-1"
-  type           = "cloudWatch"
-  cloudwatch_config = {
-    namespace = "example"
+  type           = "prometheusRemoteWrite"
+  endpoint       = "http://example.com"
+  deploy_profile = "default"
+
+  prometheus_remote_write_config = {
+    auth_type = "noauth"
   }
 }
 
-resource "automq_integration" "example-2" {
-  environment_id = "env-example"
+resource "automq_integration" "prometheus_remote_write_example_2" {
+  environment_id = var.automq_environment_id
   name           = "example-2"
-  type           = "prometheus"
-  endpoint       = "http://xxxxx.xxx"
-}
+  type           = "prometheusRemoteWrite"
+  endpoint       = "http://example.com"
+  deploy_profile = "default"
 
-resource "automq_integration" "example-3" {
-  environment_id = "env-example"
-  name           = "example-3"
-  type           = "prometheus_remote_write"
-  endpoint       = "http://xxxxx.xxx"
   prometheus_remote_write_config = {
     auth_type = "basic"
-    username  = "username"
-    password  = "password"
+    username  = "example-username"
+    password  = "example-password"
   }
+}
+
+resource "automq_integration" "prometheus_remote_write_example_3" {
+  environment_id = var.automq_environment_id
+  name           = "example-3"
+  type           = "prometheusRemoteWrite"
+  endpoint       = "http://example.com"
+  deploy_profile = "default"
+
+  prometheus_remote_write_config = {
+    auth_type    = "bearer"
+    bearer_token = "example-token"
+  }
+}
+
+
+variable "automq_environment_id" {
+  type = string
 }
 ```
 
