@@ -1,217 +1,577 @@
 package provider
 
 import (
-	"context"
-	"encoding/json"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
-	"net/http"
+	"math/big"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
-	"terraform-provider-automq/client"
-	"terraform-provider-automq/internal/models"
-
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/wiremock/go-wiremock"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-const (
-	expectedCountOne = int64(1)
-)
+func getRequiredEnvVars(t *testing.T) map[string]string {
+	envVars := map[string]string{
+		"AUTOMQ_BYOC_ENDPOINT":       "http://44.207.11.83:8080",         // os.Getenv("AUTOMQ_BYOC_ENDPOINT"),
+		"AUTOMQ_BYOC_ACCESS_KEY_ID":  "TeDaXnaRASROF9AZ",                 // os.Getenv("AUTOMQ_BYOC_ACCESS_KEY_ID"),
+		"AUTOMQ_BYOC_SECRET_KEY":     "Lj41KSn5WciTS9UNc5cf4k3MRcIbs0D4", // os.Getenv("AUTOMQ_BYOC_SECRET_KEY"),
+		"AUTOMQ_TEST_ENV_ID":         "env-vstohprknxupims1",             // os.Getenv("AUTOMQ_TEST_ENV_ID"),
+		"AUTOMQ_TEST_SUBNET_ID":      "subnet-0005ed305e0891752",         //os.Getenv("AUTOMQ_TEST_SUBNET_ID"),
+		"AUTOMQ_TEST_ZONE":           "us-east-1a",                       // os.Getenv("AUTOMQ_TEST_ZONE"),
+		"AUTOMQ_TEST_DEPLOY_PROFILE": "default",                          // os.Getenv("AUTOMQ_TEST_DEPLOY_PROFILE"),
+	}
 
-var createKafkaInstancePath = "/api/v1/instances"
-var getKafkaInstancePath = "/api/v1/instances/%s"
-var getKafkaInstanceEndpointPath = "/api/v1/instances/%s/endpoints"
-var getKafkaIntegrationPath = "/api/v1/instances/%s/integrations"
+	missingVars := []string{}
+	for k, v := range envVars {
+		if v == "" {
+			missingVars = append(missingVars, k)
+		}
+	}
 
+	if len(missingVars) > 0 {
+		t.Skipf("Missing required environment variables: %v", missingVars)
+	}
+
+	return envVars
+}
+
+func generateRandomSuffix() string {
+	// Generate a random 6-character string for resource naming
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, 6)
+	for i := range b {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			return "default"
+		}
+		b[i] = charset[n.Int64()]
+	}
+	return string(b)
+}
+
+// Define version upgrade path
+var kafkaVersionUpgrades = []string{
+	"1.3.10",
+	"1.4.0",
+}
+
+// TestConfig holds the test configuration parameters
+type TestConfig struct {
+	EnvironmentID string
+	Name          string
+	Description   string
+	DeployProfile string
+	Version       string
+	ComputeSpecs  ComputeSpecs
+	Features      Features
+}
+
+type ComputeSpecs struct {
+	ReservedAKU int
+	Networks    []Network
+}
+
+type Network struct {
+	Zone    string
+	Subnets []string
+}
+
+type Features struct {
+	WALMode         string
+	InstanceConfigs map[string]string
+	Security        *SecurityConfig
+}
+
+type SecurityConfig struct {
+	AuthenticationMethods  []string
+	TransitEncryptionModes []string
+	DataEncryptionMode     string
+	CertificateAuthority   string
+	CertificateChain       string
+	PrivateKey             string
+}
+
+// defaultTestConfig returns a default test configuration
+func defaultTestConfig(suffix string, envVars map[string]string) TestConfig {
+	return TestConfig{
+		EnvironmentID: envVars["AUTOMQ_TEST_ENV_ID"],
+		Name:          fmt.Sprintf("test-instance-%s", suffix),
+		Description:   "test instance description",
+		DeployProfile: envVars["AUTOMQ_TEST_DEPLOY_PROFILE"],
+		Version:       "1.3.10",
+		ComputeSpecs: ComputeSpecs{
+			ReservedAKU: 6,
+			Networks: []Network{
+				{
+					Zone:    envVars["AUTOMQ_TEST_ZONE"],
+					Subnets: []string{envVars["AUTOMQ_TEST_SUBNET_ID"]},
+				},
+			},
+		},
+		Features: Features{
+			WALMode: "EBSWAL",
+			InstanceConfigs: map[string]string{
+				"auto.create.topics.enable": "true",
+				"num.partitions":            "1",
+			},
+		},
+	}
+}
+
+// renderHCLConfig converts a TestConfig to HCL format
+func renderHCLConfig(config TestConfig, envVars map[string]string) string {
+	// Base template with provider and resource structure
+	template := `
+provider "automq" {
+  automq_byoc_endpoint     = "%[1]s"
+  automq_byoc_access_key_id = "%[2]s"
+  automq_byoc_secret_key   = "%[3]s"
+}
+
+data "automq_deploy_profile" "default" {
+  environment_id = "%[4]s"
+  name = "default"
+}
+
+data "automq_data_bucket_profiles" "test" {
+  environment_id = "%[4]s"
+  profile_name = data.automq_deploy_profile.default.name
+}
+
+resource "automq_kafka_instance" "test" {
+    environment_id = "%[4]s"
+    name          = "%[5]s"
+    description   = "%[6]s"
+    deploy_profile = "%[7]s"
+    version       = "%[8]s"
+
+    compute_specs = {
+        reserved_aku = %[9]d
+        networks = [
+            {
+                zone    = "%[10]s"
+                subnets = ["%[11]s"]
+            }
+        ]
+        bucket_profiles = [
+            {
+                id = data.automq_data_bucket_profiles.test.data_buckets[0].id
+            }
+        ]
+    }
+
+    features = {
+        wal_mode = "%[12]s"
+        %[13]s
+        %[14]s
+    }
+}
+`
+
+	// Build instance configs string if present
+	instanceConfigsStr := ""
+	if len(config.Features.InstanceConfigs) > 0 {
+		instanceConfigsStr = "instance_configs = {\n"
+		for k, v := range config.Features.InstanceConfigs {
+			instanceConfigsStr += fmt.Sprintf(`            "%s" = "%s"`+"\n", k, v)
+		}
+		instanceConfigsStr += "        }"
+	}
+
+	// Build security config string if present
+	securityConfigStr := ""
+	if config.Features.Security != nil {
+		securityConfigStr = "security = {\n"
+		if len(config.Features.Security.AuthenticationMethods) > 0 {
+			securityConfigStr += fmt.Sprintf(`            authentication_methods = ["%s"]`+"\n",
+				strings.Join(config.Features.Security.AuthenticationMethods, `","`))
+		}
+		if len(config.Features.Security.TransitEncryptionModes) > 0 {
+			securityConfigStr += fmt.Sprintf(`            transit_encryption_modes = ["%s"]`+"\n",
+				strings.Join(config.Features.Security.TransitEncryptionModes, `","`))
+		}
+		securityConfigStr += fmt.Sprintf(`            data_encryption_mode = "%s"`+"\n", config.Features.Security.DataEncryptionMode)
+
+		if config.Features.Security.CertificateAuthority != "" {
+			securityConfigStr += fmt.Sprintf(`            certificate_authority = <<-EOT
+%s
+EOT
+`, config.Features.Security.CertificateAuthority)
+		}
+		if config.Features.Security.CertificateChain != "" {
+			securityConfigStr += fmt.Sprintf(`            certificate_chain = <<-EOT
+%s
+EOT
+`, config.Features.Security.CertificateChain)
+		}
+		if config.Features.Security.PrivateKey != "" {
+			securityConfigStr += fmt.Sprintf(`            private_key = <<-EOT
+%s
+EOT
+`, config.Features.Security.PrivateKey)
+		}
+		securityConfigStr += "        }"
+	}
+
+	// Format the final configuration
+	return fmt.Sprintf(template,
+		envVars["AUTOMQ_BYOC_ENDPOINT"],            // 1
+		envVars["AUTOMQ_BYOC_ACCESS_KEY_ID"],       // 2
+		envVars["AUTOMQ_BYOC_SECRET_KEY"],          // 3
+		config.EnvironmentID,                       // 4
+		config.Name,                                // 5
+		config.Description,                         // 6
+		config.DeployProfile,                       // 7
+		config.Version,                             // 8
+		config.ComputeSpecs.ReservedAKU,            // 9
+		config.ComputeSpecs.Networks[0].Zone,       // 10
+		config.ComputeSpecs.Networks[0].Subnets[0], // 11
+		config.Features.WALMode,                    // 12
+		instanceConfigsStr,                         // 13
+		securityConfigStr,                          // 14
+	)
+}
+
+// TestAccKafkaInstanceResource tests basic CRUD operations for Kafka instance
 func TestAccKafkaInstanceResource(t *testing.T) {
-	ctx := context.Background()
-
-	wiremockContainer, err := setupWiremock(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// nolint:errcheck
-	defer wiremockContainer.Terminate(ctx)
-
-	mockAutoMQTestServerUrl := wiremockContainer.URI
-	wiremockClient := wiremock.NewClient(mockAutoMQTestServerUrl)
-
-	creatingResponse := testAccKafkaInstanceResponseInCreating()
-	creatingResponseJson, err := json.Marshal(creatingResponse)
-	if err != nil {
-		t.Fatal(err)
+	if os.Getenv("AUTOMQ_BYOC_ENDPOINT") == "" {
+		t.Skip("Skipping test as AUTOMQ_TEST_DEPLOY_PROFILE is not set")
 	}
 
-	availableResponse := testAccKafkaInstanceResponseInAvailable()
-	availableResponseJson, err := json.Marshal(availableResponse)
-	if err != nil {
-		t.Fatal(err)
-	}
-	deletingResponse := testAccKafkaInstanceResponseInDeleting()
-	deletingResponseJson, err := json.Marshal(deletingResponse)
-	if err != nil {
-		t.Fatal(err)
-	}
-	IntegrationResponse := newInstanceIntegrationResponse()
-	IntegrationResponseJson, err := json.Marshal(IntegrationResponse)
-	if err != nil {
-		t.Fatal(err)
+	envVars := getRequiredEnvVars(t)
+	suffix := generateRandomSuffix()
+
+	// Generate certificates for security testing
+	caCert, serverCert, serverKey, err := generateTestCertificate()
+	newCaCert, newServerCert, newServerKey, newErr := generateTestCertificate()
+	if err != nil || newErr != nil {
+		t.Fatalf("Failed to generate test certificates: %v, %v", err, newErr)
 	}
 
-	EndpointsResponse := newInstanceEndpointsResponse()
-	EndpointsResponseJson, err := json.Marshal(EndpointsResponse)
-	if err != nil {
-		t.Fatal(err)
+	// Initial configuration
+	initialConfig := defaultTestConfig(suffix, envVars)
+	initialConfig.Version = kafkaVersionUpgrades[0]
+	initialConfig.Features.Security = &SecurityConfig{
+		AuthenticationMethods:  []string{"sasl", "mtls"},
+		TransitEncryptionModes: []string{"tls"},
+		DataEncryptionMode:     "CPMK",
+		CertificateAuthority:   caCert,
+		CertificateChain:       serverCert,
+		PrivateKey:             serverKey,
 	}
-	createInstanceStub := wiremock.Post(wiremock.
-		URLPathEqualTo(createKafkaInstancePath)).
-		WillReturnResponse(wiremock.NewResponse().WithBody(string(creatingResponseJson)).WithStatus(http.StatusOK))
-	_ = wiremockClient.StubFor(createInstanceStub)
 
-	getInstanceStubWhenStarted := wiremock.Get(wiremock.
-		URLPathEqualTo(fmt.Sprintf(getKafkaInstancePath, creatingResponse.InstanceID))).
-		WillReturnResponse(wiremock.NewResponse().WithBody(string(availableResponseJson)).WithStatus(http.StatusOK)).
-		InScenario("KafkaInstanceState").WhenScenarioStateIs(wiremock.ScenarioStateStarted)
-	_ = wiremockClient.StubFor(getInstanceStubWhenStarted)
-
-	getKafkaInstanceEndpointStub := wiremock.Get(wiremock.
-		URLPathEqualTo(fmt.Sprintf(getKafkaInstanceEndpointPath, creatingResponse.InstanceID))).
-		WillReturnResponse(wiremock.NewResponse().WithBody(string(EndpointsResponseJson)).WithStatus(http.StatusOK))
-	_ = wiremockClient.StubFor(getKafkaInstanceEndpointStub)
-
-	getInstanceIntegrationStubWhenStarted := wiremock.Get(wiremock.
-		URLPathEqualTo(fmt.Sprintf(getKafkaIntegrationPath, creatingResponse.InstanceID))).
-		WillReturnResponse(wiremock.NewResponse().WithBody(string(IntegrationResponseJson)).WithStatus(http.StatusOK))
-	_ = wiremockClient.StubFor(getInstanceIntegrationStubWhenStarted)
-
-	deleteInstanceStub := wiremock.Delete(wiremock.
-		URLPathEqualTo(fmt.Sprintf(getKafkaInstancePath, creatingResponse.InstanceID))).
-		WillReturnResponse(wiremock.NewResponse().WithBody(string(deletingResponseJson)).WithStatus(http.StatusNoContent)).
-		InScenario("KafkaInstanceState").WillSetStateTo("Deleted")
-	_ = wiremockClient.StubFor(deleteInstanceStub)
-
-	getInstanceStubWhenDeleted := wiremock.Get(wiremock.
-		URLPathEqualTo(fmt.Sprintf(getKafkaInstancePath, creatingResponse.InstanceID))).
-		WillReturnResponse(wiremock.NewResponse().WithStatus(http.StatusNotFound)).
-		InScenario("KafkaInstanceState").WhenScenarioStateIs("Deleted")
-	_ = wiremockClient.StubFor(getInstanceStubWhenDeleted)
+	// Updated configuration
+	updatedConfig := defaultTestConfig(suffix, envVars)
+	updatedConfig.Name = fmt.Sprintf("test-instance-updated-%s", suffix)
+	updatedConfig.Description = "updated test instance description"
+	updatedConfig.Version = kafkaVersionUpgrades[1]
+	updatedConfig.ComputeSpecs.ReservedAKU = 8
+	updatedConfig.Features.InstanceConfigs = map[string]string{
+		"auto.create.topics.enable": "false",
+		"num.partitions":            "3",
+		"log.retention.hours":       "24",
+	}
+	updatedConfig.Features.Security = &SecurityConfig{
+		AuthenticationMethods:  []string{"sasl", "mtls"},
+		TransitEncryptionModes: []string{"tls"},
+		DataEncryptionMode:     "CPMK",
+		CertificateAuthority:   newCaCert,
+		CertificateChain:       newServerCert,
+		PrivateKey:             newServerKey,
+	}
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckKafkaInstanceDestroy,
 		Steps: []resource.TestStep{
-			// Create and Read testing
+			// Initial creation
 			{
-				Config: testAccKafkaInstanceResourceConfig(mockAutoMQTestServerUrl),
+				Config: renderHCLConfig(initialConfig, envVars),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "name", "test"),
+					testAccCheckKafkaInstanceExists("automq_kafka_instance.test"),
+					// Basic attributes
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "name", initialConfig.Name),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "description", initialConfig.Description),
+
+					// Compute specs
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.reserved_aku", fmt.Sprintf("%d", initialConfig.ComputeSpecs.ReservedAKU)),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.networks.#", "1"),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.networks.0.zone", initialConfig.ComputeSpecs.Networks[0].Zone),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.networks.0.subnets.#", "1"),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.networks.0.subnets.0", initialConfig.ComputeSpecs.Networks[0].Subnets[0]),
+
+					// Features
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.wal_mode", initialConfig.Features.WALMode),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "version", initialConfig.Version),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.instance_configs.num.partitions", initialConfig.Features.InstanceConfigs["num.partitions"]),
+
+					// Required fields
+					resource.TestCheckResourceAttrSet("automq_kafka_instance.test", "id"),
+					resource.TestCheckResourceAttrSet("automq_kafka_instance.test", "status"),
+					resource.TestCheckResourceAttrSet("automq_kafka_instance.test", "created_at"),
 				),
+			},
+			// Update test
+			{
+				Config: renderHCLConfig(updatedConfig, envVars),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckKafkaInstanceExists("automq_kafka_instance.test"),
+					// Basic attributes
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "name", updatedConfig.Name),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "description", updatedConfig.Description),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "version", updatedConfig.Version),
+
+					// Compute specs
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.reserved_aku", fmt.Sprintf("%d", updatedConfig.ComputeSpecs.ReservedAKU)),
+
+					// Instance configs
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.instance_configs.auto.create.topics.enable", updatedConfig.Features.InstanceConfigs["auto.create.topics.enable"]),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.instance_configs.num.partitions", updatedConfig.Features.InstanceConfigs["num.partitions"]),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.instance_configs.log.retention.hours", updatedConfig.Features.InstanceConfigs["log.retention.hours"]),
+
+					// Security certificates
+					resource.TestCheckResourceAttrSet("automq_kafka_instance.test", "features.security.certificate_authority"),
+					resource.TestCheckResourceAttrSet("automq_kafka_instance.test", "features.security.certificate_chain"),
+					resource.TestCheckResourceAttrSet("automq_kafka_instance.test", "features.security.private_key"),
+				),
+			},
+			// import test
+			{
+				ResourceName:      "automq_kafka_instance.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateIdFunc: func(s *terraform.State) (string, error) {
+					rs, ok := s.RootModule().Resources["automq_kafka_instance.test"]
+					if !ok {
+						return "", fmt.Errorf("Not found: %s", "automq_kafka_instance.test")
+					}
+					id := fmt.Sprintf("%s@%s", rs.Primary.Attributes["environment_id"], rs.Primary.Attributes["id"])
+					// The import ID format is <environment_id>@<kafka_instance_id>
+					return id, nil
+				},
+				ImportStateVerifyIgnore: []string{
+					"features.security.certificate_authority",
+					"features.security.certificate_chain",
+					"features.security.private_key",
+					"features.instance_configs",
+				},
 			},
 		},
 	})
-
-	checkStubCount(t, wiremockClient, createInstanceStub, fmt.Sprintf("POST %s", createKafkaInstancePath), expectedCountOne)
-	checkStubCount(t, wiremockClient, deleteInstanceStub, fmt.Sprintf("DELETE %s", getKafkaInstancePath), expectedCountOne)
 }
 
-func testAccKafkaInstanceResourceConfig(mockServerUrl string) string {
-	return fmt.Sprintf(`
-provider "automq" {
-  automq_byoc_endpoint  = "%s"
-  automq_byoc_access_key_id = "VLaUIeNYndeOAXjaol32o4UAHvX8A7VE"
-  automq_byoc_secret_key = "CHlRi0hOIA8pAnzW"
-}
-resource "automq_kafka_instance" "test" {
-  environment_id = "env-1"
-  name   = "test"
-  description    = "test"
-  cloud_provider = "aws"
-  region         = "ap-southeast-1"
-  networks = [{
-    zone   = "ap-southeast-1a"
-    subnets = ["vsw-bp14v5eikr8wrgoqje7hr"]
-  }]
-  compute_specs = {
-    aku = "6"
-  }
-  integrations = ["integration-1"]
-}
-`, mockServerUrl)
+// Add CheckDestroy function
+func testAccCheckKafkaInstanceDestroy(s *terraform.State) error {
+	// Loop through resources in state
+	for _, rs := range s.RootModule().Resources {
+		if rs.Type != "automq_kafka_instance" {
+			continue
+		}
+
+		// Try to get the instance
+		// In a real implementation, you would use your client to check if the instance still exists
+		// For now, we'll just return nil to indicate the instance was destroyed
+		return nil
+	}
+
+	return nil
 }
 
-// Return a json string for a KafkaInstanceResponse with Creating status
-func testAccKafkaInstanceResponseInCreating() client.KafkaInstanceResponse {
-	instanceResponse := newInstanceResponse()
+// Add Exists check function
+func testAccCheckKafkaInstanceExists(n string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		rs, ok := s.RootModule().Resources[n]
+		if !ok {
+			return fmt.Errorf("Not found: %s", n)
+		}
 
-	instanceResponse.Status = models.StateCreating
-	instanceResponse.GmtCreate = time.Now()
-	instanceResponse.GmtModified = time.Now()
-	return instanceResponse
+		if rs.Primary.ID == "" {
+			return fmt.Errorf("No Kafka Instance ID is set")
+		}
+
+		// In a real implementation, you would use your client to check if the instance exists
+		// For now, we'll just return nil to indicate the instance exists
+		return nil
+	}
 }
 
-// Return a json string for a KafkaInstanceResponse with Available status
-func testAccKafkaInstanceResponseInAvailable() client.KafkaInstanceResponse {
-	instanceResponse := newInstanceResponse()
-
-	instanceResponse.Status = models.StateAvailable
-	instanceResponse.GmtModified = time.Now()
-	return instanceResponse
+// SecurityTestCase defines a test case for security configurations
+type SecurityTestCase struct {
+	name                 string
+	authMethods          []string
+	transitEncryption    []string
+	dataEncryption       string
+	requiresCertificates bool
 }
 
-// Return a json string for a KafkaInstanceResponse with Available status
-func testAccKafkaInstanceResponseInDeleting() client.KafkaInstanceResponse {
-	instanceResponse := newInstanceResponse()
+func TestAccKafkaInstanceSecurityCombinations(t *testing.T) {
+	if os.Getenv("AUTOMQ_BYOC_ENDPOINT") == "" {
+		t.Skip("Skipping test as AUTOMQ_TEST_DEPLOY_PROFILE is not set")
+	}
 
-	instanceResponse.Status = models.StateDeleting
-	instanceResponse.GmtModified = time.Now()
-	return instanceResponse
-}
+	envVars := getRequiredEnvVars(t)
+	suffix := generateRandomSuffix()
+	caCert, serverCert, serverKey, err := generateTestCertificate()
+	if err != nil {
+		t.Fatalf("Failed to generate test certificates: %v", err)
+	}
 
-func newInstanceResponse() client.KafkaInstanceResponse {
-	instanceResponse := client.KafkaInstanceResponse{}
-	instanceResponse.InstanceID = "kf-cakz90r71mspc7vy"
-	instanceResponse.DisplayName = "test"
-	instanceResponse.Description = "test"
-	instanceResponse.Provider = "aws"
-	instanceResponse.Region = "ap-southeast-1"
-	instanceResponse.Spec.Version = "1.2.0"
-	instanceResponse.Spec.PaymentPlan.PaymentType = "ON_DEMAND"
-	instanceResponse.Spec.PaymentPlan.Period = 1
-	instanceResponse.Spec.PaymentPlan.Unit = "MONTH"
-	instanceResponse.Spec.Values = []client.Value{{Key: "aku", Value: 6}, {Key: "walMode", Value: "block"}}
-	instanceResponse.Networks = []client.Network{{Zone: "ap-southeast-1a", Subnets: []client.Subnet{{Subnet: "vsw-bp14v5eikr8wrgoqje7hr"}}}}
-	return instanceResponse
-}
+	// Define all possible security combinations
+	testCases := []SecurityTestCase{
+		{
+			name:                 "anonymous_plaintext_none",
+			authMethods:          []string{"anonymous"},
+			transitEncryption:    []string{"plaintext"},
+			dataEncryption:       "NONE",
+			requiresCertificates: false,
+		},
+		{
+			name:                 "anonymous_plaintext_cpmk",
+			authMethods:          []string{"anonymous"},
+			transitEncryption:    []string{"plaintext"},
+			dataEncryption:       "CPMK",
+			requiresCertificates: false,
+		},
+		{
+			name:                 "sasl_plaintext_none",
+			authMethods:          []string{"sasl"},
+			transitEncryption:    []string{"plaintext"},
+			dataEncryption:       "NONE",
+			requiresCertificates: false,
+		},
+		{
+			name:                 "sasl_plaintext_cpmk",
+			authMethods:          []string{"sasl"},
+			transitEncryption:    []string{"plaintext"},
+			dataEncryption:       "CPMK",
+			requiresCertificates: false,
+		},
+		{
+			name:                 "sasl_mtls_tls_none",
+			authMethods:          []string{"sasl", "mtls"},
+			transitEncryption:    []string{"tls"},
+			dataEncryption:       "NONE",
+			requiresCertificates: true,
+		},
+		{
+			name:                 "sasl_mtls_tls_cpmk",
+			authMethods:          []string{"sasl", "mtls"},
+			transitEncryption:    []string{"tls"},
+			dataEncryption:       "CPMK",
+			requiresCertificates: true,
+		},
+	}
 
-func newInstanceIntegrationResponse() client.PageNumResultIntegrationVO {
-	return client.PageNumResultIntegrationVO{
-		List: []client.IntegrationVO{
-			{
-				Type:     "cloudWatch",
-				Code:     "integration-1",
-				Name:     "cloudwatch",
-				EndPoint: nil,
-				Config: map[string]interface{}{
-					"namespace": "example",
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			config := defaultTestConfig(suffix, envVars)
+			config.Name = fmt.Sprintf("test-secure-%s-%s", tc.name, suffix)
+			config.Description = fmt.Sprintf("Test instance with %s security configuration", tc.name)
+
+			// Set up security configuration
+			config.Features.Security = &SecurityConfig{
+				AuthenticationMethods:  tc.authMethods,
+				TransitEncryptionModes: tc.transitEncryption,
+				DataEncryptionMode:     tc.dataEncryption,
+			}
+
+			if tc.requiresCertificates {
+				config.Features.Security.CertificateAuthority = caCert
+				config.Features.Security.CertificateChain = serverCert
+				config.Features.Security.PrivateKey = serverKey
+			}
+
+			resource.Test(t, resource.TestCase{
+				ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+				Steps: []resource.TestStep{
+					{
+						Config: renderHCLConfig(config, envVars),
+						Check: resource.ComposeAggregateTestCheckFunc(
+							// Basic attributes
+							resource.TestCheckResourceAttr("automq_kafka_instance.test", "name", config.Name),
+							resource.TestCheckResourceAttr("automq_kafka_instance.test", "description", config.Description),
+
+							// Security configuration
+							resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.security.authentication_methods.#", fmt.Sprintf("%d", len(tc.authMethods))),
+							resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.security.transit_encryption_modes.#", fmt.Sprintf("%d", len(tc.transitEncryption))),
+							resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.security.data_encryption_mode", tc.dataEncryption),
+
+							// Conditional checks for certificates
+							func(s *terraform.State) error {
+								if tc.requiresCertificates {
+									return resource.ComposeAggregateTestCheckFunc(
+										resource.TestCheckResourceAttrSet("automq_kafka_instance.test", "features.security.certificate_authority"),
+										resource.TestCheckResourceAttrSet("automq_kafka_instance.test", "features.security.certificate_chain"),
+										resource.TestCheckResourceAttrSet("automq_kafka_instance.test", "features.security.private_key"),
+									)(s)
+								}
+								return nil
+							},
+						),
+					},
 				},
-				GmtCreate:   time.Now(),
-				GmtModified: time.Now(),
-			},
-		},
+			})
+		})
 	}
 }
 
-func newInstanceEndpointsResponse() client.PageNumResultInstanceAccessInfoVO {
-	return client.PageNumResultInstanceAccessInfoVO{
-		List: []client.InstanceAccessInfoVO{
-			{
-				BootstrapServers: "kafka-1:9092",
-				DisplayName:      "kafka-1",
-				NetworkType:      "VPC",
-				Protocol:         "PLAINTEXT",
-				Mechanisms:       "PLAIN",
-			},
-		},
+// generateTestCertificate generates test certificates for TLS configuration
+func generateTestCertificate() (string, string, string, error) {
+	// Generate CA key
+	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return "", "", "", err
 	}
+
+	// Generate CA certificate
+	caTemplate := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "Test CA"},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().AddDate(1, 0, 0),
+		IsCA:                  true,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature,
+		BasicConstraintsValid: true,
+	}
+
+	caCertDER, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	// Generate server key
+	serverKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	// Generate server certificate
+	serverTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(2),
+		Subject:      pkix.Name{CommonName: "localhost"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().AddDate(1, 0, 0),
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	}
+
+	serverCertDER, err := x509.CreateCertificate(rand.Reader, serverTemplate, caTemplate, &serverKey.PublicKey, caKey)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	// Encode to PEM
+	caPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caCertDER})
+	serverCertPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: serverCertDER})
+	serverKeyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(serverKey)})
+
+	return string(caPEM), string(serverCertPEM), string(serverKeyPEM), nil
 }

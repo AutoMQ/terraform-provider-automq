@@ -3,24 +3,65 @@
 page_title: "automq_kafka_acl Resource - automq"
 subcategory: ""
 description: |-
-  automq_kafka_acl provides an Access Control List (ACL) Policy in AutoMQ Cluster. AutoMQ supports ACL authorization for Cluster, Topic, Consumer Group, and Transaction ID resources, and simplifies the complex API actions of Apache Kafka through Operation Groups.
+  Using the automq_kafka_acl resource type, you can create and manage Kafka ACL rules.
+  Note: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
 ---
 
 # automq_kafka_acl (Resource)
 
-![General_Availability](https://img.shields.io/badge/Lifecycle_Stage-General_Availability(GA)-green?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>`automq_kafka_acl` provides an Access Control List (ACL) Policy in AutoMQ Cluster. AutoMQ supports ACL authorization for Cluster, Topic, Consumer Group, and Transaction ID resources, and simplifies the complex API actions of Apache Kafka through Operation Groups.
+![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)
+
+Using the `automq_kafka_acl` resource type, you can create and manage Kafka ACL rules.
+
+> **Note**: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
 
 ## Example Usage
 
 ```terraform
-resource "automq_kafka_acl" "example" {
-  environment_id    = "env-example"
-  kafka_instance_id = "kf-gm4xxxxxxxxg2"
+resource "automq_kafka_acl" "example-topic" {
+  environment_id    = var.automq_environment_id
+  kafka_instance_id = automq_kafka_instance.example.id
 
   resource_type   = "TOPIC"
-  resource_name   = "example-"
-  pattern_type    = "PREFIXED"
-  principal       = "User:automq_xxxx_user"
+  resource_name   = automq_kafka_topic.example.name
+  pattern_type    = "LITERAL"
+  principal       = "User:${automq_kafka_user.example.username}"
+  operation_group = "ALL"
+  permission      = "ALLOW"
+}
+
+resource "automq_kafka_acl" "example-group" {
+  environment_id    = var.automq_environment_id
+  kafka_instance_id = automq_kafka_instance.example.id
+
+  resource_type   = "GROUP"
+  resource_name   = "kafka_group-example"
+  pattern_type    = "LITERAL"
+  principal       = "User:${automq_kafka_user.example.username}"
+  operation_group = "ALL"
+  permission      = "ALLOW"
+}
+
+resource "automq_kafka_acl" "example-cluster" {
+  environment_id    = var.automq_environment_id
+  kafka_instance_id = automq_kafka_instance.example.id
+
+  resource_type   = "CLUSTER"
+  resource_name   = "kafka-cluster"
+  pattern_type    = "LITERAL"
+  principal       = "User:${automq_kafka_user.example.username}"
+  operation_group = "ALL"
+  permission      = "ALLOW"
+}
+
+resource "automq_kafka_acl" "example-transaction" {
+  environment_id    = var.automq_environment_id
+  kafka_instance_id = automq_kafka_instance.example.id
+
+  resource_type   = "TRANSACTIONAL_ID"
+  resource_name   = "kafka_transaction-example"
+  pattern_type    = "LITERAL"
+  principal       = "User:${automq_kafka_user.example.username}"
   operation_group = "ALL"
   permission      = "ALLOW"
 }
@@ -37,7 +78,7 @@ resource "automq_kafka_acl" "example" {
 - `pattern_type` (String) Set the resource name matching pattern, supporting `LITERAL` and `PREFIXED`. `LITERAL` represents exact matching, while `PREFIXED` represents prefix matching.
 - `principal` (String) Set the authorized target principal, which currently supports Kafka User type principals, i.e., `User:xxxx`. Specify the Kafka user name. Principal must start with `User:` and contact with `kafka_user`.
 - `resource_name` (String) The target resource name for Kafka ACL authorization, can be a specific resource name or a resource name prefix (when using prefix matching, only the prefix needs to be provided without ending with `*`). If only `*` is specified, it represents all resources.
-- `resource_type` (String) The Kafka ACL authorized resource types, currently support `CLUSTER`, `TOPIC`, `GROUP` and `TRANSACTION_ID`.
+- `resource_type` (String) The Kafka ACL authorized resource types, currently support `CLUSTER`, `TOPIC`, `GROUP` and `TRANSACTIONAL_ID`.
 
 ### Optional
 

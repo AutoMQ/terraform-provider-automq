@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 	"terraform-provider-automq/client"
 	"terraform-provider-automq/internal/framework"
 	"terraform-provider-automq/internal/models"
@@ -40,7 +41,11 @@ func (r *KafkaTopicResource) Metadata(ctx context.Context, req resource.Metadata
 
 func (r *KafkaTopicResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "![General_Availability](https://img.shields.io/badge/Lifecycle_Stage-General_Availability(GA)-green?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>`automq_kafka_topic` provides a Kafka Topic resource that enables creating and deleting Kafka Topics on a Kafka cluster on AutoMQ BYOC environment.",
+		MarkdownDescription: "![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)\n" +
+			"\n" +
+			"Using the `automq_kafka_topic` resource type, you can create and manage Kafka topics.\n" +
+			"\n" +
+			"> **Note**: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.",
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
@@ -248,7 +253,25 @@ func (r *KafkaTopicResource) Delete(ctx context.Context, req resource.DeleteRequ
 }
 
 func (r *KafkaTopicResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("topic_id"), req, resp)
+	idParts := strings.Split(req.ID, "@")
+
+	if len(idParts) != 3 || idParts[0] == "" || idParts[1] == "" || idParts[2] == "" {
+		resp.Diagnostics.Append(
+			diag.NewErrorDiagnostic(
+				"Invalid Import ID",
+				fmt.Sprintf("The import ID must be in the format <environment_id>@<kafka_instance_id>@<topic_id>. Got: %s", req.ID),
+			),
+		)
+		return
+	}
+
+	environmentID := idParts[0]
+	kafkaInstanceID := idParts[1]
+	topicId := idParts[2]
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("environment_id"), environmentID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("kafka_instance_id"), kafkaInstanceID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("topic_id"), topicId)...)
 }
 
 func ReadKafkaTopic(ctx context.Context, r *KafkaTopicResource, instanceId, topicId string, data *models.KafkaTopicResourceModel) diag.Diagnostics {

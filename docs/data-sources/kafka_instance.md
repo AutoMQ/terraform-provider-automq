@@ -4,11 +4,16 @@ page_title: "automq_kafka_instance Data Source - automq"
 subcategory: ""
 description: |-
   Using the automq_kafka_instance data source, you can manage kafka resoure within instance.
+  Note: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
 ---
 
 # automq_kafka_instance (Data Source)
 
-![General_Availability](https://img.shields.io/badge/Lifecycle_Stage-General_Availability(GA)-green?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>Using the `automq_kafka_instance` data source, you can manage kafka resoure within instance.
+![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)
+
+Using the `automq_kafka_instance` data source, you can manage kafka resoure within instance.
+
+> **Note**: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
 
 ## Example Usage
 
@@ -41,26 +46,50 @@ output "example-id" {
 
 ### Read-Only
 
-- `acl` (Boolean) The ACL status the Kafka instance.
-- `cloud_provider` (String) The cloud provider of kafka instance. Currently, `aws` is supported.
-- `compute_specs` (Attributes) The compute specs of the instance, contains aku and version. (see [below for nested schema](#nestedatt--compute_specs))
-- `configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
+- `compute_specs` (Attributes) The compute specs of the instance (see [below for nested schema](#nestedatt--compute_specs))
 - `created_at` (String)
+- `deploy_profile` (String)
 - `description` (String) The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.
 - `endpoints` (Attributes List) The bootstrap endpoints of instance. AutoMQ supports multiple access protocols; therefore, the Endpoint is a list. (see [below for nested schema](#nestedatt--endpoints))
-- `integrations` (List of String) List of All Integrations Associated with the Current Instance. AutoMQ supports integration with external products like `prometheus` and `cloudWatch`, forwarding instance Metrics data to Prometheus and CloudWatch.
+- `features` (Attributes) (see [below for nested schema](#nestedatt--features))
 - `last_updated` (String)
-- `networks` (Attributes List) The networks of the Kafka instance. Currently, you can get one availability zone or three availability zones. (see [below for nested schema](#nestedatt--networks))
-- `region` (String) The region of the Kafka instance
 - `status` (String) The status of instance. Currently supports statuses: `Creating`, `Running`, `Deleting`, `Changing` and `Abnormal`. For definitions and limitations of each status, please refer to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/manage-instances#lifecycle).
+- `version` (String) The software version of AutoMQ instance. By default, there is no need to set version; the latest version will be used. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.
 
 <a id="nestedatt--compute_specs"></a>
 ### Nested Schema for `compute_specs`
 
 Read-Only:
 
-- `aku` (Number) AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc).
-- `version` (String) The software version of AutoMQ instance.
+- `bucket_profiles` (Attributes List) Bucket profiles configuration (see [below for nested schema](#nestedatt--compute_specs--bucket_profiles))
+- `kubernetes_node_groups` (Attributes List) Kubernetes node groups configuration (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
+- `networks` (Attributes List) To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones. (see [below for nested schema](#nestedatt--compute_specs--networks))
+- `reserved_aku` (Number) AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.
+
+<a id="nestedatt--compute_specs--bucket_profiles"></a>
+### Nested Schema for `compute_specs.bucket_profiles`
+
+Read-Only:
+
+- `id` (String) Bucket profile ID
+
+
+<a id="nestedatt--compute_specs--kubernetes_node_groups"></a>
+### Nested Schema for `compute_specs.kubernetes_node_groups`
+
+Read-Only:
+
+- `id` (String) Node group ID
+
+
+<a id="nestedatt--compute_specs--networks"></a>
+### Nested Schema for `compute_specs.networks`
+
+Read-Only:
+
+- `subnets` (List of String) Specify the subnet under the corresponding availability zone for deploying the instance. Currently, only one subnet can be set for each availability zone.
+- `zone` (String) The availability zone ID of the cloud provider.
+
 
 
 <a id="nestedatt--endpoints"></a>
@@ -68,17 +97,36 @@ Read-Only:
 
 Read-Only:
 
-- `bootstrap_servers` (String) The bootstrap servers of the endpoint.
-- `display_name` (String) The name of the endpoint
+- `bootstrap_servers` (String) The bootstrap servers of endpoint.
+- `display_name` (String) The name of endpoint
 - `mechanisms` (String) The supported mechanisms of endpoint. Currently support `PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512`.
 - `network_type` (String) The network type of endpoint. Currently support `VPC` and `INTERNET`. `VPC` type is generally used for internal network access, while `INTERNET` type is used for accessing the AutoMQ cluster from the internet.
 - `protocol` (String) The protocol of endpoint. Currently support `PLAINTEXT` and `SASL_PLAINTEXT`.
 
 
-<a id="nestedatt--networks"></a>
-### Nested Schema for `networks`
+<a id="nestedatt--features"></a>
+### Nested Schema for `features`
 
 Read-Only:
 
-- `subnets` (List of String) The subnets under the corresponding availability zone for deploying the instance. Currently, only one subnet can be set for each availability zone.
-- `zone` (String) The availability zone ID of the cloud provider.
+- `instance_configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
+- `integrations` (Attributes List) Integration configurations (see [below for nested schema](#nestedatt--features--integrations))
+- `security` (Attributes) (see [below for nested schema](#nestedatt--features--security))
+- `wal_mode` (String) Write-Ahead Logging mode: EBSWAL (using EBS as write buffer) or S3WAL (using object storage as write buffer). Defaults to EBSWAL.
+
+<a id="nestedatt--features--integrations"></a>
+### Nested Schema for `features.integrations`
+
+Read-Only:
+
+- `id` (String) Integration ID
+
+
+<a id="nestedatt--features--security"></a>
+### Nested Schema for `features.security`
+
+Read-Only:
+
+- `authentication_methods` (Set of String) Authentication methods: anonymous (anonymous access), sasl (SASL user auth), mtls (TLS cert auth). Defaults to anonymous.
+- `data_encryption_mode` (String) Data encryption mode: NONE (no encryption), CPMK (cloud-managed KMS), BYOK (custom KMS key)
+- `transit_encryption_modes` (Set of String) Transit encryption modes: plaintext (unencrypted) or tls (TLS encrypted). Defaults to plaintext.

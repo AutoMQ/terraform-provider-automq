@@ -9,6 +9,7 @@ type IntegrationVO struct {
 	Type        string                 `json:"type,omitempty"`
 	Code        string                 `json:"code,omitempty"`
 	Name        string                 `json:"name,omitempty"`
+	Profile     string                 `json:"profile,omitempty"`
 	EndPoint    *string                `json:"endPoint,omitempty"`
 	Config      map[string]interface{} `json:"config,omitempty"`
 }
@@ -17,6 +18,7 @@ type IntegrationVO struct {
 type IntegrationParam struct {
 	Type     *string           `json:"type,omitempty"`
 	Name     string            `json:"name" validate:"regexp=^[a-zA-Z\\\\u4e00-\\\\u9fa5][a-z0-9A-Z\\\\u4e00-\\\\u9fa5_\\\\s-]*$"`
+	Profile  string            `json:"profile"`
 	EndPoint string            `json:"endPoint"`
 	Config   []ConfigItemParam `json:"config,omitempty"`
 }

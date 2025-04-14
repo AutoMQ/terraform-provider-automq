@@ -11,7 +11,6 @@ import (
 )
 
 const (
-	kafkaType      = IntegrationTypeKafka
 	cloudWatchType = IntegrationTypeCloudWatch
 
 	securityProtocol = "SASL_PLAINTEXT"
@@ -19,39 +18,21 @@ const (
 	saslUsername     = "user1"
 	saslPassword     = "pass1"
 	testNamespace    = "test-namespace"
+
+	promRemoteWriteType = IntegrationTypePrometheusRemoteWrite
+
+	testAuthType    = "basic"
+	testUsername    = "admin"
+	testPassword    = "password"
+	testBearerToken = "test-token"
 )
 
 func TestFlattenIntergationResource(t *testing.T) {
+	testEndpoint := "http://localhost:9090/api/v1/write"
 	tests := []struct {
 		integration *client.IntegrationVO
 		expected    IntegrationResourceModel
 	}{
-		{
-			integration: &client.IntegrationVO{
-				Code:        "123",
-				Name:        "test-kafka",
-				Type:        kafkaType,
-				GmtCreate:   time.Now(),
-				GmtModified: time.Now(),
-				Config: map[string]interface{}{
-					"securityProtocol": securityProtocol,
-					"saslMechanism":    saslMechanism,
-					"saslUsername":     saslUsername,
-					"saslPassword":     saslPassword,
-				},
-			},
-			expected: IntegrationResourceModel{
-				ID:   types.StringValue("123"),
-				Name: types.StringValue("test-kafka"),
-				Type: types.StringValue(kafkaType),
-				KafkaConfig: &KafkaIntegrationConfig{
-					SecurityProtocol: types.StringValue(securityProtocol),
-					SaslMechanism:    types.StringValue(saslMechanism),
-					SaslUsername:     types.StringValue(saslUsername),
-					SaslPassword:     types.StringValue(saslPassword),
-				},
-			},
-		},
 		{
 			integration: &client.IntegrationVO{
 				Code:        "456",
@@ -72,6 +53,56 @@ func TestFlattenIntergationResource(t *testing.T) {
 				},
 			},
 		},
+		{
+			integration: &client.IntegrationVO{
+				Code:        "789",
+				Name:        "test-prometheus-remote-write",
+				Type:        promRemoteWriteType,
+				EndPoint:    &testEndpoint,
+				GmtCreate:   time.Now(),
+				GmtModified: time.Now(),
+				Config: map[string]interface{}{
+					"authType": testAuthType,
+					"username": testUsername,
+					"password": testPassword,
+				},
+			},
+			expected: IntegrationResourceModel{
+				ID:       types.StringValue("789"),
+				Name:     types.StringValue("test-prometheus-remote-write"),
+				Type:     types.StringValue(promRemoteWriteType),
+				EndPoint: types.StringValue(testEndpoint),
+				PrometheusRemoteWriteConfig: &PrometheusRemoteWriteIntegrationConfig{
+					AuthType: types.StringValue(testAuthType),
+					Username: types.StringValue(testUsername),
+					Password: types.StringValue(testPassword),
+				},
+			},
+		},
+		{
+			integration: &client.IntegrationVO{
+				Code:        "101",
+				Name:        "test-prometheus-remote-write-bearer",
+				Type:        promRemoteWriteType,
+				EndPoint:    &testEndpoint,
+				GmtCreate:   time.Now(),
+				GmtModified: time.Now(),
+				Config: map[string]interface{}{
+					"authType": "bearer",
+					"token":    testBearerToken,
+				},
+			},
+			expected: IntegrationResourceModel{
+				ID:       types.StringValue("101"),
+				Name:     types.StringValue("test-prometheus-remote-write-bearer"),
+				Type:     types.StringValue(promRemoteWriteType),
+				EndPoint: types.StringValue(testEndpoint),
+				PrometheusRemoteWriteConfig: &PrometheusRemoteWriteIntegrationConfig{
+					AuthType:    types.StringValue("bearer"),
+					BearerToken: types.StringValue(testBearerToken),
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -81,50 +112,30 @@ func TestFlattenIntergationResource(t *testing.T) {
 		assert.Equal(t, test.expected.ID.ValueString(), resource.ID.ValueString())
 		assert.Equal(t, test.expected.Name.ValueString(), resource.Name.ValueString())
 		assert.Equal(t, test.expected.Type.ValueString(), resource.Type.ValueString())
-		if test.expected.KafkaConfig != nil {
-			assert.Equal(t, test.expected.KafkaConfig.SecurityProtocol.ValueString(), resource.KafkaConfig.SecurityProtocol.ValueString())
-			assert.Equal(t, test.expected.KafkaConfig.SaslMechanism.ValueString(), resource.KafkaConfig.SaslMechanism.ValueString())
-			assert.Equal(t, test.expected.KafkaConfig.SaslUsername.ValueString(), resource.KafkaConfig.SaslUsername.ValueString())
-			assert.Equal(t, test.expected.KafkaConfig.SaslPassword.ValueString(), resource.KafkaConfig.SaslPassword.ValueString())
-		}
 		if test.expected.CloudWatchConfig != nil {
 			assert.Equal(t, test.expected.CloudWatchConfig.NameSpace.ValueString(), resource.CloudWatchConfig.NameSpace.ValueString())
+		}
+		if test.expected.PrometheusRemoteWriteConfig != nil {
+			assert.Equal(t, test.expected.PrometheusRemoteWriteConfig.AuthType.ValueString(), resource.PrometheusRemoteWriteConfig.AuthType.ValueString())
+			if test.expected.PrometheusRemoteWriteConfig.AuthType.ValueString() == "basic" {
+				assert.Equal(t, test.expected.PrometheusRemoteWriteConfig.Username.ValueString(), resource.PrometheusRemoteWriteConfig.Username.ValueString())
+				assert.Equal(t, test.expected.PrometheusRemoteWriteConfig.Password.ValueString(), resource.PrometheusRemoteWriteConfig.Password.ValueString())
+			} else if test.expected.PrometheusRemoteWriteConfig.AuthType.ValueString() == "bearer" {
+				assert.Equal(t, test.expected.PrometheusRemoteWriteConfig.BearerToken.ValueString(), resource.PrometheusRemoteWriteConfig.BearerToken.ValueString())
+			}
 		}
 	}
 }
 
 func TestExpandIntergationResource(t *testing.T) {
 	cloudwatch := cloudWatchType
-	kafka := kafkaType
+	promRemoteWrite := promRemoteWriteType
+	testEndpoint := "http://localhost:9090/api/v1/write"
 
 	tests := []struct {
 		integration IntegrationResourceModel
 		expected    client.IntegrationParam
 	}{
-		{
-			integration: IntegrationResourceModel{
-				Name:     types.StringValue("test-kafka"),
-				Type:     types.StringValue(kafka),
-				EndPoint: types.StringValue("http://localhost:9092"),
-				KafkaConfig: &KafkaIntegrationConfig{
-					SecurityProtocol: types.StringValue("SASL_PLAINTEXT"),
-					SaslMechanism:    types.StringValue("PLAIN"),
-					SaslUsername:     types.StringValue("user1"),
-					SaslPassword:     types.StringValue("pass1"),
-				},
-			},
-			expected: client.IntegrationParam{
-				Name:     "test-kafka",
-				Type:     &kafka,
-				EndPoint: "http://localhost:9092",
-				Config: []client.ConfigItemParam{
-					{Key: "security_protocol", Value: "SASL_PLAINTEXT"},
-					{Key: "sasl_mechanism", Value: "PLAIN"},
-					{Key: "sasl_username", Value: "user1"},
-					{Key: "sasl_password", Value: "pass1"},
-				},
-			},
-		},
 		{
 			integration: IntegrationResourceModel{
 				Name: types.StringValue("test-cloudwatch"),
@@ -138,6 +149,48 @@ func TestExpandIntergationResource(t *testing.T) {
 				Type: &cloudwatch,
 				Config: []client.ConfigItemParam{
 					{Key: "namespace", Value: "test-namespace"},
+				},
+			},
+		},
+		{
+			integration: IntegrationResourceModel{
+				Name:     types.StringValue("test-prometheus-remote-write"),
+				Type:     types.StringValue(promRemoteWrite),
+				EndPoint: types.StringValue(testEndpoint),
+				PrometheusRemoteWriteConfig: &PrometheusRemoteWriteIntegrationConfig{
+					AuthType: types.StringValue(testAuthType),
+					Username: types.StringValue(testUsername),
+					Password: types.StringValue(testPassword),
+				},
+			},
+			expected: client.IntegrationParam{
+				Name:     "test-prometheus-remote-write",
+				Type:     &promRemoteWrite,
+				EndPoint: testEndpoint,
+				Config: []client.ConfigItemParam{
+					{Key: "authType", Value: testAuthType},
+					{Key: "username", Value: testUsername},
+					{Key: "password", Value: testPassword},
+				},
+			},
+		},
+		{
+			integration: IntegrationResourceModel{
+				Name:     types.StringValue("test-prometheus-remote-write-bearer"),
+				Type:     types.StringValue(promRemoteWrite),
+				EndPoint: types.StringValue(testEndpoint),
+				PrometheusRemoteWriteConfig: &PrometheusRemoteWriteIntegrationConfig{
+					AuthType:    types.StringValue("bearer"),
+					BearerToken: types.StringValue(testBearerToken),
+				},
+			},
+			expected: client.IntegrationParam{
+				Name:     "test-prometheus-remote-write-bearer",
+				Type:     &promRemoteWrite,
+				EndPoint: testEndpoint,
+				Config: []client.ConfigItemParam{
+					{Key: "authType", Value: "bearer"},
+					{Key: "token", Value: testBearerToken},
 				},
 			},
 		},

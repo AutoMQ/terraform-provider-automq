@@ -3,43 +3,63 @@
 page_title: "automq_integration Resource - automq"
 subcategory: ""
 description: |-
-  AutoMQ uses automq_integration to describe external third-party data transmission. By creating integrations and associating them with AutoMQ instances, you can forward instance Metrics and other data to external systems. Currently supported integration types are Prometheus and CloudWatch.
+  Using the automq_integration resource type, you can describe external third-party data transmission. By creating integrations and associating them with AutoMQ instances, you can forward instance Metrics and other data to external systems. Currently supported integration types are Prometheus and CloudWatch.
+  Note: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
 ---
 
 # automq_integration (Resource)
 
-![General_Availability](https://img.shields.io/badge/Lifecycle_Stage-General_Availability(GA)-green?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>AutoMQ uses `automq_integration` to describe external third-party data transmission. By creating integrations and associating them with AutoMQ instances, you can forward instance Metrics and other data to external systems. Currently supported integration types are Prometheus and CloudWatch.
+![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)
+
+Using the `automq_integration` resource type, you can describe external third-party data transmission. By creating integrations and associating them with AutoMQ instances, you can forward instance Metrics and other data to external systems. Currently supported integration types are Prometheus and CloudWatch.
+
+> **Note**: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
 
 ## Example Usage
 
 ```terraform
-resource "automq_integration" "example-1" {
-  environment_id = "env-example"
+resource "automq_integration" "prometheus_remote_write_example_1" {
+  environment_id = var.automq_environment_id
   name           = "example-1"
-  type           = "cloudWatch"
-  cloudwatch_config = {
-    namespace = "example"
+  type           = "prometheusRemoteWrite"
+  endpoint       = "http://example.com"
+  deploy_profile = "default"
+
+  prometheus_remote_write_config = {
+    auth_type = "noauth"
   }
 }
 
-resource "automq_integration" "example-2" {
-  environment_id = "env-example"
+resource "automq_integration" "prometheus_remote_write_example_2" {
+  environment_id = var.automq_environment_id
   name           = "example-2"
-  type           = "kafka"
-  endpoint       = "http://xxxxx.xxx"
-  kafka_config = {
-    security_protocol = "SASL_PLAINTEXT"
-    sasl_mechanism    = "PLAIN"
-    sasl_username     = "example"
-    sasl_password     = "example"
+  type           = "prometheusRemoteWrite"
+  endpoint       = "http://example.com"
+  deploy_profile = "default"
+
+  prometheus_remote_write_config = {
+    auth_type = "basic"
+    username  = "example-username"
+    password  = "example-password"
   }
 }
 
-resource "automq_integration" "example-3" {
-  environment_id = "env-example"
+resource "automq_integration" "prometheus_remote_write_example_3" {
+  environment_id = var.automq_environment_id
   name           = "example-3"
-  type           = "prometheus"
-  endpoint       = "http://xxxxx.xxx"
+  type           = "prometheusRemoteWrite"
+  endpoint       = "http://example.com"
+  deploy_profile = "default"
+
+  prometheus_remote_write_config = {
+    auth_type    = "bearer"
+    bearer_token = "example-token"
+  }
+}
+
+
+variable "automq_environment_id" {
+  type = string
 }
 ```
 
@@ -48,15 +68,16 @@ resource "automq_integration" "example-3" {
 
 ### Required
 
+- `deploy_profile` (String) Deploy profile.
 - `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
 - `name` (String) The integrated name identifies different configurations and contains 3 to 64 characters, including letters a to z or a to z, digits 0 to 9, underscores (_), and hyphens (-).
-- `type` (String) Type of integration, currently support `kafka` and `cloudWatch`
+- `type` (String) Type of integration, currently supports `prometheus_remote_write`, and `cloudwatch`.
 
 ### Optional
 
 - `cloudwatch_config` (Attributes) CloudWatch integration configurations. When Type is `cloudwatch`, it must be set. (see [below for nested schema](#nestedatt--cloudwatch_config))
 - `endpoint` (String) Endpoint of integration. When selecting Prometheus and Kafka integration, you need to configure the corresponding endpoints. For detailed configuration instructions, please refer to the [documentation](https://docs.automq.com/automq-cloud/manage-environments/byoc-environment/manage-integrations).
-- `kafka_config` (Attributes) Kafka integration configurations. When Type is `kafka`, it must be set. (see [below for nested schema](#nestedatt--kafka_config))
+- `prometheus_remote_write_config` (Attributes) Prometheus remote write integration configurations. When Type is `prometheus_remote_write`, it must be set. (see [below for nested schema](#nestedatt--prometheus_remote_write_config))
 
 ### Read-Only
 
@@ -72,12 +93,12 @@ Optional:
 - `namespace` (String) Set cloudwatch namespace, AutoMQ will write all Metrics data under this namespace. The namespace name must contain 1 to 255 valid ASCII characters and may be alphanumeric, periods, hyphens, underscores, forward slashes, pound signs, colons, and spaces, but not all spaces.
 
 
-<a id="nestedatt--kafka_config"></a>
-### Nested Schema for `kafka_config`
+<a id="nestedatt--prometheus_remote_write_config"></a>
+### Nested Schema for `prometheus_remote_write_config`
 
-Required:
+Optional:
 
-- `sasl_mechanism` (String) SASL mechanism for external kafka cluster, currently support `PLAIN`, `SCRAM-SHA-256` and `SCRAM-SHA-512`
-- `sasl_password` (String) SASL password for Kafka, The username and password are declared and returned when creating the kafka_user resource in AutoMQ.
-- `sasl_username` (String) SASL username for Kafka, The username and password are declared and returned when creating the kafka_user resource in AutoMQ.
-- `security_protocol` (String) Security protocol for external kafka cluster, currently support `PLAINTEXT` and `SASL_PLAINTEXT`
+- `auth_type` (String) Authentication type, currently supports `noauth`, `basic`, `bearer`, and `sigv4`.
+- `bearer_token` (String) Bearer token for bearer authentication. When authType is `bearer`, it must be set.
+- `password` (String) Password for basic authentication. When authType is `basic`, it must be set.
+- `username` (String) Username for basic authentication. When authType is `basic`, it must be set.

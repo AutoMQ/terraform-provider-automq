@@ -4,43 +4,91 @@ page_title: "automq_kafka_instance Resource - automq"
 subcategory: ""
 description: |-
   Using the automq_kafka_instance resource type, you can create and manage Kafka instances, where each instance represents a physical cluster.
+  Note: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
 ---
 
 # automq_kafka_instance (Resource)
 
-![General_Availability](https://img.shields.io/badge/Lifecycle_Stage-General_Availability(GA)-green?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>Using the `automq_kafka_instance` resource type, you can create and manage Kafka instances, where each instance represents a physical cluster.
+![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)
+
+Using the `automq_kafka_instance` resource type, you can create and manage Kafka instances, where each instance represents a physical cluster.
+
+> **Note**: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
 
 ## Example Usage
 
 ```terraform
-resource "automq_kafka_instance" "example" {
+data "automq_deploy_profile" "default" {
   environment_id = "env-example"
-  name           = "automq-example-1"
+  name           = "default"
+}
+
+data "automq_data_bucket_profiles" "test" {
+  environment_id = "env-example"
+  profile_name   = data.automq_deploy_profile.test.name
+}
+
+resource "automq_kafka_instance" "test" {
+  environment_id = "env-example"
+  name           = "example-1"
   description    = "example"
-  cloud_provider = "aws"
-  region         = local.instance_deploy_region
-  networks = [
-    {
-      zone    = var.instance_deploy_zone
-      subnets = [var.instance_deploy_subnet]
-    }
-  ]
+  deploy_profile = data.automq_deploy_profile.default.name
+  version        = "1.4.0"
+
   compute_specs = {
-    aku = "6"
+    reserved_aku = 6
+    networks = [
+      {
+        zone    = "us-east-1a"
+        subnets = ["subnet-xxxxxx"]
+      }
+    ]
+    bucket_profiles = [
+      {
+        id = data.automq_data_bucket_profiles.test.data_buckets[0].id
+      }
+    ]
   }
-  acl = true
-  configs = {
-    "auto.create.topics.enable" = "false"
-    "log.retention.ms"          = "3600000"
+
+  features = {
+    wal_mode = "EBSWAL"
+    security = {
+      authentication_methods   = ["anonymous"]
+      transit_encryption_modes = ["plaintext"]
+    }
   }
 }
 
-variable "instance_deploy_zone" {
-  type = string
-}
+resource "automq_kafka_instance" "test" {
+  environment_id = "env-example"
+  name           = "example-1"
+  description    = "example"
+  deploy_profile = data.automq_deploy_profile.default.name
+  version        = "1.4.0"
 
-variable "instance_deploy_subnet" {
-  type = string
+  compute_specs = {
+    reserved_aku = 6
+    kubernetes_node_groups = [{
+      id = "k8s-node-group-1"
+    }]
+    bucket_profiles = [
+      {
+        id = data.automq_data_bucket_profiles.test.data_buckets[0].id
+      }
+    ]
+  }
+
+  features = {
+    wal_mode = "EBSWAL"
+    security = {
+      authentication_methods   = ["sasl"]
+      transit_encryption_modes = ["tls"]
+      data_encryption_mode     = "CPMK"
+      certificate_authority    = file("${path.module}/certificate.pem")
+      certificate_chain        = file("${path.module}/certificate.pem")
+      private_key              = file("${path.module}/private_key.pem")
+    }
+  }
 }
 ```
 
@@ -49,19 +97,16 @@ variable "instance_deploy_subnet" {
 
 ### Required
 
-- `cloud_provider` (String) To set up a Kafka instance, you need to specify the target cloud provider environment for deployment. Currently, `aws` is supported. This parameter must match the cloud provider and region where the current environment is deployed.
-- `compute_specs` (Attributes) The compute specs of the instance, contains aku and version. (see [below for nested schema](#nestedatt--compute_specs))
+- `compute_specs` (Attributes) The compute specs of the instance (see [below for nested schema](#nestedatt--compute_specs))
+- `deploy_profile` (String) Deploy profile defining cloud resource configuration including VPC, Kubernetes, storage and IAM roles.
 - `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
+- `features` (Attributes) (see [below for nested schema](#nestedatt--features))
 - `name` (String) The name of the Kafka instance. It can contain letters (a-z or A-Z), numbers (0-9), underscores (_), and hyphens (-), with a length limit of 3 to 64 characters.
-- `networks` (Attributes List) To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones. (see [below for nested schema](#nestedatt--networks))
-- `region` (String) To set up an instance, you need to specify the target region for deployment. This parameter must match the cloud provider and region where the current environment is deployed.
+- `version` (String) The software version of AutoMQ instance. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.
 
 ### Optional
 
-- `acl` (Boolean) Configure ACL enablement. Default is false (disabled).
-- `configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
 - `description` (String) The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.
-- `integrations` (List of String) Configure integration setting. Set existed integration id. AutoMQ supports integration with external products like `prometheus` and `cloudWatch`, forwarding instance Metrics data to Prometheus and CloudWatch. Currently, only one integration is supported. Configuring multiple integrations simultaneously is not supported.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 
 ### Read-Only
@@ -77,20 +122,84 @@ variable "instance_deploy_subnet" {
 
 Required:
 
-- `aku` (Number) AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.
+- `bucket_profiles` (Attributes List) Bucket profiles configuration (see [below for nested schema](#nestedatt--compute_specs--bucket_profiles))
+- `reserved_aku` (Number) AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.
 
 Optional:
 
-- `version` (String) The software version of AutoMQ instance. By default, there is no need to set version; the latest version will be used. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.
+- `kubernetes_node_groups` (Attributes List) Node groups (or node pools) are units for unified configuration management of physical nodes in Kubernetes. Different Kubernetes providers may use different terms for node groups. Select target node groups that must be created in advance and configured for either single-AZ or three-AZ deployment. The instance node type must meet the requirements specified in the documentation. If you select a single-AZ node group, the AutoMQ instance will be deployed in a single availability zone; if you select a three-AZ node group, the instance will be deployed across three availability zones. (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
+- `networks` (Attributes List) To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones. (see [below for nested schema](#nestedatt--compute_specs--networks))
+
+<a id="nestedatt--compute_specs--bucket_profiles"></a>
+### Nested Schema for `compute_specs.bucket_profiles`
+
+Required:
+
+- `id` (String) Bucket profile ID
 
 
-<a id="nestedatt--networks"></a>
-### Nested Schema for `networks`
+<a id="nestedatt--compute_specs--kubernetes_node_groups"></a>
+### Nested Schema for `compute_specs.kubernetes_node_groups`
+
+Required:
+
+- `id` (String) Node group identifier
+
+
+<a id="nestedatt--compute_specs--networks"></a>
+### Nested Schema for `compute_specs.networks`
 
 Required:
 
 - `subnets` (List of String) Specify the subnet under the corresponding availability zone for deploying the instance. Currently, only one subnet can be set for each availability zone.
 - `zone` (String) The availability zone ID of the cloud provider.
+
+
+
+<a id="nestedatt--features"></a>
+### Nested Schema for `features`
+
+Required:
+
+- `security` (Attributes) (see [below for nested schema](#nestedatt--features--security))
+- `wal_mode` (String) Write-Ahead Logging mode: EBSWAL (using EBS as write buffer) or S3WAL (using object storage as write buffer). Defaults to EBSWAL.
+
+Optional:
+
+- `instance_configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
+- `integrations` (Set of String) Integration identifiers
+
+<a id="nestedatt--features--security"></a>
+### Nested Schema for `features.security`
+
+Required:
+
+- `authentication_methods` (Set of String) Configure client authentication methods. Supported values:
+
+* `anonymous` - No authentication required. Only available in VPC networks
+* `sasl` - SASL protocol authentication. Supports PLAIN and SCRAM mechanisms
+* `mtls` - Mutual TLS authentication. Each client uses unique TLS certificates mapped to ACL identities. Automatically supported when TLS encryption is enabled
+
+Changes to authentication methods require instance replacement.
+- `transit_encryption_modes` (Set of String) Configure data transmission encryption. Supported values:
+
+	* `plaintext` - No encryption. Only supported in VPC networks. Compatible with PLAINTEXT and SASL authentication protocols
+	* `tls` - TLS encrypted transmission. Requires trusted CA certificates and server certificates
+
+Changes to encryption modes require instance replacement.
+
+Optional:
+
+- `certificate_authority` (String) The trusted CA certificate chain in PEM format used by AutoMQ to verify the validity of both server and client certificates. Required when `mtls` authentication method is enabled.
+- `certificate_chain` (String) The server certificate chain in PEM format issued by the CA. AutoMQ will deploy the instance with this certificate. Required when `mtls` authentication method is enabled.
+- `data_encryption_mode` (String) The encryption mode used to protect data stored in AutoMQ using cloud provider's storage encryption capabilities. Supported values:
+
+	* `NONE` - No encryption (default)
+	* `CPMK` - Cloud Provider Managed Key encryption using cloud provider's KMS service
+
+Changes to encryption mode require instance replacement.
+- `private_key` (String) The private key in PEM format corresponding to the server certificate. AutoMQ will deploy the instance with this key. Required when `mtls` authentication method is enabled.
+
 
 
 <a id="nestedblock--timeouts"></a>

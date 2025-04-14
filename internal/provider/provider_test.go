@@ -4,6 +4,7 @@
 package provider
 
 import (
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
@@ -19,7 +20,19 @@ var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServe
 }
 
 func testAccPreCheck(t *testing.T) {
-	// You can add code here to run prior to any test case execution, for example assertions
-	// about the appropriate environment variables being set are common to see in a pre-check
-	// function.
+	envVars := []string{
+		"AUTOMQ_BYOC_ENDPOINT",
+		"AUTOMQ_BYOC_ACCESS_KEY_ID",
+		"AUTOMQ_BYOC_SECRET_KEY",
+		"AUTOMQ_TEST_ENV_ID",
+		"AUTOMQ_TEST_SUBNET_ID",
+		"AUTOMQ_TEST_ZONE",
+		"AUTOMQ_TEST_DEPLOY_PROFILE",
+	}
+
+	for _, v := range envVars {
+		if os.Getenv(v) == "" {
+			t.Fatalf("%s must be set for acceptance tests", v)
+		}
+	}
 }
