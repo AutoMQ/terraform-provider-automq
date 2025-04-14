@@ -514,16 +514,18 @@ func FlattenKafkaInstanceModelWithIntegrations(integrations []client.Integration
 		)}
 	}
 
+	if resource.Features == nil {
+		resource.Features = &FeaturesModel{}
+	}
 	// Handle integrations if present
 	if len(integrations) > 0 {
 		integrationIds := make([]attr.Value, 0, len(integrations))
 		for _, integration := range integrations {
 			integrationIds = append(integrationIds, types.StringValue(integration.Code))
 		}
-		if resource.Features == nil {
-			resource.Features = &FeaturesModel{}
-		}
 		resource.Features.Integrations = types.SetValueMust(types.StringType, integrationIds)
+	} else if len(integrations) == 0 {
+		resource.Features.Integrations = types.SetNull(types.StringType)
 	}
 	return diags
 }

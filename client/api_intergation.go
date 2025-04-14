@@ -57,7 +57,7 @@ func (c *Client) UpdateIntergration(ctx context.Context, integrationId string, p
 }
 
 func (c *Client) AddInstanceIntergation(ctx context.Context, instanceId string, param *IntegrationInstanceAddParam) error {
-	_, err := c.Patch(ctx, InstanceIntegrationPath, param)
+	_, err := c.Patch(ctx, fmt.Sprintf(InstanceIntegrationPath, instanceId), param)
 	if err != nil {
 		return err
 	}
