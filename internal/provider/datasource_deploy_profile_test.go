@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -8,6 +9,10 @@ import (
 
 func TestAccDeployProfileDataSource(t *testing.T) {
 	envVars := getRequiredEnvVars(t)
+
+	if os.Getenv("AUTOMQ_BYOC_ENDPOINT") == "" {
+		t.Skip("Skipping test as AUTOMQ_TEST_DEPLOY_PROFILE is not set")
+	}
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,

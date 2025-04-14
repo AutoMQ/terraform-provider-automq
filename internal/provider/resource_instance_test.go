@@ -8,6 +8,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -240,6 +241,10 @@ EOT
 
 // TestAccKafkaInstanceResource tests basic CRUD operations for Kafka instance
 func TestAccKafkaInstanceResource(t *testing.T) {
+	if os.Getenv("AUTOMQ_BYOC_ENDPOINT") == "" {
+		t.Skip("Skipping test as AUTOMQ_TEST_DEPLOY_PROFILE is not set")
+	}
+
 	envVars := getRequiredEnvVars(t)
 	suffix := generateRandomSuffix()
 
@@ -408,6 +413,10 @@ type SecurityTestCase struct {
 }
 
 func TestAccKafkaInstanceSecurityCombinations(t *testing.T) {
+	if os.Getenv("AUTOMQ_BYOC_ENDPOINT") == "" {
+		t.Skip("Skipping test as AUTOMQ_TEST_DEPLOY_PROFILE is not set")
+	}
+
 	envVars := getRequiredEnvVars(t)
 	suffix := generateRandomSuffix()
 	caCert, serverCert, serverKey, err := generateTestCertificate()
