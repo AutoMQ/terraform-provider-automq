@@ -64,7 +64,7 @@ variable "instance_deploy_subnet" {
 ### Required
 
 - `compute_specs` (Attributes) The compute specs of the instance (see [below for nested schema](#nestedatt--compute_specs))
-- `deploy_profile` (String)
+- `deploy_profile` (String) Deploy profile defining cloud resource configuration including VPC, Kubernetes, storage and IAM roles.
 - `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
 - `features` (Attributes) (see [below for nested schema](#nestedatt--features))
 - `name` (String) The name of the Kafka instance. It can contain letters (a-z or A-Z), numbers (0-9), underscores (_), and hyphens (-), with a length limit of 3 to 64 characters.
@@ -93,7 +93,7 @@ Required:
 
 Optional:
 
-- `kubernetes_node_groups` (Attributes List) Kubernetes node groups configuration (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
+- `kubernetes_node_groups` (Attributes List) Node groups (or node pools) are units for unified configuration management of physical nodes in Kubernetes. Different Kubernetes providers may use different terms for node groups. Select target node groups that must be created in advance and configured for either single-AZ or three-AZ deployment. The instance node type must meet the requirements specified in the documentation. If you select a single-AZ node group, the AutoMQ instance will be deployed in a single availability zone; if you select a three-AZ node group, the instance will be deployed across three availability zones. (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
 - `networks` (Attributes List) To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones. (see [below for nested schema](#nestedatt--compute_specs--networks))
 
 <a id="nestedatt--compute_specs--bucket_profiles"></a>
@@ -109,7 +109,7 @@ Required:
 
 Required:
 
-- `id` (String) Node group ID
+- `id` (String) Node group identifier
 
 
 <a id="nestedatt--compute_specs--networks"></a>
@@ -133,30 +133,38 @@ Required:
 Optional:
 
 - `instance_configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
-- `integrations` (Attributes List) Integration configurations (see [below for nested schema](#nestedatt--features--integrations))
+- `integrations` (Set of String) Integration identifiers
 
 <a id="nestedatt--features--security"></a>
 ### Nested Schema for `features.security`
 
 Required:
 
-- `authentication_methods` (Set of String) Authentication methods: anonymous (anonymous access), sasl (SASL user auth), mtls (TLS cert auth). Defaults to anonymous.
-- `transit_encryption_modes` (Set of String) Transit encryption modes: plaintext (unencrypted) or tls (TLS encrypted). Defaults to plaintext.
+- `authentication_methods` (Set of String) Configure client authentication methods. Supported values:
+
+* `anonymous` - No authentication required. Only available in VPC networks
+* `sasl` - SASL protocol authentication. Supports PLAIN and SCRAM mechanisms
+* `mtls` - Mutual TLS authentication. Each client uses unique TLS certificates mapped to ACL identities. Automatically supported when TLS encryption is enabled
+
+Changes to authentication methods require instance replacement.
+- `transit_encryption_modes` (Set of String) Configure data transmission encryption. Supported values:
+
+* `plaintext` - No encryption. Only supported in VPC networks. Compatible with PLAINTEXT and SASL authentication protocols
+* `tls` - TLS encrypted transmission. Requires trusted CA certificates and server certificates
+
+Changes to encryption modes require instance replacement.
 
 Optional:
 
-- `certificate_authority` (String) CA certificate for mTLS authentication
-- `certificate_chain` (String) Certificate chain for mTLS authentication
-- `data_encryption_mode` (String) Data encryption mode: NONE (no encryption), CPMK (cloud-managed KMS)
-- `private_key` (String) Private key for mTLS authentication
+- `certificate_authority` (String) The trusted CA certificate chain in PEM format used by AutoMQ to verify the validity of both server and client certificates. Required when `mtls` authentication method is enabled.
+- `certificate_chain` (String) The server certificate chain in PEM format issued by the CA. AutoMQ will deploy the instance with this certificate. Required when `mtls` authentication method is enabled.
+- `data_encryption_mode` (String) The encryption mode used to protect data stored in AutoMQ using cloud provider's storage encryption capabilities. Supported values:
 
+* `NONE` - No encryption (default)
+* `CPMK` - Cloud Provider Managed Key encryption using cloud provider's KMS service
 
-<a id="nestedatt--features--integrations"></a>
-### Nested Schema for `features.integrations`
-
-Required:
-
-- `id` (String) Integration ID
+Changes to encryption mode require instance replacement.
+- `private_key` (String) The private key in PEM format corresponding to the server certificate. AutoMQ will deploy the instance with this key. Required when `mtls` authentication method is enabled.
 
 
 

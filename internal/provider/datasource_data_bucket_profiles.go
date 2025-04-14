@@ -29,7 +29,7 @@ func (d *DataBucketProfilesDataSource) Metadata(ctx context.Context, req datasou
 
 func (d *DataBucketProfilesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Using the `automq_data_bucket_profiles` data source, you can retrieve dataBucket profile information.",
+		MarkdownDescription: "![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>Data source for AutoMQ data bucket profiles. This allows you to query information about data buckets that are associated with a specific deployment profile. Data buckets are used to store Kafka message data in object storage.",
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
@@ -37,7 +37,7 @@ func (d *DataBucketProfilesDataSource) Schema(_ context.Context, _ datasource.Sc
 				Required:            true,
 			},
 			"profile_name": schema.StringAttribute{
-				MarkdownDescription: "The name of the deployment profile.",
+				MarkdownDescription: "The name of the deployment profile that manages the data buckets. Each profile can contain multiple authorized data buckets for use with Kafka instances.",
 				Required:            true,
 			},
 			"data_buckets": schema.ListNestedAttribute{
@@ -45,16 +45,16 @@ func (d *DataBucketProfilesDataSource) Schema(_ context.Context, _ datasource.Sc
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							MarkdownDescription: "The ID of the data bucket.",
+							MarkdownDescription: "The unique identifier of the data bucket. This ID is used to reference the specific object storage bucket that stores Kafka message data. Each bucket must be authorized before it can be used with AutoMQ instances.",
 							Computed:            true,
 						},
 						"bucket_name": schema.StringAttribute{
-							MarkdownDescription: "The name of the data bucket.",
+							MarkdownDescription: "The name of the object storage bucket. This is the actual bucket name in your cloud storage service that will be used to store Kafka message data.",
 							Computed:            true,
 						},
 						"gmt_create": schema.StringAttribute{
 							CustomType:          timetypes.RFC3339Type{},
-							MarkdownDescription: "Creation time of the profile.",
+							MarkdownDescription: "The timestamp when this data bucket was added to the deployment profile, in RFC3339 format.",
 							Computed:            true,
 						},
 					},

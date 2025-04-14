@@ -83,7 +83,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				Optional:            true,
 			},
 			"deploy_profile": schema.StringAttribute{
-				MarkdownDescription: "",
+				MarkdownDescription: "Deploy profile defining cloud resource configuration including VPC, Kubernetes, storage and IAM roles.",
 				Required:            true,
 			},
 			"version": schema.StringAttribute{
@@ -131,12 +131,12 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					},
 					"kubernetes_node_groups": schema.ListNestedAttribute{
 						Optional:    true,
-						Description: "Kubernetes node groups configuration",
+						Description: "Node groups (or node pools) are units for unified configuration management of physical nodes in Kubernetes. Different Kubernetes providers may use different terms for node groups. Select target node groups that must be created in advance and configured for either single-AZ or three-AZ deployment. The instance node type must meet the requirements specified in the documentation. If you select a single-AZ node group, the AutoMQ instance will be deployed in a single availability zone; if you select a three-AZ node group, the instance will be deployed across three availability zones.",
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id": schema.StringAttribute{
 									Required:    true,
-									Description: "Node group ID",
+									Description: "Node group identifier",
 								},
 							},
 						},
@@ -181,7 +181,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					"integrations": schema.SetAttribute{
 						Optional:    true,
 						ElementType: types.StringType,
-						Description: "Integration Identifier.",
+						Description: "Integration identifiers",
 					},
 					"security": schema.SingleNestedAttribute{
 						Required: true,
@@ -189,7 +189,11 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							"authentication_methods": schema.SetAttribute{
 								Required:    true,
 								ElementType: types.StringType,
-								Description: "Authentication methods: anonymous (anonymous access), sasl (SASL user auth), mtls (TLS cert auth). Defaults to anonymous.",
+								MarkdownDescription: "Configure client authentication methods. Supported values:\n\n" +
+									"* `anonymous` - No authentication required. Only available in VPC networks\n" +
+									"* `sasl` - SASL protocol authentication. Supports PLAIN and SCRAM mechanisms\n" +
+									"* `mtls` - Mutual TLS authentication. Each client uses unique TLS certificates mapped to ACL identities. Automatically supported when TLS encryption is enabled\n\n" +
+									"Changes to authentication methods require instance replacement.",
 								Validators: []validator.Set{
 									setvalidator.ValueStringsAre(
 										stringvalidator.OneOf("anonymous", "sasl", "mtls"),
@@ -200,7 +204,10 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							"transit_encryption_modes": schema.SetAttribute{
 								Required:    true,
 								ElementType: types.StringType,
-								Description: "Transit encryption modes: plaintext (unencrypted) or tls (TLS encrypted). Defaults to plaintext.",
+								MarkdownDescription: "Configure data transmission encryption. Supported values:\n\n" +
+									"* `plaintext` - No encryption. Only supported in VPC networks. Compatible with PLAINTEXT and SASL authentication protocols\n" +
+									"* `tls` - TLS encrypted transmission. Requires trusted CA certificates and server certificates\n\n" +
+									"Changes to encryption modes require instance replacement.",
 								Validators: []validator.Set{
 									setvalidator.ValueStringsAre(
 										stringvalidator.OneOf("plaintext", "tls"),
@@ -209,26 +216,29 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 								PlanModifiers: []planmodifier.Set{setplanmodifier.RequiresReplace()},
 							},
 							"data_encryption_mode": schema.StringAttribute{
-								Optional:    true,
-								Computed:    true,
-								Description: "Data encryption mode: NONE (no encryption), CPMK (cloud-managed KMS)",
-								Default:     stringdefault.StaticString("NONE"),
+								Optional: true,
+								Computed: true,
+								MarkdownDescription: "The encryption mode used to protect data stored in AutoMQ using cloud provider's storage encryption capabilities. Supported values:\n\n" +
+									"* `NONE` - No encryption (default)\n" +
+									"* `CPMK` - Cloud Provider Managed Key encryption using cloud provider's KMS service\n\n" +
+									"Changes to encryption mode require instance replacement.",
+								Default: stringdefault.StaticString("NONE"),
 								Validators: []validator.String{
 									stringvalidator.OneOf("NONE", "CPMK"),
 								},
 								PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 							},
 							"certificate_authority": schema.StringAttribute{
-								Optional:    true,
-								Description: "CA certificate for mTLS authentication",
+								Optional:            true,
+								MarkdownDescription: "The trusted CA certificate chain in PEM format used by AutoMQ to verify the validity of both server and client certificates. Required when `mtls` authentication method is enabled.",
 							},
 							"certificate_chain": schema.StringAttribute{
-								Optional:    true,
-								Description: "Certificate chain for mTLS authentication",
+								Optional:            true,
+								MarkdownDescription: "The server certificate chain in PEM format issued by the CA. AutoMQ will deploy the instance with this certificate. Required when `mtls` authentication method is enabled.",
 							},
 							"private_key": schema.StringAttribute{
-								Optional:    true,
-								Description: "Private key for mTLS authentication",
+								Optional:            true,
+								MarkdownDescription: "The private key in PEM format corresponding to the server certificate. AutoMQ will deploy the instance with this key. Required when `mtls` authentication method is enabled.",
 							},
 						},
 					},

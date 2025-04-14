@@ -3,12 +3,12 @@
 page_title: "automq_data_bucket_profiles Data Source - automq"
 subcategory: ""
 description: |-
-  Using the automq_data_bucket_profiles data source, you can retrieve dataBucket profile information.
+  Data source for AutoMQ data bucket profiles. This allows you to query information about data buckets that are associated with a specific deployment profile. Data buckets are used to store Kafka message data in object storage.
 ---
 
 # automq_data_bucket_profiles (Data Source)
 
-Using the `automq_data_bucket_profiles` data source, you can retrieve dataBucket profile information.
+![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)<br><br>Data source for AutoMQ data bucket profiles. This allows you to query information about data buckets that are associated with a specific deployment profile. Data buckets are used to store Kafka message data in object storage.
 
 
 
@@ -18,7 +18,7 @@ Using the `automq_data_bucket_profiles` data source, you can retrieve dataBucket
 ### Required
 
 - `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
-- `profile_name` (String) The name of the deployment profile.
+- `profile_name` (String) The name of the deployment profile that manages the data buckets. Each profile can contain multiple authorized data buckets for use with Kafka instances.
 
 ### Read-Only
 
@@ -29,6 +29,6 @@ Using the `automq_data_bucket_profiles` data source, you can retrieve dataBucket
 
 Read-Only:
 
-- `bucket_name` (String) The name of the data bucket.
-- `gmt_create` (String) Creation time of the profile.
-- `id` (String) The ID of the data bucket.
+- `bucket_name` (String) The name of the object storage bucket. This is the actual bucket name in your cloud storage service that will be used to store Kafka message data.
+- `gmt_create` (String) The timestamp when this data bucket was added to the deployment profile, in RFC3339 format.
+- `id` (String) The unique identifier of the data bucket. This ID is used to reference the specific object storage bucket that stores Kafka message data. Each bucket must be authorized before it can be used with AutoMQ instances.
