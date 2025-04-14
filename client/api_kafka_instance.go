@@ -145,7 +145,7 @@ func (c *Client) UpdateKafkaInstanceComputeSpecs(ctx context.Context, instanceId
 	return c.updateInstance(ctx, instanceId, updateParam, UpdateInstancePath)
 }
 
-func (c *Client) UpdateKafkaInstanCertificate(ctx context.Context, instanceId string, updateParam InstanceCertificateParam) error {
+func (c *Client) UpdateKafkaInstanceCertificate(ctx context.Context, instanceId string, updateParam InstanceCertificateParam) error {
 	_, err := c.Put(ctx, fmt.Sprintf(UpdateInstanceCertificatePath, instanceId), updateParam)
 	if err != nil {
 		return err

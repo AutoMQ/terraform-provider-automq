@@ -163,7 +163,7 @@ func (r *IntegrationResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	out, err := r.client.CreateIntergration(ctx, in)
+	out, err := r.client.CreateIntegration(ctx, in)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create integration", err.Error())
 		return

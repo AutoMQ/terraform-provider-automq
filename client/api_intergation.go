@@ -14,7 +14,7 @@ const (
 	RemoveInstanceIntergationPath = "/api/v1/instances/%s/integrations/%s"
 )
 
-func (c *Client) CreateIntergration(ctx context.Context, param IntegrationParam) (*IntegrationVO, error) {
+func (c *Client) CreateIntegration(ctx context.Context, param IntegrationParam) (*IntegrationVO, error) {
 	body, err := c.Post(ctx, IntegrationPath, param)
 	if err != nil {
 		return nil, err

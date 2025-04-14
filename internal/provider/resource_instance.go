@@ -607,7 +607,7 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		}
 
 		// Call API to update certificate
-		err := r.client.UpdateKafkaInstanCertificate(ctx, instanceId, param)
+		err := r.client.UpdateKafkaInstanceCertificate(ctx, instanceId, param)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error",
 				fmt.Sprintf("Unable to update Kafka instance %q certificate, got error: %s", instanceId, err))
