@@ -736,8 +736,10 @@ func (r *KafkaInstanceResource) ImportState(ctx context.Context, req resource.Im
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), instanceId)...)
 
 	config := types.MapValueMust(types.StringType, map[string]attr.Value{})
+	integration := types.SetValueMust(types.StringType, []attr.Value{})
 	features := models.FeaturesModel{
 		InstanceConfigs: config,
+		Integrations:    integration,
 	}
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("features"), features)...)
 }

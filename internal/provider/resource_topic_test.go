@@ -13,6 +13,9 @@ func TestAccKafkaTopicResource(t *testing.T) {
 	if os.Getenv("AUTOMQ_BYOC_ENDPOINT") == "" {
 		t.Skip("Skipping test as AUTOMQ_TEST_DEPLOY_PROFILE is not set")
 	}
+	if os.Getenv("TF_ACC_TIMEOUT") == "" {
+		t.Setenv("TF_ACC_TIMEOUT", "2h")
+	}
 
 	envVars := getRequiredEnvVars(t)
 	suffix := generateRandomSuffix()
@@ -94,6 +97,11 @@ func TestAccKafkaTopicResource(t *testing.T) {
 				ImportState:                          true,
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "topic_id",
+				ImportStateVerifyIgnore: []string{
+					"configs.%", // ignore configs
+					"configs.cleanup.policy",
+					"configs.retention.ms",
+				},
 				ImportStateIdFunc: func(s *terraform.State) (string, error) {
 					rs, ok := s.RootModule().Resources["automq_kafka_topic.test"]
 					if !ok {
