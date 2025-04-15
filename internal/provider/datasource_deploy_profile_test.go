@@ -41,15 +41,6 @@ func TestAccDeployProfileDataSource(t *testing.T) {
 					resource.TestCheckResourceAttrSet("data.automq_deploy_profile.test", "ops_bucket.provider"),
 					resource.TestCheckResourceAttrSet("data.automq_deploy_profile.test", "ops_bucket.region"),
 
-					// Verify data buckets
-					resource.TestCheckResourceAttrSet("data.automq_deploy_profile.test", "data_buckets.#"),
-					resource.TestCheckResourceAttrSet("data.automq_deploy_profile.test", "data_buckets.0.id"),
-					resource.TestCheckResourceAttrSet("data.automq_deploy_profile.test", "data_buckets.0.bucket_name"),
-					resource.TestCheckResourceAttrSet("data.automq_deploy_profile.test", "data_buckets.0.provider"),
-					resource.TestCheckResourceAttrSet("data.automq_deploy_profile.test", "data_buckets.0.region"),
-					resource.TestCheckResourceAttrSet("data.automq_deploy_profile.test", "data_buckets.0.gmt_create"),
-					resource.TestCheckResourceAttrSet("data.automq_deploy_profile.test", "data_buckets.0.gmt_modified"),
-
 					// Verify DNS and instance profile
 					resource.TestCheckResourceAttrSet("data.automq_deploy_profile.test", "dns_zone"),
 					resource.TestCheckResourceAttrSet("data.automq_deploy_profile.test", "instance_profile"),

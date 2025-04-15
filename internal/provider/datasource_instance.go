@@ -124,17 +124,10 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 						MarkdownDescription: "Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).",
 						Computed:            true,
 					},
-					"integrations": schema.ListNestedAttribute{
-						Computed:    true,
-						Description: "Integration configurations",
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"id": schema.StringAttribute{
-									Computed:    true,
-									Description: "Integration ID",
-								},
-							},
-						},
+					"integrations": schema.SetAttribute{
+						Optional:    true,
+						ElementType: types.StringType,
+						Description: "Integration identifiers",
 					},
 					"security": schema.SingleNestedAttribute{
 						Computed: true,

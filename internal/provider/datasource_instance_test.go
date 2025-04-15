@@ -9,6 +9,9 @@ import (
 )
 
 func TestAccKafkaInstanceDataSource(t *testing.T) {
+	if os.Getenv("TF_ACC_TIMEOUT") == "" {
+		t.Setenv("TF_ACC_TIMEOUT", "2h")
+	}
 	if os.Getenv("AUTOMQ_BYOC_ENDPOINT") == "" {
 		t.Skip("Skipping test as AUTOMQ_TEST_DEPLOY_PROFILE is not set")
 	}

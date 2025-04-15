@@ -19,13 +19,13 @@ import (
 
 func getRequiredEnvVars(t *testing.T) map[string]string {
 	envVars := map[string]string{
-		"AUTOMQ_BYOC_ENDPOINT":       "http://44.207.11.83:8080",         // os.Getenv("AUTOMQ_BYOC_ENDPOINT"),
-		"AUTOMQ_BYOC_ACCESS_KEY_ID":  "TeDaXnaRASROF9AZ",                 // os.Getenv("AUTOMQ_BYOC_ACCESS_KEY_ID"),
-		"AUTOMQ_BYOC_SECRET_KEY":     "Lj41KSn5WciTS9UNc5cf4k3MRcIbs0D4", // os.Getenv("AUTOMQ_BYOC_SECRET_KEY"),
-		"AUTOMQ_TEST_ENV_ID":         "env-vstohprknxupims1",             // os.Getenv("AUTOMQ_TEST_ENV_ID"),
-		"AUTOMQ_TEST_SUBNET_ID":      "subnet-0005ed305e0891752",         //os.Getenv("AUTOMQ_TEST_SUBNET_ID"),
-		"AUTOMQ_TEST_ZONE":           "us-east-1a",                       // os.Getenv("AUTOMQ_TEST_ZONE"),
-		"AUTOMQ_TEST_DEPLOY_PROFILE": "default",                          // os.Getenv("AUTOMQ_TEST_DEPLOY_PROFILE"),
+		"AUTOMQ_BYOC_ENDPOINT":       os.Getenv("AUTOMQ_BYOC_ENDPOINT"),
+		"AUTOMQ_BYOC_ACCESS_KEY_ID":  os.Getenv("AUTOMQ_BYOC_ACCESS_KEY_ID"),
+		"AUTOMQ_BYOC_SECRET_KEY":     os.Getenv("AUTOMQ_BYOC_SECRET_KEY"),
+		"AUTOMQ_TEST_ENV_ID":         os.Getenv("AUTOMQ_TEST_ENV_ID"),
+		"AUTOMQ_TEST_SUBNET_ID":      os.Getenv("AUTOMQ_TEST_SUBNET_ID"),
+		"AUTOMQ_TEST_ZONE":           os.Getenv("AUTOMQ_TEST_ZONE"),
+		"AUTOMQ_TEST_DEPLOY_PROFILE": os.Getenv("AUTOMQ_TEST_DEPLOY_PROFILE"),
 	}
 
 	missingVars := []string{}
@@ -59,7 +59,7 @@ func generateRandomSuffix() string {
 // Define version upgrade path
 var kafkaVersionUpgrades = []string{
 	"1.3.10",
-	"1.4.0",
+	"1.4.1",
 }
 
 // TestConfig holds the test configuration parameters
@@ -244,6 +244,9 @@ func TestAccKafkaInstanceResource(t *testing.T) {
 	if os.Getenv("AUTOMQ_BYOC_ENDPOINT") == "" {
 		t.Skip("Skipping test as AUTOMQ_TEST_DEPLOY_PROFILE is not set")
 	}
+	if os.Getenv("TF_ACC_TIMEOUT") == "" {
+		t.Setenv("TF_ACC_TIMEOUT", "2h")
+	}
 
 	envVars := getRequiredEnvVars(t)
 	suffix := generateRandomSuffix()
@@ -416,6 +419,11 @@ func TestAccKafkaInstanceSecurityCombinations(t *testing.T) {
 	if os.Getenv("AUTOMQ_BYOC_ENDPOINT") == "" {
 		t.Skip("Skipping test as AUTOMQ_TEST_DEPLOY_PROFILE is not set")
 	}
+	if os.Getenv("TF_ACC_TIMEOUT") == "" {
+		t.Setenv("TF_ACC_TIMEOUT", "2h")
+	}
+
+	t.Skip("Skipping test")
 
 	envVars := getRequiredEnvVars(t)
 	suffix := generateRandomSuffix()

@@ -107,20 +107,15 @@ Read-Only:
 <a id="nestedatt--features"></a>
 ### Nested Schema for `features`
 
+Optional:
+
+- `integrations` (Set of String) Integration identifiers
+
 Read-Only:
 
 - `instance_configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
-- `integrations` (Attributes List) Integration configurations (see [below for nested schema](#nestedatt--features--integrations))
 - `security` (Attributes) (see [below for nested schema](#nestedatt--features--security))
 - `wal_mode` (String) Write-Ahead Logging mode: EBSWAL (using EBS as write buffer) or S3WAL (using object storage as write buffer). Defaults to EBSWAL.
-
-<a id="nestedatt--features--integrations"></a>
-### Nested Schema for `features.integrations`
-
-Read-Only:
-
-- `id` (String) Integration ID
-
 
 <a id="nestedatt--features--security"></a>
 ### Nested Schema for `features.security`
