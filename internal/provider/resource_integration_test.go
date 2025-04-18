@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestAccIntegrationResource(t *testing.T) {
@@ -17,15 +18,15 @@ func TestAccIntegrationResource(t *testing.T) {
 	if deployProfile == "" {
 		t.Skip("AUTOMQ_TEST_DEPLOY_PROFILE must be set for this test")
 	}
-	endpoint := os.Getenv("AUTOMQ_TEST_BYOC_ENDPOINT")
+	endpoint := os.Getenv("AUTOMQ_BYOC_ENDPOINT")
 	if endpoint == "" {
-		t.Skip("AUTOMQ_TEST_BYOC_ENDPOINT must be set for this test")
+		t.Skip("AUTOMQ_BYOC_ENDPOINT must be set for this test")
 	}
-	accessKeyId := os.Getenv("AUTOMQ_TEST_BYOC_ACCESS_KEY_ID")
+	accessKeyId := os.Getenv("AUTOMQ_BYOC_ACCESS_KEY_ID")
 	if accessKeyId == "" {
 		t.Skip("AUTOMQ_TEST_BYOC_ACCESS_KEY_ID must be set for this test")
 	}
-	secretKey := os.Getenv("AUTOMQ_TEST_BYOC_SECRET_KEY")
+	secretKey := os.Getenv("AUTOMQ_BYOC_SECRET_KEY")
 	if secretKey == "" {
 		t.Skip("AUTOMQ_TEST_BYOC_SECRET_KEY must be set for this test")
 	}
@@ -56,6 +57,18 @@ func TestAccIntegrationResource(t *testing.T) {
 				ResourceName:      "automq_integration.test_prometheus",
 				ImportState:       true,
 				ImportStateVerify: true,
+				ImportStateIdFunc: func(s *terraform.State) (string, error) {
+					rs, ok := s.RootModule().Resources["automq_integration.test_prometheus"]
+					if !ok {
+						return "", fmt.Errorf("Not found: %s", "automq_integration.test_prometheus")
+					}
+					id := fmt.Sprintf("%s@%s", rs.Primary.Attributes["environment_id"], rs.Primary.Attributes["id"])
+					return id, nil
+				},
+				ImportStateVerifyIgnore: []string{
+					"created_at",
+					"last_updated",
+				},
 			},
 			// Update testing
 			{
@@ -147,7 +160,7 @@ resource "automq_integration" "test_cloudwatch" {
   deploy_profile   = %[2]q
   name            = "test-cloudwatch"
   type            = "cloudWatch"
-  cloudwatch_config {
+  cloudwatch_config =  {
     namespace     = "AutoMQ/Test"
   }
 }

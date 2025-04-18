@@ -185,6 +185,11 @@ func ExpandIntergationResource(in *client.IntegrationParam, integration Integrat
 
 func FlattenIntergrationResource(integration *client.IntegrationVO, resource *IntegrationResourceModel) {
 	resource.ID = types.StringValue(integration.Code)
+	if integration.EndPoint != nil && *integration.EndPoint != "" {
+		resource.EndPoint = types.StringValue(*integration.EndPoint)
+	} else {
+		resource.EndPoint = types.StringNull()
+	}
 	resource.Name = types.StringValue(integration.Name)
 	resource.Type = types.StringValue(integration.Type)
 	resource.DeployProfile = types.StringValue(integration.Profile)
