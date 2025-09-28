@@ -23,10 +23,16 @@ type SpecificationParam struct {
 	SecurityGroup        *string                    `json:"securityGroup,omitempty"`
 	BucketProfiles       []BucketProfileBindParam   `json:"bucketProfiles,omitempty"`
 	Template             *string                    `json:"template,omitempty"`
+	FileSystem           *FileSystemParam           `json:"fileSystemForFsWal,omitempty"`
 }
 
 type BucketProfileBindParam struct {
 	Id *string `json:"id,omitempty"`
+}
+
+type FileSystemParam struct {
+	ThroughputMiBpsPerFileSystem int32 `json:"throughputMiBpsPerFileSystem"`
+	FileSystemCount              int32 `json:"fileSystemCount"`
 }
 
 type NodeConfigParam struct {
@@ -133,6 +139,7 @@ type SpecificationVO struct {
 	KubernetesNodeGroups []KubernetesNodeGroupVO  `json:"kubernetesNodeGroups,omitempty"`
 	BucketProfiles       []BucketProfileSummaryVO `json:"bucketProfiles,omitempty"`
 	SecurityGroupId      *string                  `json:"securityGroupId,omitempty"`
+	FileSystem           *FileSystemVO            `json:"fileSystem,omitempty"`
 }
 
 type NodeConfigVO struct {
@@ -153,6 +160,11 @@ type KubernetesNodeGroupVO struct {
 type BucketProfileSummaryVO struct {
 	Id         *string `json:"id,omitempty"`
 	BucketName *string `json:"bucketName,omitempty"`
+}
+
+type FileSystemVO struct {
+	ThroughputMiBpsPerFileSystem *int32 `json:"throughputMiBpsPerFileSystem,omitempty"`
+	FileSystemCount              *int32 `json:"fileSystemCount,omitempty"`
 }
 
 type InstanceFeatureVO struct {
@@ -197,6 +209,7 @@ type SpecificationUpdateParam struct {
 	Template             *string                    `json:"template,omitempty"`
 	Networks             []InstanceNetworkParam     `json:"networks,omitempty"`
 	KubernetesNodeGroups []KubernetesNodeGroupParam `json:"kubernetesNodeGroups,omitempty"`
+	FileSystem           *FileSystemParam           `json:"fileSystem,omitempty"`
 }
 
 type KafkaInstanceRequestPaymentPlan struct {

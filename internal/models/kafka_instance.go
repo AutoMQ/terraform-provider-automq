@@ -72,10 +72,16 @@ type ComputeSpecsModel struct {
 	Networks             []NetworkModel         `tfsdk:"networks"`
 	KubernetesNodeGroups []NodeGroupModel       `tfsdk:"kubernetes_node_groups"`
 	BucketProfiles       []BucketProfileIDModel `tfsdk:"bucket_profiles"`
+	FileSystemParam      *FileSystemParamModel  `tfsdk:"file_system_param"`
 }
 
 type NodeGroupModel struct {
 	ID types.String `tfsdk:"id"`
+}
+
+type FileSystemParamModel struct {
+	ThroughputMiBpsPerFileSystem types.Int64 `tfsdk:"throughput_mibps_per_file_system"`
+	FileSystemCount              types.Int64 `tfsdk:"file_system_count"`
 }
 
 type FeaturesModel struct {
@@ -182,6 +188,20 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 			}
 			request.Spec.BucketProfiles = bucketProfiles
 		}
+
+		if instance.ComputeSpecs.FileSystemParam != nil {
+			fsParam := instance.ComputeSpecs.FileSystemParam
+			if fsParam.ThroughputMiBpsPerFileSystem.IsNull() || fsParam.ThroughputMiBpsPerFileSystem.IsUnknown() {
+				return fmt.Errorf("compute_specs.file_system_param.throughput_mibps_per_file_system must be provided when file_system_param is set")
+			}
+			if fsParam.FileSystemCount.IsNull() || fsParam.FileSystemCount.IsUnknown() {
+				return fmt.Errorf("compute_specs.file_system_param.file_system_count must be provided when file_system_param is set")
+			}
+			request.Spec.FileSystem = &client.FileSystemParam{
+				ThroughputMiBpsPerFileSystem: int32(fsParam.ThroughputMiBpsPerFileSystem.ValueInt64()),
+				FileSystemCount:              int32(fsParam.FileSystemCount.ValueInt64()),
+			}
+		}
 	}
 
 	// Features
@@ -286,15 +306,22 @@ func ConvertKafkaInstanceModel(resource *KafkaInstanceResourceModel, model *Kafk
 	model.DeployProfile = resource.DeployProfile
 	model.Version = resource.Version
 	model.ComputeSpecs = resource.ComputeSpecs
-	model.Features = &FeaturesSummaryModel{
-		WalMode:         resource.Features.WalMode,
-		InstanceConfigs: resource.Features.InstanceConfigs,
-		Integrations:    resource.Features.Integrations,
-		Security: &SecuritySummaryModel{
-			AuthenticationMethods:  resource.Features.Security.AuthenticationMethods,
-			TransitEncryptionModes: resource.Features.Security.TransitEncryptionModes,
-			DataEncryptionMode:     resource.Features.Security.DataEncryptionMode,
-		},
+	if resource.Features != nil {
+		features := &FeaturesSummaryModel{
+			WalMode:         resource.Features.WalMode,
+			InstanceConfigs: resource.Features.InstanceConfigs,
+			Integrations:    resource.Features.Integrations,
+		}
+		if resource.Features.Security != nil {
+			features.Security = &SecuritySummaryModel{
+				AuthenticationMethods:  resource.Features.Security.AuthenticationMethods,
+				TransitEncryptionModes: resource.Features.Security.TransitEncryptionModes,
+				DataEncryptionMode:     resource.Features.Security.DataEncryptionMode,
+			}
+		}
+		model.Features = features
+	} else {
+		model.Features = nil
 	}
 	model.Endpoints = resource.Endpoints
 	model.CreatedAt = resource.CreatedAt
@@ -402,6 +429,7 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 				BucketProfiles:       []BucketProfileIDModel{},
 			}
 		}
+		resource.ComputeSpecs.FileSystemParam = nil
 		// Reserved AKU
 		if instance.Spec.ReservedAku != nil {
 			resource.ComputeSpecs.ReservedAku = types.Int64Value(int64(*instance.Spec.ReservedAku))
@@ -439,6 +467,20 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 				}
 			}
 			resource.ComputeSpecs.BucketProfiles = bucketProfiles
+		}
+
+		if instance.Spec.FileSystem != nil {
+			resource.ComputeSpecs.FileSystemParam = &FileSystemParamModel{}
+			if instance.Spec.FileSystem.ThroughputMiBpsPerFileSystem != nil {
+				resource.ComputeSpecs.FileSystemParam.ThroughputMiBpsPerFileSystem = types.Int64Value(int64(*instance.Spec.FileSystem.ThroughputMiBpsPerFileSystem))
+			} else {
+				resource.ComputeSpecs.FileSystemParam.ThroughputMiBpsPerFileSystem = types.Int64Null()
+			}
+			if instance.Spec.FileSystem.FileSystemCount != nil {
+				resource.ComputeSpecs.FileSystemParam.FileSystemCount = types.Int64Value(int64(*instance.Spec.FileSystem.FileSystemCount))
+			} else {
+				resource.ComputeSpecs.FileSystemParam.FileSystemCount = types.Int64Null()
+			}
 		}
 	}
 
@@ -507,26 +549,29 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 func FlattenKafkaInstanceModelWithIntegrations(integrations []client.IntegrationVO, resource *KafkaInstanceResourceModel) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	if integrations == nil {
-		return diag.Diagnostics{diag.NewErrorDiagnostic(
-			"Invalid Integrations",
-			"Cannot flatten nil integrations",
-		)}
-	}
-
 	if resource.Features == nil {
 		resource.Features = &FeaturesModel{}
 	}
-	// Handle integrations if present
-	if len(integrations) > 0 {
-		integrationIds := make([]attr.Value, 0, len(integrations))
-		for _, integration := range integrations {
-			integrationIds = append(integrationIds, types.StringValue(integration.Code))
-		}
-		resource.Features.Integrations = types.SetValueMust(types.StringType, integrationIds)
-	} else if len(integrations) == 0 {
+
+	if len(integrations) == 0 {
 		resource.Features.Integrations = types.SetNull(types.StringType)
+		return diags
 	}
+
+	integrationIds := make([]attr.Value, 0, len(integrations))
+	for _, integration := range integrations {
+		if integration.Code == "" {
+			continue
+		}
+		integrationIds = append(integrationIds, types.StringValue(integration.Code))
+	}
+
+	if len(integrationIds) == 0 {
+		resource.Features.Integrations = types.SetNull(types.StringType)
+		return diags
+	}
+
+	resource.Features.Integrations = types.SetValueMust(types.StringType, integrationIds)
 	return diags
 }
 

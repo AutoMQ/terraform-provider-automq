@@ -19,6 +19,7 @@ const (
 	UpdateInstanceComputeSpecsPath = "/api/v1/instances/%s/spec"
 	UpdateInstancePath             = "/api/v1/instances/%s"
 	UpdateInstanceCertificatePath  = "/api/v1/instances/%s/certificate"
+	UpdateInstanceFileSystemsPath  = "/api/v1/instances/%s/file-systems"
 )
 
 func (c *Client) CreateKafkaInstance(ctx context.Context, kafka InstanceCreateParam) (*InstanceSummaryVO, error) {
@@ -143,6 +144,10 @@ func (c *Client) UpdateKafkaInstanceConfig(ctx context.Context, instanceId strin
 
 func (c *Client) UpdateKafkaInstanceComputeSpecs(ctx context.Context, instanceId string, updateParam InstanceUpdateParam) error {
 	return c.updateInstance(ctx, instanceId, updateParam, UpdateInstancePath)
+}
+
+func (c *Client) UpdateKafkaInstanceFileSystems(ctx context.Context, instanceId string, updateParam InstanceUpdateParam) error {
+	return c.updateInstance(ctx, instanceId, updateParam, UpdateInstanceFileSystemsPath)
 }
 
 func (c *Client) UpdateKafkaInstanceCertificate(ctx context.Context, instanceId string, updateParam InstanceCertificateParam) error {

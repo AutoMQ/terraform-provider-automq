@@ -37,7 +37,7 @@ var _ resource.ResourceWithImportState = &KafkaInstanceResource{}
 
 func NewKafkaInstanceResource() resource.Resource {
 	r := &KafkaInstanceResource{}
-	r.SetDefaultCreateTimeout(15 * time.Minute)
+	r.SetDefaultCreateTimeout(60 * time.Minute)
 	r.SetDefaultUpdateTimeout(90 * time.Minute)
 	r.SetDefaultDeleteTimeout(15 * time.Minute)
 	return r
@@ -161,6 +161,26 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						},
 						PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplace()},
 					},
+					"file_system_param": schema.SingleNestedAttribute{
+						Optional:    true,
+						Description: "File system configuration required when WAL mode is FSWAL.",
+						Attributes: map[string]schema.Attribute{
+							"throughput_mibps_per_file_system": schema.Int64Attribute{
+								Required:    true,
+								Description: "Provisioned throughput in MiB/s for each file system.",
+								Validators: []validator.Int64{
+									int64validator.AtLeast(1),
+								},
+							},
+							"file_system_count": schema.Int64Attribute{
+								Required:    true,
+								Description: "Number of file systems allocated for WAL storage.",
+								Validators: []validator.Int64{
+									int64validator.AtLeast(1),
+								},
+							},
+						},
+					},
 				},
 			},
 			"features": schema.SingleNestedAttribute{
@@ -168,9 +188,9 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				Attributes: map[string]schema.Attribute{
 					"wal_mode": schema.StringAttribute{
 						Required:    true,
-						Description: "Write-Ahead Logging mode: EBSWAL (using EBS as write buffer) or S3WAL (using object storage as write buffer). Defaults to EBSWAL.",
+						Description: "Write-Ahead Logging mode: EBSWAL (using EBS as write buffer), S3WAL (using object storage as write buffer), or FSWAL (using file systems as write buffer). Defaults to EBSWAL.",
 						Validators: []validator.String{
-							stringvalidator.OneOf("EBSWAL", "S3WAL"),
+							stringvalidator.OneOf("EBSWAL", "S3WAL", "FSWAL"),
 						},
 						// Default:       stringdefault.StaticString("EBSWAL"),
 						PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
@@ -339,7 +359,15 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 		resp.Diagnostics.AddError("Model Expansion Error", fmt.Sprintf("Failed to expand Kafka instance resource: %s", err))
 		return
 	}
-	tflog.Debug(ctx, fmt.Sprintf("Creating new Kafka Cluster: %s", fmt.Sprintf("%v", in)))
+	logFields := map[string]any{
+		"environment_id": instance.EnvironmentID.ValueString(),
+		"name":           instance.Name.ValueString(),
+		"deploy_profile": instance.DeployProfile.ValueString(),
+	}
+	if instance.ComputeSpecs != nil {
+		logFields["reserved_aku"] = instance.ComputeSpecs.ReservedAku.ValueInt64()
+	}
+	tflog.Debug(ctx, "Creating new Kafka Cluster", logFields)
 
 	out, err := r.client.CreateKafkaInstance(ctx, in)
 	if err != nil {
@@ -677,6 +705,32 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 			return
 		}
 	}
+
+	// Check and update file system settings for FSWAL clusters
+	if plan.Features != nil && plan.Features.WalMode.ValueString() == "FSWAL" {
+		planFS, planOk := extractFileSystemConfig(plan.ComputeSpecs)
+		stateFS, stateOk := extractFileSystemConfig(state.ComputeSpecs)
+		if !planOk {
+			resp.Diagnostics.AddError(
+				"Invalid Configuration",
+				"When `features.wal_mode` is set to `FSWAL`, `compute_specs.file_system_param` must include both throughput and file system count values.",
+			)
+			return
+		}
+		if !stateOk || planFS.ThroughputMiBpsPerFileSystem != stateFS.ThroughputMiBpsPerFileSystem || planFS.FileSystemCount != stateFS.FileSystemCount {
+			updateParam := client.InstanceUpdateParam{
+				Spec: &client.SpecificationUpdateParam{
+					FileSystem: &client.FileSystemParam{
+						ThroughputMiBpsPerFileSystem: int32(planFS.ThroughputMiBpsPerFileSystem),
+						FileSystemCount:              int32(planFS.FileSystemCount),
+					},
+				},
+			}
+			if err := updateInstanceAndWait(ctx, r, instanceId, updateParam, "file_system", updateTimeout, &state, resp); err != nil {
+				return
+			}
+		}
+	}
 }
 
 func (r *KafkaInstanceResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -808,7 +862,13 @@ func updateInstanceAndWait(
 ) error {
 	tflog.Debug(ctx, fmt.Sprintf("Updating Kafka instance compute specs due to changes in %s", updateType))
 
-	err := r.client.UpdateKafkaInstanceComputeSpecs(ctx, instanceId, param)
+	var err error
+	switch updateType {
+	case "file_system":
+		err = r.client.UpdateKafkaInstanceFileSystems(ctx, instanceId, param)
+	default:
+		err = r.client.UpdateKafkaInstanceComputeSpecs(ctx, instanceId, param)
+	}
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Client Error",
@@ -837,4 +897,26 @@ func updateInstanceAndWait(
 	}
 
 	return nil
+}
+
+type fileSystemConfig struct {
+	ThroughputMiBpsPerFileSystem int64
+	FileSystemCount              int64
+}
+
+func extractFileSystemConfig(specs *models.ComputeSpecsModel) (fileSystemConfig, bool) {
+	if specs == nil || specs.FileSystemParam == nil {
+		return fileSystemConfig{}, false
+	}
+	fs := specs.FileSystemParam
+	if fs.ThroughputMiBpsPerFileSystem.IsNull() || fs.ThroughputMiBpsPerFileSystem.IsUnknown() {
+		return fileSystemConfig{}, false
+	}
+	if fs.FileSystemCount.IsNull() || fs.FileSystemCount.IsUnknown() {
+		return fileSystemConfig{}, false
+	}
+	return fileSystemConfig{
+		ThroughputMiBpsPerFileSystem: fs.ThroughputMiBpsPerFileSystem.ValueInt64(),
+		FileSystemCount:              fs.FileSystemCount.ValueInt64(),
+	}, true
 }

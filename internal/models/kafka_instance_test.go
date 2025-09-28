@@ -20,6 +20,40 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 		expected client.InstanceCreateParam
 	}{
 		{
+			name: "FSWAL with file system param",
+			input: KafkaInstanceResourceModel{
+				Name:          types.StringValue("fswal-instance"),
+				DeployProfile: types.StringValue("fswal-profile"),
+				Version:       types.StringValue("1.2.3"),
+				ComputeSpecs: &ComputeSpecsModel{
+					ReservedAku: types.Int64Value(8),
+					FileSystemParam: &FileSystemParamModel{
+						ThroughputMiBpsPerFileSystem: types.Int64Value(256),
+						FileSystemCount:              types.Int64Value(4),
+					},
+				},
+				Features: &FeaturesModel{
+					WalMode: types.StringValue("FSWAL"),
+				},
+			},
+			expected: client.InstanceCreateParam{
+				Name:          "fswal-instance",
+				DeployProfile: "fswal-profile",
+				Version:       "1.2.3",
+				Spec: client.SpecificationParam{
+					ReservedAku: 8,
+					NodeConfig:  &client.NodeConfigParam{},
+					FileSystem: &client.FileSystemParam{
+						ThroughputMiBpsPerFileSystem: 256,
+						FileSystemCount:              4,
+					},
+				},
+				Features: &client.InstanceFeatureParam{
+					WalMode: stringPtr("FSWAL"),
+				},
+			},
+		},
+		{
 			name: "Full configuration",
 			input: KafkaInstanceResourceModel{
 				Name:          types.StringValue("test-instance"),
@@ -188,6 +222,28 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 	}
 }
 
+func TestExpandKafkaInstanceResource_FswalMissingFields(t *testing.T) {
+	request := &client.InstanceCreateParam{}
+	model := KafkaInstanceResourceModel{
+		Name:          types.StringValue("bad-fswal"),
+		DeployProfile: types.StringValue("profile"),
+		Version:       types.StringValue("1.0.0"),
+		ComputeSpecs: &ComputeSpecsModel{
+			ReservedAku: types.Int64Value(6),
+			FileSystemParam: &FileSystemParamModel{
+				ThroughputMiBpsPerFileSystem: types.Int64Null(),
+				FileSystemCount:              types.Int64Value(2),
+			},
+		},
+		Features: &FeaturesModel{
+			WalMode: types.StringValue("FSWAL"),
+		},
+	}
+
+	err := ExpandKafkaInstanceResource(model, request)
+	assert.Error(t, err)
+}
+
 func stringPtr(s string) *string {
 	return &s
 }
@@ -249,6 +305,29 @@ func TestFlattenKafkaInstanceBasicModel(t *testing.T) {
 			assert.Equal(t, tt.expected.LastUpdated, actual.LastUpdated)
 		})
 	}
+}
+
+func TestFlattenKafkaInstanceModel_FileSystemParam(t *testing.T) {
+	instance := &client.InstanceVO{
+		Spec: &client.SpecificationVO{
+			ReservedAku: int32Ptr(8),
+			FileSystem: &client.FileSystemVO{
+				ThroughputMiBpsPerFileSystem: int32Ptr(512),
+				FileSystemCount:              int32Ptr(6),
+			},
+		},
+		Features: &client.InstanceFeatureVO{
+			WalMode: stringPtr("FSWAL"),
+		},
+	}
+	resource := &KafkaInstanceResourceModel{}
+	diags := FlattenKafkaInstanceModel(instance, resource)
+	assert.False(t, diags.HasError())
+	if assert.NotNil(t, resource.ComputeSpecs) && assert.NotNil(t, resource.ComputeSpecs.FileSystemParam) {
+		assert.Equal(t, int64(512), resource.ComputeSpecs.FileSystemParam.ThroughputMiBpsPerFileSystem.ValueInt64())
+		assert.Equal(t, int64(6), resource.ComputeSpecs.FileSystemParam.FileSystemCount.ValueInt64())
+	}
+	assert.Equal(t, types.StringValue("FSWAL"), resource.Features.WalMode)
 }
 
 func TestFlattenKafkaInstanceModelWithIntegrations(t *testing.T) {
@@ -388,4 +467,8 @@ func strPtr(s string) *string {
 func timePtr(s string) *time.Time {
 	t, _ := time.Parse(time.RFC3339, s)
 	return &t
+}
+
+func int32Ptr(v int32) *int32 {
+	return &v
 }
