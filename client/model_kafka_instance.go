@@ -139,7 +139,7 @@ type SpecificationVO struct {
 	KubernetesNodeGroups []KubernetesNodeGroupVO  `json:"kubernetesNodeGroups,omitempty"`
 	BucketProfiles       []BucketProfileSummaryVO `json:"bucketProfiles,omitempty"`
 	SecurityGroupId      *string                  `json:"securityGroupId,omitempty"`
-	FileSystem           *FileSystemVO            `json:"fileSystem,omitempty"`
+	FileSystem           *FileSystemVO            `json:"fileSystemForFsWal,omitempty"`
 }
 
 type NodeConfigVO struct {
