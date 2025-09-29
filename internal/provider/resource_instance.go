@@ -684,9 +684,10 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 	// Check and update AKU if needed
 	stateAKU := *instance.Spec.ReservedAku
 	if planAKU != stateAKU {
+		planAKUCopy := planAKU
 		updateParam := client.InstanceUpdateParam{
 			Spec: &client.SpecificationUpdateParam{
-				ReservedAku: planAKU,
+				ReservedAku: &planAKUCopy,
 			},
 		}
 		if err := updateInstanceAndWait(ctx, r, instanceId, updateParam, "aku", updateTimeout, &state, resp); err != nil {

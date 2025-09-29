@@ -203,13 +203,13 @@ type InstanceConfigParam struct {
 }
 
 type SpecificationUpdateParam struct {
-	ReservedAku          int32                      `json:"reservedAku"`
+	ReservedAku          *int32                     `json:"reservedAku,omitempty"`
 	NodeConfig           *NodeConfigParam           `json:"nodeConfig,omitempty"`
 	SecurityGroup        *string                    `json:"securityGroup,omitempty"`
 	Template             *string                    `json:"template,omitempty"`
 	Networks             []InstanceNetworkParam     `json:"networks,omitempty"`
 	KubernetesNodeGroups []KubernetesNodeGroupParam `json:"kubernetesNodeGroups,omitempty"`
-	FileSystem           *FileSystemParam           `json:"fileSystem,omitempty"`
+	FileSystem           *FileSystemParam           `json:"fileSystemForFsWal,omitempty"`
 }
 
 type KafkaInstanceRequestPaymentPlan struct {
