@@ -62,6 +62,7 @@ output "example-id" {
 Read-Only:
 
 - `bucket_profiles` (Attributes List) Bucket profiles configuration (see [below for nested schema](#nestedatt--compute_specs--bucket_profiles))
+- `file_system_param` (Attributes) File system configuration for FSWAL clusters. (see [below for nested schema](#nestedatt--compute_specs--file_system_param))
 - `kubernetes_node_groups` (Attributes List) Kubernetes node groups configuration (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
 - `networks` (Attributes List) To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones. (see [below for nested schema](#nestedatt--compute_specs--networks))
 - `reserved_aku` (Number) AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.
@@ -72,6 +73,15 @@ Read-Only:
 Read-Only:
 
 - `id` (String) Bucket profile ID
+
+
+<a id="nestedatt--compute_specs--file_system_param"></a>
+### Nested Schema for `compute_specs.file_system_param`
+
+Read-Only:
+
+- `file_system_count` (Number) Number of file systems allocated for WAL storage.
+- `throughput_mibps_per_file_system` (Number) Provisioned throughput in MiB/s for each file system.
 
 
 <a id="nestedatt--compute_specs--kubernetes_node_groups"></a>
@@ -115,7 +125,7 @@ Read-Only:
 
 - `instance_configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
 - `security` (Attributes) (see [below for nested schema](#nestedatt--features--security))
-- `wal_mode` (String) Write-Ahead Logging mode: EBSWAL (using EBS as write buffer) or S3WAL (using object storage as write buffer). Defaults to EBSWAL.
+- `wal_mode` (String) Write-Ahead Logging mode: EBSWAL (using EBS as write buffer), S3WAL (using object storage as write buffer), or FSWAL (using file systems as write buffer). Defaults to EBSWAL.
 
 <a id="nestedatt--features--security"></a>
 ### Nested Schema for `features.security`

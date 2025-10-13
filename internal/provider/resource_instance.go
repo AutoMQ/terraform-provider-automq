@@ -85,8 +85,13 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				Optional:            true,
 			},
 			"deploy_profile": schema.StringAttribute{
-				MarkdownDescription: "Deploy profile defining cloud resource configuration including VPC, Kubernetes, storage and IAM roles.",
-				Required:            true,
+				MarkdownDescription: "(Deprecated) Deploy profile defining cloud resource configuration including VPC, Kubernetes, storage and IAM roles. Inline compute_specs should be used instead.",
+				Optional:            true,
+				Computed:            true,
+				DeprecationMessage:  "deploy_profile is deprecated. Use compute_specs.* fields to describe deployments.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"version": schema.StringAttribute{
 				Required:    true,

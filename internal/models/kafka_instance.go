@@ -224,7 +224,9 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 	// Basic fields
 	request.Name = instance.Name.ValueString()
 	request.Description = instance.Description.ValueString()
-	request.DeployProfile = instance.DeployProfile.ValueString()
+	if !instance.DeployProfile.IsNull() && !instance.DeployProfile.IsUnknown() {
+		request.DeployProfile = instance.DeployProfile.ValueString()
+	}
 	request.Version = instance.Version.ValueString()
 
 	// Validate required fields

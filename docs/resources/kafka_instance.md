@@ -18,62 +18,31 @@ Using the `automq_kafka_instance` resource type, you can create and manage Kafka
 ## Example Usage
 
 ```terraform
-data "automq_deploy_profile" "default" {
-  environment_id = "env-example"
-  name           = "default"
-}
-
-data "automq_data_bucket_profiles" "test" {
-  environment_id = "env-example"
-  profile_name   = data.automq_deploy_profile.test.name
-}
-
-resource "automq_kafka_instance" "test" {
-  environment_id = "env-example"
-  name           = "example-1"
-  description    = "example"
-  deploy_profile = data.automq_deploy_profile.default.name
-  version        = "1.4.0"
+resource "automq_kafka_instance" "example" {
+  environment_id = var.automq_environment_id
+  name           = "automq-example"
+  description    = "example deployment using inline compute specs"
+  version        = "1.5.0"
 
   compute_specs = {
     reserved_aku = 6
+    deploy_type  = "IAAS"
+    provider     = "aws"
+    region       = "us-east-1"
+    vpc          = "vpc-12345678"
+
     networks = [
       {
         zone    = "us-east-1a"
-        subnets = ["subnet-xxxxxx"]
+        subnets = ["subnet-aaaaaa"]
       }
     ]
-    bucket_profiles = [
+
+    data_buckets = [
       {
-        id = data.automq_data_bucket_profiles.test.data_buckets[0].id
-      }
-    ]
-  }
-
-  features = {
-    wal_mode = "EBSWAL"
-    security = {
-      authentication_methods   = ["anonymous"]
-      transit_encryption_modes = ["plaintext"]
-    }
-  }
-}
-
-resource "automq_kafka_instance" "test" {
-  environment_id = "env-example"
-  name           = "example-1"
-  description    = "example"
-  deploy_profile = data.automq_deploy_profile.default.name
-  version        = "1.4.0"
-
-  compute_specs = {
-    reserved_aku = 6
-    kubernetes_node_groups = [{
-      id = "k8s-node-group-1"
-    }]
-    bucket_profiles = [
-      {
-        id = data.automq_data_bucket_profiles.test.data_buckets[0].id
+        bucket_name = "automq-data-bucket"
+        provider    = "aws"
+        region      = "us-east-1"
       }
     ]
   }
@@ -83,10 +52,22 @@ resource "automq_kafka_instance" "test" {
     security = {
       authentication_methods   = ["sasl"]
       transit_encryption_modes = ["tls"]
-      data_encryption_mode     = "CPMK"
-      certificate_authority    = file("${path.module}/certificate.pem")
-      certificate_chain        = file("${path.module}/certificate.pem")
-      private_key              = file("${path.module}/private_key.pem")
+    }
+
+    metrics_exporter = {
+      prometheus = {
+        enabled   = true
+        end_point = "http://prometheus.example.com/api/v1/write"
+        labels = {
+          "env" = "test"
+        }
+      }
+    }
+
+    table_topic = {
+      warehouse     = "default"
+      catalog_type  = "HIVE"
+      metastore_uri = "thrift://hive-metastore.example.com:9083"
     }
   }
 }
@@ -98,7 +79,6 @@ resource "automq_kafka_instance" "test" {
 ### Required
 
 - `compute_specs` (Attributes) The compute specs of the instance (see [below for nested schema](#nestedatt--compute_specs))
-- `deploy_profile` (String) Deploy profile defining cloud resource configuration including VPC, Kubernetes, storage and IAM roles.
 - `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
 - `features` (Attributes) (see [below for nested schema](#nestedatt--features))
 - `name` (String) The name of the Kafka instance. It can contain letters (a-z or A-Z), numbers (0-9), underscores (_), and hyphens (-), with a length limit of 3 to 64 characters.
@@ -106,6 +86,7 @@ resource "automq_kafka_instance" "test" {
 
 ### Optional
 
+- `deploy_profile` (String, Deprecated) (Deprecated) Deploy profile defining cloud resource configuration including VPC, Kubernetes, storage and IAM roles. Inline compute_specs should be used instead.
 - `description` (String) The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 
@@ -122,13 +103,31 @@ resource "automq_kafka_instance" "test" {
 
 Required:
 
-- `bucket_profiles` (Attributes List) Bucket profiles configuration (see [below for nested schema](#nestedatt--compute_specs--bucket_profiles))
 - `reserved_aku` (Number) AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.
 
 Optional:
 
+- `bucket_profiles` (Attributes List, Deprecated) (Deprecated) Bucket profile bindings. Use `data_buckets` instead. (see [below for nested schema](#nestedatt--compute_specs--bucket_profiles))
+- `credential` (String)
+- `data_buckets` (Attributes List) Inline bucket configuration replacing legacy bucket profiles. (see [below for nested schema](#nestedatt--compute_specs--data_buckets))
+- `deploy_type` (String) Deployment platform for the instance. Supported values: `IAAS`, `KUBERNETES`.
+- `dns_resource_group` (String)
+- `dns_zone` (String) DNS zone used when creating custom records.
+- `domain` (String) Custom domain for the Kafka instance endpoints.
+- `file_system_param` (Attributes) File system configuration required when WAL mode is FSWAL. (see [below for nested schema](#nestedatt--compute_specs--file_system_param))
+- `instance_role` (String)
+- `k8s_resource_group` (String)
+- `kubernetes_cluster_id` (String) Identifier for the target Kubernetes cluster when deploy_type is KUBERNETES.
+- `kubernetes_namespace` (String)
 - `kubernetes_node_groups` (Attributes List) Node groups (or node pools) are units for unified configuration management of physical nodes in Kubernetes. Different Kubernetes providers may use different terms for node groups. Select target node groups that must be created in advance and configured for either single-AZ or three-AZ deployment. The instance node type must meet the requirements specified in the documentation. If you select a single-AZ node group, the AutoMQ instance will be deployed in a single availability zone; if you select a three-AZ node group, the instance will be deployed across three availability zones. (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
+- `kubernetes_service_account` (String)
 - `networks` (Attributes List) To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones. (see [below for nested schema](#nestedatt--compute_specs--networks))
+- `provider` (String) Cloud provider identifier, e.g. `aws`.
+- `region` (String) Region where the instance will be deployed.
+- `scope` (String) Cloud provider scope such as account ID or organization.
+- `tenant_id` (String)
+- `vpc` (String) VPC identifier for the deployment target.
+- `vpc_resource_group` (String)
 
 <a id="nestedatt--compute_specs--bucket_profiles"></a>
 ### Nested Schema for `compute_specs.bucket_profiles`
@@ -136,6 +135,31 @@ Optional:
 Required:
 
 - `id` (String) Bucket profile ID
+
+
+<a id="nestedatt--compute_specs--data_buckets"></a>
+### Nested Schema for `compute_specs.data_buckets`
+
+Required:
+
+- `bucket_name` (String) Object storage bucket name used for data.
+
+Optional:
+
+- `credential` (String)
+- `endpoint` (String) Custom endpoint for accessing the bucket (e.g., when using private object storage).
+- `provider` (String)
+- `region` (String)
+- `scope` (String)
+
+
+<a id="nestedatt--compute_specs--file_system_param"></a>
+### Nested Schema for `compute_specs.file_system_param`
+
+Required:
+
+- `file_system_count` (Number) Number of file systems allocated for WAL storage.
+- `throughput_mibps_per_file_system` (Number) Provisioned throughput in MiB/s for each file system.
 
 
 <a id="nestedatt--compute_specs--kubernetes_node_groups"></a>
@@ -162,12 +186,17 @@ Required:
 Required:
 
 - `security` (Attributes) (see [below for nested schema](#nestedatt--features--security))
-- `wal_mode` (String) Write-Ahead Logging mode: EBSWAL (using EBS as write buffer) or S3WAL (using object storage as write buffer). Defaults to EBSWAL.
+- `wal_mode` (String) Write-Ahead Logging mode: EBSWAL (using EBS as write buffer), S3WAL (using object storage as write buffer), or FSWAL (using file systems as write buffer). Defaults to EBSWAL.
 
 Optional:
 
+- `extend_listeners` (Attributes List) (see [below for nested schema](#nestedatt--features--extend_listeners))
+- `inbound_rules` (Attributes List) (see [below for nested schema](#nestedatt--features--inbound_rules))
 - `instance_configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
-- `integrations` (Set of String) Integration identifiers
+- `integrations` (Set of String, Deprecated) (Deprecated) Integration identifiers previously used for metrics/table topic bindings.
+- `metrics_exporter` (Attributes) Inline metrics exporter configuration for Prometheus, CloudWatch or Kafka sinks. (see [below for nested schema](#nestedatt--features--metrics_exporter))
+- `s3_failover` (Attributes) (see [below for nested schema](#nestedatt--features--s3_failover))
+- `table_topic` (Attributes) Inline table topic (Iceberg/Hive) configuration replacing legacy integration references. (see [below for nested schema](#nestedatt--features--table_topic))
 
 <a id="nestedatt--features--security"></a>
 ### Nested Schema for `features.security`
@@ -199,6 +228,105 @@ Optional:
 
 Changes to encryption mode require instance replacement.
 - `private_key` (String) The private key in PEM format corresponding to the server certificate. AutoMQ will deploy the instance with this key. Required when `mtls` authentication method is enabled.
+
+
+<a id="nestedatt--features--extend_listeners"></a>
+### Nested Schema for `features.extend_listeners`
+
+Required:
+
+- `listener_name` (String)
+
+Optional:
+
+- `port` (Number)
+- `security_protocol` (String)
+
+
+<a id="nestedatt--features--inbound_rules"></a>
+### Nested Schema for `features.inbound_rules`
+
+Required:
+
+- `cidrs` (List of String)
+- `listener_name` (String)
+
+
+<a id="nestedatt--features--metrics_exporter"></a>
+### Nested Schema for `features.metrics_exporter`
+
+Optional:
+
+- `cloudwatch` (Attributes) (see [below for nested schema](#nestedatt--features--metrics_exporter--cloudwatch))
+- `kafka` (Attributes) (see [below for nested schema](#nestedatt--features--metrics_exporter--kafka))
+- `prometheus` (Attributes) (see [below for nested schema](#nestedatt--features--metrics_exporter--prometheus))
+
+<a id="nestedatt--features--metrics_exporter--cloudwatch"></a>
+### Nested Schema for `features.metrics_exporter.cloudwatch`
+
+Optional:
+
+- `enabled` (Boolean)
+- `namespace` (String)
+
+
+<a id="nestedatt--features--metrics_exporter--kafka"></a>
+### Nested Schema for `features.metrics_exporter.kafka`
+
+Optional:
+
+- `bootstrap_servers` (String)
+- `collection_period` (Number)
+- `enabled` (Boolean)
+- `sasl_mechanism` (String)
+- `sasl_password` (String, Sensitive)
+- `sasl_username` (String)
+- `security_protocol` (String)
+- `topic` (String)
+
+
+<a id="nestedatt--features--metrics_exporter--prometheus"></a>
+### Nested Schema for `features.metrics_exporter.prometheus`
+
+Optional:
+
+- `auth_type` (String)
+- `enabled` (Boolean)
+- `end_point` (String)
+- `labels` (Map of String)
+- `password` (String, Sensitive)
+- `prometheus_arn` (String)
+- `token` (String, Sensitive)
+- `username` (String)
+
+
+
+<a id="nestedatt--features--s3_failover"></a>
+### Nested Schema for `features.s3_failover`
+
+Optional:
+
+- `ebs_volume_size_gb` (Number)
+- `enabled` (Boolean)
+- `storage_type` (String)
+
+
+<a id="nestedatt--features--table_topic"></a>
+### Nested Schema for `features.table_topic`
+
+Required:
+
+- `catalog_type` (String)
+- `warehouse` (String)
+
+Optional:
+
+- `hive_auth_mode` (String)
+- `kerberos_principal` (String)
+- `keytab_file` (String, Sensitive)
+- `krb5conf_file` (String, Sensitive)
+- `metastore_uri` (String)
+- `user_principal` (String)
 
 
 
