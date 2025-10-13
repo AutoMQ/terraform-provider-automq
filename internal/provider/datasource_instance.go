@@ -69,6 +69,25 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 						Computed:    true,
 						Description: "AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.",
 					},
+					"deploy_type": schema.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Deployment platform for the instance.",
+					},
+					"provider":                   schema.StringAttribute{Computed: true},
+					"region":                     schema.StringAttribute{Computed: true},
+					"scope":                      schema.StringAttribute{Computed: true},
+					"vpc":                        schema.StringAttribute{Computed: true},
+					"domain":                     schema.StringAttribute{Computed: true},
+					"dns_zone":                   schema.StringAttribute{Computed: true},
+					"kubernetes_cluster_id":      schema.StringAttribute{Computed: true},
+					"kubernetes_namespace":       schema.StringAttribute{Computed: true},
+					"kubernetes_service_account": schema.StringAttribute{Computed: true},
+					"credential":                 schema.StringAttribute{Computed: true},
+					"instance_role":              schema.StringAttribute{Computed: true},
+					"tenant_id":                  schema.StringAttribute{Computed: true},
+					"vpc_resource_group":         schema.StringAttribute{Computed: true},
+					"k8s_resource_group":         schema.StringAttribute{Computed: true},
+					"dns_resource_group":         schema.StringAttribute{Computed: true},
 					"networks": schema.ListNestedAttribute{
 						Computed:    true,
 						Description: "To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones.",
@@ -99,14 +118,29 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 						},
 					},
 					"bucket_profiles": schema.ListNestedAttribute{
-						Computed:    true,
-						Description: "Bucket profiles configuration",
+						Computed:           true,
+						Description:        "(Deprecated) Bucket profile bindings.",
+						DeprecationMessage: "bucket_profiles is deprecated. Consult data_buckets instead.",
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id": schema.StringAttribute{
 									Computed:    true,
 									Description: "Bucket profile ID",
 								},
+							},
+						},
+					},
+					"data_buckets": schema.ListNestedAttribute{
+						Computed:    true,
+						Description: "Inline bucket configuration replacing legacy bucket profiles.",
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"bucket_name": schema.StringAttribute{Computed: true},
+								"provider":    schema.StringAttribute{Computed: true},
+								"region":      schema.StringAttribute{Computed: true},
+								"scope":       schema.StringAttribute{Computed: true},
+								"credential":  schema.StringAttribute{Computed: true},
+								"endpoint":    schema.StringAttribute{Computed: true},
 							},
 						},
 					},
@@ -139,9 +173,95 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 						Computed:            true,
 					},
 					"integrations": schema.SetAttribute{
-						Optional:    true,
+						Computed:    true,
 						ElementType: types.StringType,
-						Description: "Integration identifiers",
+						Description: "(Deprecated) Integration identifiers returned for compatibility.",
+					},
+					"metrics_exporter": schema.SingleNestedAttribute{
+						Computed:            true,
+						MarkdownDescription: "Metrics exporter configuration for Prometheus, CloudWatch, or Kafka sinks.",
+						Attributes: map[string]schema.Attribute{
+							"prometheus": schema.SingleNestedAttribute{
+								Computed: true,
+								Attributes: map[string]schema.Attribute{
+									"enabled":        schema.BoolAttribute{Computed: true},
+									"auth_type":      schema.StringAttribute{Computed: true},
+									"end_point":      schema.StringAttribute{Computed: true},
+									"prometheus_arn": schema.StringAttribute{Computed: true},
+									"username":       schema.StringAttribute{Computed: true},
+									"password":       schema.StringAttribute{Computed: true, Sensitive: true},
+									"token":          schema.StringAttribute{Computed: true, Sensitive: true},
+									"labels": schema.MapAttribute{
+										Computed:    true,
+										ElementType: types.StringType,
+									},
+								},
+							},
+							"cloudwatch": schema.SingleNestedAttribute{
+								Computed: true,
+								Attributes: map[string]schema.Attribute{
+									"enabled":   schema.BoolAttribute{Computed: true},
+									"namespace": schema.StringAttribute{Computed: true},
+								},
+							},
+							"kafka": schema.SingleNestedAttribute{
+								Computed: true,
+								Attributes: map[string]schema.Attribute{
+									"enabled":           schema.BoolAttribute{Computed: true},
+									"bootstrap_servers": schema.StringAttribute{Computed: true},
+									"topic":             schema.StringAttribute{Computed: true},
+									"collection_period": schema.Int64Attribute{Computed: true},
+									"security_protocol": schema.StringAttribute{Computed: true},
+									"sasl_mechanism":    schema.StringAttribute{Computed: true},
+									"sasl_username":     schema.StringAttribute{Computed: true},
+									"sasl_password":     schema.StringAttribute{Computed: true, Sensitive: true},
+								},
+							},
+						},
+					},
+					"table_topic": schema.SingleNestedAttribute{
+						Computed:            true,
+						MarkdownDescription: "Table topic configuration (warehouse/catalog settings).",
+						Attributes: map[string]schema.Attribute{
+							"warehouse":          schema.StringAttribute{Computed: true},
+							"catalog_type":       schema.StringAttribute{Computed: true},
+							"metastore_uri":      schema.StringAttribute{Computed: true},
+							"hive_auth_mode":     schema.StringAttribute{Computed: true},
+							"kerberos_principal": schema.StringAttribute{Computed: true},
+							"user_principal":     schema.StringAttribute{Computed: true},
+							"keytab_file":        schema.StringAttribute{Computed: true, Sensitive: true},
+							"krb5conf_file":      schema.StringAttribute{Computed: true, Sensitive: true},
+						},
+					},
+					"s3_failover": schema.SingleNestedAttribute{
+						Computed: true,
+						Attributes: map[string]schema.Attribute{
+							"enabled":            schema.BoolAttribute{Computed: true},
+							"storage_type":       schema.StringAttribute{Computed: true},
+							"ebs_volume_size_gb": schema.Int64Attribute{Computed: true},
+						},
+					},
+					"inbound_rules": schema.ListNestedAttribute{
+						Computed: true,
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"listener_name": schema.StringAttribute{Computed: true},
+								"cidrs": schema.ListAttribute{
+									Computed:    true,
+									ElementType: types.StringType,
+								},
+							},
+						},
+					},
+					"extend_listeners": schema.ListNestedAttribute{
+						Computed: true,
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"listener_name":     schema.StringAttribute{Computed: true},
+								"security_protocol": schema.StringAttribute{Computed: true},
+								"port":              schema.Int64Attribute{Computed: true},
+							},
+						},
 					},
 					"security": schema.SingleNestedAttribute{
 						Computed: true,
