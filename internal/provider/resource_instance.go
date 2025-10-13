@@ -46,7 +46,85 @@ func NewKafkaInstanceResource() resource.Resource {
 // KafkaInstanceResource defines the resource implementation.
 type KafkaInstanceResource struct {
 	client *client.Client
+	api    kafkaInstanceAPI
 	framework.WithTimeouts
+}
+
+type kafkaInstanceAPI interface {
+	CreateKafkaInstance(ctx context.Context, param client.InstanceCreateParam) (*client.InstanceSummaryVO, error)
+	GetKafkaInstance(ctx context.Context, instanceId string) (*client.InstanceVO, error)
+	GetKafkaInstanceByName(ctx context.Context, name string) (*client.InstanceVO, error)
+	DeleteKafkaInstance(ctx context.Context, instanceId string) error
+	UpdateKafkaInstanceComputeSpecs(ctx context.Context, instanceId string, param client.InstanceUpdateParam) error
+	UpdateKafkaInstanceFileSystems(ctx context.Context, instanceId string, param client.InstanceUpdateParam) error
+	UpdateKafkaInstanceBasicInfo(ctx context.Context, instanceId string, param client.InstanceBasicParam) error
+	UpdateKafkaInstanceConfig(ctx context.Context, instanceId string, param client.InstanceConfigParam) error
+	UpdateKafkaInstanceCertificate(ctx context.Context, instanceId string, param client.InstanceCertificateParam) error
+	AddInstanceIntergation(ctx context.Context, instanceId string, param *client.IntegrationInstanceAddParam) error
+	RemoveInstanceIntergation(ctx context.Context, instanceId, integrationId string) error
+	ListInstanceIntegrations(ctx context.Context, instanceId string) ([]client.IntegrationVO, error)
+	GetInstanceEndpoints(ctx context.Context, instanceId string) ([]client.InstanceAccessInfoVO, error)
+	GetInstanceConfigs(ctx context.Context, instanceId string) ([]client.ConfigItemParam, error)
+}
+
+type defaultKafkaInstanceAPI struct {
+	client *client.Client
+}
+
+func (a defaultKafkaInstanceAPI) CreateKafkaInstance(ctx context.Context, param client.InstanceCreateParam) (*client.InstanceSummaryVO, error) {
+	return a.client.CreateKafkaInstance(ctx, param)
+}
+
+func (a defaultKafkaInstanceAPI) GetKafkaInstance(ctx context.Context, instanceId string) (*client.InstanceVO, error) {
+	return a.client.GetKafkaInstance(ctx, instanceId)
+}
+
+func (a defaultKafkaInstanceAPI) GetKafkaInstanceByName(ctx context.Context, name string) (*client.InstanceVO, error) {
+	return a.client.GetKafkaInstanceByName(ctx, name)
+}
+
+func (a defaultKafkaInstanceAPI) DeleteKafkaInstance(ctx context.Context, instanceId string) error {
+	return a.client.DeleteKafkaInstance(ctx, instanceId)
+}
+
+func (a defaultKafkaInstanceAPI) UpdateKafkaInstanceComputeSpecs(ctx context.Context, instanceId string, param client.InstanceUpdateParam) error {
+	return a.client.UpdateKafkaInstanceComputeSpecs(ctx, instanceId, param)
+}
+
+func (a defaultKafkaInstanceAPI) UpdateKafkaInstanceFileSystems(ctx context.Context, instanceId string, param client.InstanceUpdateParam) error {
+	return a.client.UpdateKafkaInstanceFileSystems(ctx, instanceId, param)
+}
+
+func (a defaultKafkaInstanceAPI) UpdateKafkaInstanceBasicInfo(ctx context.Context, instanceId string, param client.InstanceBasicParam) error {
+	return a.client.UpdateKafkaInstanceBasicInfo(ctx, instanceId, param)
+}
+
+func (a defaultKafkaInstanceAPI) UpdateKafkaInstanceConfig(ctx context.Context, instanceId string, param client.InstanceConfigParam) error {
+	return a.client.UpdateKafkaInstanceConfig(ctx, instanceId, param)
+}
+
+func (a defaultKafkaInstanceAPI) UpdateKafkaInstanceCertificate(ctx context.Context, instanceId string, param client.InstanceCertificateParam) error {
+	return a.client.UpdateKafkaInstanceCertificate(ctx, instanceId, param)
+}
+
+func (a defaultKafkaInstanceAPI) AddInstanceIntergation(ctx context.Context, instanceId string, param *client.IntegrationInstanceAddParam) error {
+	return a.client.AddInstanceIntergation(ctx, instanceId, param)
+}
+
+func (a defaultKafkaInstanceAPI) RemoveInstanceIntergation(ctx context.Context, instanceId, integrationId string) error {
+	return a.client.RemoveInstanceIntergation(ctx, instanceId, integrationId)
+}
+
+func (a defaultKafkaInstanceAPI) ListInstanceIntegrations(ctx context.Context, instanceId string) ([]client.IntegrationVO, error) {
+	return a.client.ListInstanceIntegrations(ctx, instanceId)
+}
+
+func (a defaultKafkaInstanceAPI) GetInstanceEndpoints(ctx context.Context, instanceId string) ([]client.InstanceAccessInfoVO, error) {
+	return a.client.GetInstanceEndpoints(ctx, instanceId)
+}
+
+func (a defaultKafkaInstanceAPI) GetInstanceConfigs(ctx context.Context, instanceId string) ([]client.ConfigItemParam, error) {
+	return a.client.GetInstanceConfigs(ctx, instanceId)
 }
 
 func (r *KafkaInstanceResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -535,6 +613,7 @@ func (r *KafkaInstanceResource) Configure(ctx context.Context, req resource.Conf
 		return
 	}
 	r.client = client
+	r.api = defaultKafkaInstanceAPI{client: client}
 }
 
 func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -568,7 +647,7 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 	}
 	tflog.Debug(ctx, "Creating new Kafka Cluster", logFields)
 
-	out, err := r.client.CreateKafkaInstance(ctx, in)
+	out, err := r.api.CreateKafkaInstance(ctx, in)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create Kafka instance, got error: %s", err))
 		return
@@ -582,7 +661,7 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 	instanceId := instance.InstanceID.ValueString()
 
 	createTimeout := r.CreateTimeout(ctx, instance.Timeouts)
-	if err := framework.WaitForKafkaClusterToProvision(ctx, r.client, instanceId, models.StateCreating, createTimeout); err != nil {
+	if err := waitForKafkaClusterToProvisionFunc(ctx, r.client, instanceId, models.StateCreating, createTimeout); err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error waiting for Kafka Cluster %q to provision: %s", instanceId, err))
 		return
 	}
@@ -606,7 +685,7 @@ func (r *KafkaInstanceResource) Read(ctx context.Context, req resource.ReadReque
 	}
 	ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
 	instanceId := state.InstanceID.ValueString()
-	instance, err := r.client.GetKafkaInstance(ctx, instanceId)
+	instance, err := r.api.GetKafkaInstance(ctx, instanceId)
 	if err != nil {
 		if framework.IsNotFoundError(err) {
 			// Treat HTTP 404 Not Found status as a signal to recreate resource and return early
@@ -617,13 +696,13 @@ func (r *KafkaInstanceResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 	// Get instance integrations
-	integrations, err := r.client.ListInstanceIntegrations(ctx, instanceId)
+	integrations, err := r.api.ListInstanceIntegrations(ctx, instanceId)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to list integrations for Kafka instance %q, got error: %s", state.InstanceID.ValueString(), err))
 		return
 	}
 	// Get instance endpoints
-	endpoints, err := r.client.GetInstanceEndpoints(ctx, instanceId)
+	endpoints, err := r.api.GetInstanceEndpoints(ctx, instanceId)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get endpoints for Kafka instance %q, got error: %s", state.InstanceID.ValueString(), err))
 		return
@@ -652,7 +731,7 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 
 	// check if the instance exists
 	instanceId := plan.InstanceID.ValueString()
-	instance, err := r.client.GetKafkaInstance(ctx, instanceId)
+	instance, err := r.api.GetKafkaInstance(ctx, instanceId)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", instanceId, err))
 		return
@@ -675,7 +754,7 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 			DisplayName: plan.Name.ValueString(),
 			Description: plan.Description.ValueString(),
 		}
-		err = r.client.UpdateKafkaInstanceBasicInfo(ctx, instanceId, basicUpdate)
+		err = r.api.UpdateKafkaInstanceBasicInfo(ctx, instanceId, basicUpdate)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update Kafka instance %q basicInfo, got error: %s", instanceId, err))
 			return
@@ -732,13 +811,13 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		param := client.IntegrationInstanceAddParam{
 			Codes: needAddIntegration,
 		}
-		err = r.client.AddInstanceIntergation(ctx, instanceId, &param)
+		err = r.api.AddInstanceIntergation(ctx, instanceId, &param)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to add integrations for Kafka instance %q intergations, got error: %s", instanceId, err))
 			return
 		}
 		// wait for version update
-		if err := framework.WaitForKafkaClusterToProvision(ctx, r.client, instanceId, models.StateChanging, updateTimeout); err != nil {
+		if err := waitForKafkaClusterToProvisionFunc(ctx, r.client, instanceId, models.StateChanging, updateTimeout); err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error waiting for Kafka Cluster %q to provision: %s", instanceId, err))
 			return
 		}
@@ -756,13 +835,13 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 	if len(needRemoveIntegration) > 0 {
 		// Generate API request body from plan
 		for _, integration := range needRemoveIntegration {
-			err = r.client.RemoveInstanceIntergation(ctx, instanceId, integration)
+			err = r.api.RemoveInstanceIntergation(ctx, instanceId, integration)
 			if err != nil {
 				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to remove integrations for Kafka instance %q intergations, got error: %s", instanceId, err))
 				return
 			}
 			// wait for version update
-			if err := framework.WaitForKafkaClusterToProvision(ctx, r.client, instanceId, models.StateChanging, updateTimeout); err != nil {
+			if err := waitForKafkaClusterToProvisionFunc(ctx, r.client, instanceId, models.StateChanging, updateTimeout); err != nil {
 				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error waiting for Kafka Cluster %q to provision: %s", instanceId, err))
 				return
 			}
@@ -796,14 +875,14 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		in := client.InstanceConfigParam{}
 		in.Configs = models.ExpandStringValueMap(planConfig)
 
-		err := r.client.UpdateKafkaInstanceConfig(ctx, instanceId, in)
+		err := r.api.UpdateKafkaInstanceConfig(ctx, instanceId, in)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update Kafka instance %q configs, got error: %s", instanceId, err))
 			return
 		}
 
 		// wait for version update
-		if err := framework.WaitForKafkaClusterToProvision(ctx, r.client, instanceId, models.StateChanging, updateTimeout); err != nil {
+		if err := waitForKafkaClusterToProvisionFunc(ctx, r.client, instanceId, models.StateChanging, updateTimeout); err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error waiting for Kafka Cluster %q to provision: %s", instanceId, err))
 			return
 		}
@@ -834,7 +913,7 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		}
 
 		// Call API to update certificate
-		err := r.client.UpdateKafkaInstanceCertificate(ctx, instanceId, param)
+		err := r.api.UpdateKafkaInstanceCertificate(ctx, instanceId, param)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error",
 				fmt.Sprintf("Unable to update Kafka instance %q certificate, got error: %s", instanceId, err))
@@ -842,7 +921,7 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		}
 
 		// Wait for certificate update to complete
-		if err := framework.WaitForKafkaClusterToProvision(ctx, r.client, instanceId, models.StateChanging, updateTimeout); err != nil {
+		if err := waitForKafkaClusterToProvisionFunc(ctx, r.client, instanceId, models.StateChanging, updateTimeout); err != nil {
 			resp.Diagnostics.AddError("Client Error",
 				fmt.Sprintf("Error waiting for Kafka Cluster %q certificate update: %s", instanceId, err))
 			return
@@ -944,7 +1023,7 @@ func (r *KafkaInstanceResource) Delete(ctx context.Context, req resource.DeleteR
 	ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
 
 	instanceId := state.InstanceID.ValueString()
-	instance, err := r.client.GetKafkaInstance(ctx, instanceId)
+	instance, err := r.api.GetKafkaInstance(ctx, instanceId)
 	if err != nil {
 		if framework.IsNotFoundError(err) {
 			return
@@ -957,7 +1036,7 @@ func (r *KafkaInstanceResource) Delete(ctx context.Context, req resource.DeleteR
 	}
 
 	if *instance.State != models.StateDeleting {
-		err = r.client.DeleteKafkaInstance(ctx, instanceId)
+		err = r.api.DeleteKafkaInstance(ctx, instanceId)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete Kafka instance %q, got error: %s", instanceId, err))
 			return
@@ -999,7 +1078,7 @@ func (r *KafkaInstanceResource) ImportState(ctx context.Context, req resource.Im
 }
 
 func ReadKafkaInstance(ctx context.Context, r *KafkaInstanceResource, instanceId string, plan *models.KafkaInstanceResourceModel) diag.Diagnostics {
-	instance, err := r.client.GetKafkaInstance(ctx, instanceId)
+	instance, err := r.api.GetKafkaInstance(ctx, instanceId)
 	if err != nil {
 		if framework.IsNotFoundError(err) {
 			return nil
@@ -1010,12 +1089,12 @@ func ReadKafkaInstance(ctx context.Context, r *KafkaInstanceResource, instanceId
 		return diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Kafka instance %q not found", plan.InstanceID.ValueString()))}
 	}
 
-	integrations, err := r.client.ListInstanceIntegrations(ctx, instanceId)
+	integrations, err := r.api.ListInstanceIntegrations(ctx, instanceId)
 	if err != nil {
 		return diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to list integrations for Kafka instance %q, got error: %s", plan.InstanceID.ValueString(), err))}
 	}
 
-	endpoints, err := r.client.GetInstanceEndpoints(ctx, instanceId)
+	endpoints, err := r.api.GetInstanceEndpoints(ctx, instanceId)
 	if err != nil {
 		return diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get endpoints for Kafka instance %q, got error: %s", plan.InstanceID.ValueString(), err))}
 	}
@@ -1065,9 +1144,9 @@ func updateInstanceAndWait(
 	var err error
 	switch updateType {
 	case "file_system":
-		err = r.client.UpdateKafkaInstanceFileSystems(ctx, instanceId, param)
+		err = r.api.UpdateKafkaInstanceFileSystems(ctx, instanceId, param)
 	default:
-		err = r.client.UpdateKafkaInstanceComputeSpecs(ctx, instanceId, param)
+		err = r.api.UpdateKafkaInstanceComputeSpecs(ctx, instanceId, param)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -1078,7 +1157,7 @@ func updateInstanceAndWait(
 		return err
 	}
 
-	if err := framework.WaitForKafkaClusterToProvision(ctx, r.client, instanceId, models.StateChanging, timeout); err != nil {
+	if err := waitForKafkaClusterToProvisionFunc(ctx, r.client, instanceId, models.StateChanging, timeout); err != nil {
 		resp.Diagnostics.AddError(
 			"Client Error",
 			fmt.Sprintf("Error waiting for Kafka Cluster %q compute specs update: %s", instanceId, err),
@@ -1120,3 +1199,5 @@ func extractFileSystemConfig(specs *models.ComputeSpecsModel) (fileSystemConfig,
 		FileSystemCount:              fs.FileSystemCount.ValueInt64(),
 	}, true
 }
+
+var waitForKafkaClusterToProvisionFunc = framework.WaitForKafkaClusterToProvision
