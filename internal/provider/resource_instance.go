@@ -103,6 +103,37 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							int64validator.Between(3, 500),
 						},
 					},
+					"deploy_type": schema.StringAttribute{
+						Optional:            true,
+						MarkdownDescription: "Deployment platform for the instance. Supported values: `IAAS`, `KUBERNETES`.",
+						Validators: []validator.String{
+							stringvalidator.OneOf("IAAS", "KUBERNETES"),
+						},
+					},
+					"provider": schema.StringAttribute{
+						Optional:            true,
+						MarkdownDescription: "Cloud provider identifier, e.g. `aws`.",
+					},
+					"region": schema.StringAttribute{
+						Optional:            true,
+						MarkdownDescription: "Region where the instance will be deployed.",
+					},
+					"scope": schema.StringAttribute{
+						Optional:            true,
+						MarkdownDescription: "Cloud provider scope such as account ID or organization.",
+					},
+					"vpc": schema.StringAttribute{
+						Optional:            true,
+						MarkdownDescription: "VPC identifier for the deployment target.",
+					},
+					"domain": schema.StringAttribute{
+						Optional:            true,
+						MarkdownDescription: "Custom domain for the Kafka instance endpoints.",
+					},
+					"dns_zone": schema.StringAttribute{
+						Optional:            true,
+						MarkdownDescription: "DNS zone used when creating custom records.",
+					},
 					"networks": schema.ListNestedAttribute{
 						Optional:    true,
 						Description: "To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones.",
@@ -145,8 +176,9 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplace()},
 					},
 					"bucket_profiles": schema.ListNestedAttribute{
-						Required:    true,
-						Description: "Bucket profiles configuration",
+						Optional:           true,
+						Description:        "(Deprecated) Bucket profile bindings. Use `data_buckets` instead.",
+						DeprecationMessage: "bucket_profiles is deprecated. Please migrate to data_buckets.",
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id": schema.StringAttribute{
@@ -160,6 +192,37 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							listvalidator.SizeAtMost(1),
 						},
 						PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplace()},
+					},
+					"data_buckets": schema.ListNestedAttribute{
+						Optional:    true,
+						Description: "Inline bucket configuration replacing legacy bucket profiles.",
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"bucket_name": schema.StringAttribute{
+									Required:    true,
+									Description: "Object storage bucket name used for data.",
+								},
+								"provider": schema.StringAttribute{
+									Optional: true,
+								},
+								"region": schema.StringAttribute{
+									Optional: true,
+								},
+								"scope": schema.StringAttribute{
+									Optional: true,
+								},
+								"credential": schema.StringAttribute{
+									Optional: true,
+								},
+								"endpoint": schema.StringAttribute{
+									Optional:            true,
+									MarkdownDescription: "Custom endpoint for accessing the bucket (e.g., when using private object storage).",
+								},
+							},
+						},
+						Validators: []validator.List{
+							listvalidator.SizeAtMost(1),
+						},
 					},
 					"file_system_param": schema.SingleNestedAttribute{
 						Optional:    true,
@@ -181,6 +244,34 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							},
 						},
 					},
+					"kubernetes_cluster_id": schema.StringAttribute{
+						Optional:            true,
+						MarkdownDescription: "Identifier for the target Kubernetes cluster when deploy_type is KUBERNETES.",
+					},
+					"kubernetes_namespace": schema.StringAttribute{
+						Optional: true,
+					},
+					"kubernetes_service_account": schema.StringAttribute{
+						Optional: true,
+					},
+					"credential": schema.StringAttribute{
+						Optional: true,
+					},
+					"instance_role": schema.StringAttribute{
+						Optional: true,
+					},
+					"tenant_id": schema.StringAttribute{
+						Optional: true,
+					},
+					"vpc_resource_group": schema.StringAttribute{
+						Optional: true,
+					},
+					"k8s_resource_group": schema.StringAttribute{
+						Optional: true,
+					},
+					"dns_resource_group": schema.StringAttribute{
+						Optional: true,
+					},
 				},
 			},
 			"features": schema.SingleNestedAttribute{
@@ -201,9 +292,10 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						Optional:            true,
 					},
 					"integrations": schema.SetAttribute{
-						Optional:    true,
-						ElementType: types.StringType,
-						Description: "Integration identifiers",
+						Optional:           true,
+						ElementType:        types.StringType,
+						Description:        "(Deprecated) Integration identifiers previously used for metrics/table topic bindings.",
+						DeprecationMessage: "integrations is deprecated. Configure metrics_exporter or table_topic blocks instead.",
 					},
 					"security": schema.SingleNestedAttribute{
 						Required: true,
@@ -261,6 +353,108 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							"private_key": schema.StringAttribute{
 								Optional:            true,
 								MarkdownDescription: "The private key in PEM format corresponding to the server certificate. AutoMQ will deploy the instance with this key. Required when `mtls` authentication method is enabled.",
+							},
+						},
+					},
+					"metrics_exporter": schema.SingleNestedAttribute{
+						Optional:            true,
+						MarkdownDescription: "Inline metrics exporter configuration for Prometheus, CloudWatch or Kafka sinks.",
+						Attributes: map[string]schema.Attribute{
+							"prometheus": schema.SingleNestedAttribute{
+								Optional: true,
+								Attributes: map[string]schema.Attribute{
+									"enabled":        schema.BoolAttribute{Optional: true},
+									"auth_type":      schema.StringAttribute{Optional: true},
+									"end_point":      schema.StringAttribute{Optional: true},
+									"prometheus_arn": schema.StringAttribute{Optional: true},
+									"username":       schema.StringAttribute{Optional: true},
+									"password":       schema.StringAttribute{Optional: true, Sensitive: true},
+									"token":          schema.StringAttribute{Optional: true, Sensitive: true},
+									"labels": schema.MapAttribute{
+										Optional:    true,
+										ElementType: types.StringType,
+									},
+								},
+							},
+							"cloudwatch": schema.SingleNestedAttribute{
+								Optional: true,
+								Attributes: map[string]schema.Attribute{
+									"enabled":   schema.BoolAttribute{Optional: true},
+									"namespace": schema.StringAttribute{Optional: true},
+								},
+							},
+							"kafka": schema.SingleNestedAttribute{
+								Optional: true,
+								Attributes: map[string]schema.Attribute{
+									"enabled":           schema.BoolAttribute{Optional: true},
+									"bootstrap_servers": schema.StringAttribute{Optional: true},
+									"topic":             schema.StringAttribute{Optional: true},
+									"collection_period": schema.Int64Attribute{Optional: true},
+									"security_protocol": schema.StringAttribute{Optional: true},
+									"sasl_mechanism":    schema.StringAttribute{Optional: true},
+									"sasl_username":     schema.StringAttribute{Optional: true},
+									"sasl_password":     schema.StringAttribute{Optional: true, Sensitive: true},
+								},
+							},
+						},
+					},
+					"table_topic": schema.SingleNestedAttribute{
+						Optional:            true,
+						MarkdownDescription: "Inline table topic (Iceberg/Hive) configuration replacing legacy integration references.",
+						Attributes: map[string]schema.Attribute{
+							"warehouse": schema.StringAttribute{
+								Required: true,
+							},
+							"catalog_type": schema.StringAttribute{
+								Required: true,
+							},
+							"metastore_uri":      schema.StringAttribute{Optional: true},
+							"hive_auth_mode":     schema.StringAttribute{Optional: true},
+							"kerberos_principal": schema.StringAttribute{Optional: true},
+							"user_principal":     schema.StringAttribute{Optional: true},
+							"keytab_file":        schema.StringAttribute{Optional: true, Sensitive: true},
+							"krb5conf_file":      schema.StringAttribute{Optional: true, Sensitive: true},
+						},
+					},
+					"s3_failover": schema.SingleNestedAttribute{
+						Optional: true,
+						Attributes: map[string]schema.Attribute{
+							"enabled":            schema.BoolAttribute{Optional: true},
+							"storage_type":       schema.StringAttribute{Optional: true},
+							"ebs_volume_size_gb": schema.Int64Attribute{Optional: true},
+						},
+					},
+					"inbound_rules": schema.ListNestedAttribute{
+						Optional: true,
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"listener_name": schema.StringAttribute{
+									Required: true,
+								},
+								"cidrs": schema.ListAttribute{
+									Required:    true,
+									ElementType: types.StringType,
+								},
+							},
+						},
+					},
+					"extend_listeners": schema.ListNestedAttribute{
+						Optional: true,
+						Validators: []validator.List{
+							listvalidator.SizeAtMost(5),
+						},
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"listener_name": schema.StringAttribute{
+									Required: true,
+								},
+								"security_protocol": schema.StringAttribute{Optional: true},
+								"port": schema.Int64Attribute{
+									Optional: true,
+									Validators: []validator.Int64{
+										int64validator.Between(1, 65535),
+									},
+								},
 							},
 						},
 					},

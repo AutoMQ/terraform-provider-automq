@@ -62,6 +62,16 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				Version:       types.StringValue("1.0.0"),
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku: types.Int64Value(4),
+					DeployType:  types.StringValue("IAAS"),
+					Provider:    types.StringValue("aws"),
+					Region:      types.StringValue("us-east-1"),
+					Vpc:         types.StringValue("vpc-1"),
+					DataBuckets: []DataBucketModel{
+						{
+							BucketName: types.StringValue("data-bucket-1"),
+							Provider:   types.StringValue("aws"),
+						},
+					},
 					Networks: []NetworkModel{
 						{
 							Zone:    types.StringValue("zone-1"),
@@ -88,6 +98,45 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 					InstanceConfigs: types.MapValueMust(types.StringType, map[string]attr.Value{
 						"config-key": types.StringValue("config-value"),
 					}),
+					MetricsExporter: &MetricsExporterModel{
+						Prometheus: &PrometheusExporterModel{
+							Enabled:  types.BoolValue(true),
+							EndPoint: types.StringValue("http://prometheus"),
+							Labels: types.MapValueMust(types.StringType, map[string]attr.Value{
+								"env": types.StringValue("test"),
+							}),
+						},
+						CloudWatch: &CloudWatchExporterModel{
+							Enabled:   types.BoolValue(true),
+							Namespace: types.StringValue("AutoMQ/Metrics"),
+						},
+						Kafka: &KafkaMetricsExporterModel{
+							Enabled:          types.BoolValue(true),
+							BootstrapServers: types.StringValue("broker:9092"),
+						},
+					},
+					TableTopic: &TableTopicModel{
+						Warehouse:   types.StringValue("warehouse-1"),
+						CatalogType: types.StringValue("HIVE"),
+					},
+					S3Failover: &FailoverModel{
+						Enabled:           types.BoolValue(true),
+						StorageType:       types.StringValue("S3"),
+						EbsVolumeSizeInGB: types.Int64Value(200),
+					},
+					ExtendListeners: []InstanceListenerModel{
+						{
+							ListenerName:     types.StringValue("PUBLIC"),
+							SecurityProtocol: types.StringValue("PLAINTEXT"),
+							Port:             types.Int64Value(19092),
+						},
+					},
+					InboundRules: []InboundRuleModel{
+						{
+							ListenerName: types.StringValue("PUBLIC"),
+							Cidrs:        types.ListValueMust(types.StringType, []attr.Value{types.StringValue("0.0.0.0/0")}),
+						},
+					},
 				},
 			},
 			expected: client.InstanceCreateParam{
@@ -98,6 +147,10 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				Spec: client.SpecificationParam{
 					ReservedAku: 4,
 					NodeConfig:  &client.NodeConfigParam{},
+					DeployType:  stringPtr("IAAS"),
+					Provider:    stringPtr("aws"),
+					Region:      stringPtr("us-east-1"),
+					Vpc:         stringPtr("vpc-1"),
 					Networks: []client.InstanceNetworkParam{
 						{
 							Zone:   "zone-1",
@@ -107,6 +160,12 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 					BucketProfiles: []client.BucketProfileBindParam{
 						{
 							Id: stringPtr("bucket-1"),
+						},
+					},
+					DataBuckets: []client.BucketProfileParam{
+						{
+							BucketName: "data-bucket-1",
+							Provider:   stringPtr("aws"),
 						},
 					},
 				},
@@ -127,6 +186,45 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 						{
 							Key:   "config-key",
 							Value: "config-value",
+						},
+					},
+					MetricsExporter: &client.InstanceMetricsExporterParam{
+						Prometheus: &client.InstancePrometheusExporterParam{
+							Enabled:  boolPtr(true),
+							EndPoint: stringPtr("http://prometheus"),
+							Labels: []client.MetricsLabelParam{
+								{Name: "env", Value: "test"},
+							},
+						},
+						CloudWatch: &client.InstanceCloudWatchExporterParam{
+							Enabled:   boolPtr(true),
+							Namespace: stringPtr("AutoMQ/Metrics"),
+						},
+						Kafka: &client.InstanceKafkaMetricsExporterParam{
+							Enabled:          boolPtr(true),
+							BootstrapServers: stringPtr("broker:9092"),
+						},
+					},
+					TableTopic: &client.TableTopicParam{
+						Warehouse:   "warehouse-1",
+						CatalogType: "HIVE",
+					},
+					S3Failover: &client.InstanceFailoverParam{
+						Enabled:           boolPtr(true),
+						StorageType:       stringPtr("S3"),
+						EbsVolumeSizeInGB: int32Ptr(200),
+					},
+					ExtendListeners: []client.InstanceListenerParam{
+						{
+							ListenerName:     "PUBLIC",
+							SecurityProtocol: stringPtr("PLAINTEXT"),
+							Port:             int32Ptr(19092),
+						},
+					},
+					InboundRules: []client.InboundRuleParam{
+						{
+							ListenerName: "PUBLIC",
+							Cidrs:        []string{"0.0.0.0/0"},
 						},
 					},
 				},
@@ -246,6 +344,10 @@ func TestExpandKafkaInstanceResource_FswalMissingFields(t *testing.T) {
 
 func stringPtr(s string) *string {
 	return &s
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }
 
 func TestFlattenKafkaInstanceBasicModel(t *testing.T) {

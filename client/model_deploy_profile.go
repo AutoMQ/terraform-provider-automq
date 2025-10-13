@@ -37,6 +37,11 @@ type BucketProfileVO struct {
 	BucketName  *string    `json:"bucketName,omitempty"`
 	GmtCreate   *time.Time `json:"gmtCreate,omitempty"`
 	GmtModified *time.Time `json:"gmtModified,omitempty"`
+	Provider    *string    `json:"provider,omitempty"`
+	Region      *string    `json:"region,omitempty"`
+	Scope       *string    `json:"scope,omitempty"`
+	Credential  *string    `json:"credential,omitempty"`
+	Endpoint    *string    `json:"endpoint,omitempty"`
 }
 
 // BucketProfileDetailVO represents the response structure for a bucket profile

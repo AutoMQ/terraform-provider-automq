@@ -4,30 +4,56 @@ import "time"
 
 type InstanceCreateParam struct {
 	Name          string                 `json:"name"`
-	Description   string                 `json:"description"`
-	DeployProfile string                 `json:"deployProfile"`
+	Description   string                 `json:"description,omitempty"`
+	DeployProfile string                 `json:"deployProfile,omitempty"`
 	Version       string                 `json:"version"`
 	Spec          SpecificationParam     `json:"spec"`
 	Features      *InstanceFeatureParam  `json:"features,omitempty"`
 	Tags          []TagParam             `json:"tags,omitempty"`
-	ClusterId     string                 `json:"clusterId"`
+	ClusterId     string                 `json:"clusterId,omitempty"`
 	EndPoint      *InstanceEndpointParam `json:"endPoint,omitempty"`
 	Accesses      []AccessCreateParam    `json:"accesses,omitempty"`
 }
 
 type SpecificationParam struct {
-	ReservedAku          int32                      `json:"reservedAku"`
-	NodeConfig           *NodeConfigParam           `json:"nodeConfig,omitempty"`
-	Networks             []InstanceNetworkParam     `json:"networks,omitempty"`
-	KubernetesNodeGroups []KubernetesNodeGroupParam `json:"kubernetesNodeGroups,omitempty"`
-	SecurityGroup        *string                    `json:"securityGroup,omitempty"`
-	BucketProfiles       []BucketProfileBindParam   `json:"bucketProfiles,omitempty"`
-	Template             *string                    `json:"template,omitempty"`
-	FileSystem           *FileSystemParam           `json:"fileSystemForFsWal,omitempty"`
+	ReservedAku              int32                      `json:"reservedAku"`
+	NodeConfig               *NodeConfigParam           `json:"nodeConfig,omitempty"`
+	Networks                 []InstanceNetworkParam     `json:"networks,omitempty"`
+	KubernetesNodeGroups     []KubernetesNodeGroupParam `json:"kubernetesNodeGroups,omitempty"`
+	SecurityGroup            *string                    `json:"securityGroup,omitempty"`
+	BucketProfiles           []BucketProfileBindParam   `json:"bucketProfiles,omitempty"`
+	Template                 *string                    `json:"template,omitempty"`
+	FileSystem               *FileSystemParam           `json:"fileSystemForFsWal,omitempty"`
+	DeployType               *string                    `json:"deployType,omitempty"`
+	Provider                 *string                    `json:"provider,omitempty"`
+	Region                   *string                    `json:"region,omitempty"`
+	Scope                    *string                    `json:"scope,omitempty"`
+	Vpc                      *string                    `json:"vpc,omitempty"`
+	Domain                   *string                    `json:"domain,omitempty"`
+	DnsZone                  *string                    `json:"dnsZone,omitempty"`
+	KubernetesClusterId      *string                    `json:"kubernetesClusterId,omitempty"`
+	KubernetesNamespace      *string                    `json:"kubernetesNamespace,omitempty"`
+	KubernetesServiceAccount *string                    `json:"kubernetesServiceAccount,omitempty"`
+	Credential               *string                    `json:"credential,omitempty"`
+	InstanceRole             *string                    `json:"instanceRole,omitempty"`
+	DataBuckets              []BucketProfileParam       `json:"dataBuckets,omitempty"`
+	TenantId                 *string                    `json:"tenantId,omitempty"`
+	VpcResourceGroup         *string                    `json:"vpcResourceGroup,omitempty"`
+	K8sResourceGroup         *string                    `json:"k8sResourceGroup,omitempty"`
+	DnsResourceGroup         *string                    `json:"dnsResourceGroup,omitempty"`
 }
 
 type BucketProfileBindParam struct {
 	Id *string `json:"id,omitempty"`
+}
+
+type BucketProfileParam struct {
+	BucketName string  `json:"bucketName"`
+	Provider   *string `json:"provider,omitempty"`
+	Region     *string `json:"region,omitempty"`
+	Scope      *string `json:"scope,omitempty"`
+	Credential *string `json:"credential,omitempty"`
+	Endpoint   *string `json:"endpoint,omitempty"`
 }
 
 type FileSystemParam struct {
@@ -51,10 +77,15 @@ type KubernetesNodeGroupParam struct {
 }
 
 type InstanceFeatureParam struct {
-	WalMode         *string                `json:"walMode,omitempty"`
-	Security        *InstanceSecurityParam `json:"security,omitempty"`
-	Integrations    []IntegrationBindParam `json:"integrations,omitempty"`
-	InstanceConfigs []ConfigItemParam      `json:"instanceConfigs,omitempty"`
+	WalMode         *string                       `json:"walMode,omitempty"`
+	Security        *InstanceSecurityParam        `json:"security,omitempty"`
+	InstanceConfigs []ConfigItemParam             `json:"instanceConfigs,omitempty"`
+	S3Failover      *InstanceFailoverParam        `json:"s3Failover,omitempty"`
+	MetricsExporter *InstanceMetricsExporterParam `json:"metricsExporter,omitempty"`
+	TableTopic      *TableTopicParam              `json:"tableTopic,omitempty"`
+	Integrations    []IntegrationBindParam        `json:"integrations,omitempty"` // Deprecated: kept for backward compatibility
+	InboundRules    []InboundRuleParam            `json:"inboundRules,omitempty"`
+	ExtendListeners []InstanceListenerParam       `json:"extendListeners,omitempty"`
 }
 
 type InstanceSecurityParam struct {
@@ -64,6 +95,73 @@ type InstanceSecurityParam struct {
 	CertificateChain       *string  `json:"certificateChain,omitempty"`
 	PrivateKey             *string  `json:"privateKey,omitempty"`
 	DataEncryptionMode     *string  `json:"dataEncryptionMode,omitempty"`
+}
+
+type InstanceFailoverParam struct {
+	Enabled           *bool   `json:"enabled,omitempty"`
+	StorageType       *string `json:"storageType,omitempty"`
+	EbsVolumeSizeInGB *int32  `json:"ebsVolumeSizeInGB,omitempty"`
+}
+
+type InstanceMetricsExporterParam struct {
+	Prometheus *InstancePrometheusExporterParam   `json:"prometheus,omitempty"`
+	CloudWatch *InstanceCloudWatchExporterParam   `json:"cloudWatch,omitempty"`
+	Kafka      *InstanceKafkaMetricsExporterParam `json:"kafka,omitempty"`
+}
+
+type InstancePrometheusExporterParam struct {
+	Enabled       *bool               `json:"enabled,omitempty"`
+	AuthType      *string             `json:"authType,omitempty"`
+	EndPoint      *string             `json:"endPoint,omitempty"`
+	PrometheusArn *string             `json:"prometheusArn,omitempty"`
+	Username      *string             `json:"username,omitempty"`
+	Password      *string             `json:"password,omitempty"`
+	Token         *string             `json:"token,omitempty"`
+	Labels        []MetricsLabelParam `json:"labels,omitempty"`
+}
+
+type InstanceCloudWatchExporterParam struct {
+	Enabled   *bool   `json:"enabled,omitempty"`
+	Namespace *string `json:"namespace,omitempty"`
+}
+
+type InstanceKafkaMetricsExporterParam struct {
+	Enabled          *bool   `json:"enabled,omitempty"`
+	BootstrapServers *string `json:"bootstrapServers,omitempty"`
+	Topic            *string `json:"topic,omitempty"`
+	CollectionPeriod *int32  `json:"collectionPeriod,omitempty"`
+	SecurityProtocol *string `json:"securityProtocol,omitempty"`
+	SaslMechanism    *string `json:"saslMechanism,omitempty"`
+	SaslUsername     *string `json:"saslUsername,omitempty"`
+	SaslPassword     *string `json:"saslPassword,omitempty"`
+}
+
+type MetricsLabelParam struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+type TableTopicParam struct {
+	IntegrationId     *string `json:"integrationId,omitempty"`
+	Warehouse         string  `json:"warehouse"`
+	CatalogType       string  `json:"catalogType"`
+	MetastoreUri      *string `json:"metastoreUri,omitempty"`
+	HiveAuthMode      *string `json:"hiveAuthMode,omitempty"`
+	KerberosPrincipal *string `json:"kerberosPrincipal,omitempty"`
+	UserPrincipal     *string `json:"userPrincipal,omitempty"`
+	KeytabFile        *string `json:"keytabFile,omitempty"`
+	Krb5ConfFile      *string `json:"krb5confFile,omitempty"`
+}
+
+type InboundRuleParam struct {
+	ListenerName string   `json:"listenerName"`
+	Cidrs        []string `json:"cidrs"`
+}
+
+type InstanceListenerParam struct {
+	ListenerName     string  `json:"listenerName"`
+	SecurityProtocol *string `json:"securityProtocol,omitempty"`
+	Port             *int32  `json:"port,omitempty"`
 }
 
 type IntegrationBindParam struct {
@@ -132,14 +230,31 @@ type InstanceStatisticVO struct {
 }
 
 type SpecificationVO struct {
-	NodeConfig           *NodeConfigVO            `json:"nodeConfig,omitempty"`
-	ReservedAku          *int32                   `json:"reservedAku,omitempty"`
-	CurrentAku           *int32                   `json:"currentAku,omitempty"`
-	Networks             []InstanceZoneNetworkVO  `json:"networks,omitempty"`
-	KubernetesNodeGroups []KubernetesNodeGroupVO  `json:"kubernetesNodeGroups,omitempty"`
-	BucketProfiles       []BucketProfileSummaryVO `json:"bucketProfiles,omitempty"`
-	SecurityGroupId      *string                  `json:"securityGroupId,omitempty"`
-	FileSystem           *FileSystemVO            `json:"fileSystemForFsWal,omitempty"`
+	NodeConfig               *NodeConfigVO            `json:"nodeConfig,omitempty"`
+	ReservedAku              *int32                   `json:"reservedAku,omitempty"`
+	CurrentAku               *int32                   `json:"currentAku,omitempty"`
+	Networks                 []InstanceZoneNetworkVO  `json:"networks,omitempty"`
+	KubernetesNodeGroups     []KubernetesNodeGroupVO  `json:"kubernetesNodeGroups,omitempty"`
+	BucketProfiles           []BucketProfileSummaryVO `json:"bucketProfiles,omitempty"`
+	DataBuckets              []BucketProfileVO        `json:"dataBuckets,omitempty"`
+	SecurityGroupId          *string                  `json:"securityGroupId,omitempty"`
+	FileSystem               *FileSystemVO            `json:"fileSystemForFsWal,omitempty"`
+	Provider                 *string                  `json:"provider,omitempty"`
+	Region                   *string                  `json:"region,omitempty"`
+	Scope                    *string                  `json:"scope,omitempty"`
+	Vpc                      *string                  `json:"vpc,omitempty"`
+	Domain                   *string                  `json:"domain,omitempty"`
+	DnsZone                  *string                  `json:"dnsZone,omitempty"`
+	KubernetesClusterId      *string                  `json:"kubernetesClusterId,omitempty"`
+	KubernetesNamespace      *string                  `json:"kubernetesNamespace,omitempty"`
+	KubernetesServiceAccount *string                  `json:"kubernetesServiceAccount,omitempty"`
+	InstanceRole             *string                  `json:"instanceRole,omitempty"`
+	DeployType               *string                  `json:"deployType,omitempty"`
+	Credential               *string                  `json:"credential,omitempty"`
+	TenantId                 *string                  `json:"tenantId,omitempty"`
+	VpcResourceGroup         *string                  `json:"vpcResourceGroup,omitempty"`
+	K8sResourceGroup         *string                  `json:"k8sResourceGroup,omitempty"`
+	DnsResourceGroup         *string                  `json:"dnsResourceGroup,omitempty"`
 }
 
 type NodeConfigVO struct {
@@ -168,14 +283,87 @@ type FileSystemVO struct {
 }
 
 type InstanceFeatureVO struct {
-	WalMode  *string                   `json:"walMode,omitempty"`
-	Security *InstanceSecurityConfigVO `json:"security,omitempty"`
+	WalMode         *string                    `json:"walMode,omitempty"`
+	Security        *InstanceSecurityConfigVO  `json:"security,omitempty"`
+	S3Failover      *InstanceFailoverVO        `json:"s3Failover,omitempty"`
+	MetricsExporter *InstanceMetricsExporterVO `json:"metricsExporter,omitempty"`
+	TableTopic      *TableTopicVO              `json:"tableTopic,omitempty"`
+	ExtendListeners []InstanceListenerVO       `json:"extendListeners,omitempty"`
+	InboundRules    []InstanceInboundRuleVO    `json:"inboundRules,omitempty"`
 }
 
 type InstanceSecurityConfigVO struct {
 	AuthenticationMethods  []string `json:"authenticationMethods,omitempty"`
 	TransitEncryptionModes []string `json:"transitEncryptionModes,omitempty"`
 	DataEncryptionMode     *string  `json:"dataEncryptionMode,omitempty"`
+}
+
+type InstanceFailoverVO struct {
+	Enabled           bool    `json:"enabled"`
+	StorageType       *string `json:"storageType,omitempty"`
+	EbsVolumeSizeInGB *int32  `json:"ebsVolumeSizeInGB,omitempty"`
+}
+
+type InstanceMetricsExporterVO struct {
+	Oltp       *InstanceOLTPExporterVO         `json:"oltp,omitempty"`
+	Prometheus *InstancePrometheusExporterVO   `json:"prometheus,omitempty"`
+	CloudWatch *InstanceCloudWatchExporterVO   `json:"cloudWatch,omitempty"`
+	Kafka      *InstanceKafkaMetricsExporterVO `json:"kafka,omitempty"`
+}
+
+type InstancePrometheusExporterVO struct {
+	AuthType      *string          `json:"authType,omitempty"`
+	EndPoint      *string          `json:"endPoint,omitempty"`
+	Username      *string          `json:"username,omitempty"`
+	PrometheusArn *string          `json:"prometheusArn,omitempty"`
+	Labels        []MetricsLabelVO `json:"labels,omitempty"`
+}
+
+type MetricsLabelVO struct {
+	Name  *string `json:"name,omitempty"`
+	Value *string `json:"value,omitempty"`
+}
+
+type InstanceCloudWatchExporterVO struct {
+	Namespace *string `json:"namespace,omitempty"`
+}
+
+type InstanceKafkaMetricsExporterVO struct {
+	Enabled          bool    `json:"enabled"`
+	BootstrapServers *string `json:"bootstrapServers,omitempty"`
+	Topic            *string `json:"topic,omitempty"`
+	CollectionPeriod *int32  `json:"collectionPeriod,omitempty"`
+	SecurityProtocol *string `json:"securityProtocol,omitempty"`
+	SaslMechanism    *string `json:"saslMechanism,omitempty"`
+	SaslUsername     *string `json:"saslUsername,omitempty"`
+	SaslPassword     *string `json:"saslPassword,omitempty"`
+}
+
+type TableTopicVO struct {
+	Enabled           bool    `json:"enabled"`
+	Warehouse         *string `json:"warehouse,omitempty"`
+	CatalogType       *string `json:"catalogType,omitempty"`
+	MetastoreUri      *string `json:"metastoreUri,omitempty"`
+	HiveAuthMode      *string `json:"hiveAuthMode,omitempty"`
+	KerberosPrincipal *string `json:"kerberosPrincipal,omitempty"`
+	UserPrincipal     *string `json:"userPrincipal,omitempty"`
+	KeytabFile        *string `json:"keytabFile,omitempty"`
+	Krb5ConfFile      *string `json:"krb5confFile,omitempty"`
+}
+
+type InstanceListenerVO struct {
+	ListenerName     *string `json:"listenerName,omitempty"`
+	SecurityProtocol *string `json:"securityProtocol,omitempty"`
+	Port             *int32  `json:"port,omitempty"`
+}
+
+type InstanceInboundRuleVO struct {
+	ListenerName *string  `json:"listenerName,omitempty"`
+	Cidrs        []string `json:"cidrs,omitempty"`
+}
+
+type InstanceOLTPExporterVO struct {
+	EndPoint *string `json:"endPoint,omitempty"`
 }
 
 type InstanceCertificateParam struct {
@@ -203,13 +391,30 @@ type InstanceConfigParam struct {
 }
 
 type SpecificationUpdateParam struct {
-	ReservedAku          *int32                     `json:"reservedAku,omitempty"`
-	NodeConfig           *NodeConfigParam           `json:"nodeConfig,omitempty"`
-	SecurityGroup        *string                    `json:"securityGroup,omitempty"`
-	Template             *string                    `json:"template,omitempty"`
-	Networks             []InstanceNetworkParam     `json:"networks,omitempty"`
-	KubernetesNodeGroups []KubernetesNodeGroupParam `json:"kubernetesNodeGroups,omitempty"`
-	FileSystem           *FileSystemParam           `json:"fileSystemForFsWal,omitempty"`
+	ReservedAku              *int32                     `json:"reservedAku,omitempty"`
+	NodeConfig               *NodeConfigParam           `json:"nodeConfig,omitempty"`
+	SecurityGroup            *string                    `json:"securityGroup,omitempty"`
+	Template                 *string                    `json:"template,omitempty"`
+	Networks                 []InstanceNetworkParam     `json:"networks,omitempty"`
+	KubernetesNodeGroups     []KubernetesNodeGroupParam `json:"kubernetesNodeGroups,omitempty"`
+	FileSystem               *FileSystemParam           `json:"fileSystemForFsWal,omitempty"`
+	DeployType               *string                    `json:"deployType,omitempty"`
+	Provider                 *string                    `json:"provider,omitempty"`
+	Region                   *string                    `json:"region,omitempty"`
+	Scope                    *string                    `json:"scope,omitempty"`
+	Vpc                      *string                    `json:"vpc,omitempty"`
+	Domain                   *string                    `json:"domain,omitempty"`
+	DnsZone                  *string                    `json:"dnsZone,omitempty"`
+	KubernetesClusterId      *string                    `json:"kubernetesClusterId,omitempty"`
+	KubernetesNamespace      *string                    `json:"kubernetesNamespace,omitempty"`
+	KubernetesServiceAccount *string                    `json:"kubernetesServiceAccount,omitempty"`
+	Credential               *string                    `json:"credential,omitempty"`
+	InstanceRole             *string                    `json:"instanceRole,omitempty"`
+	DataBuckets              []BucketProfileParam       `json:"dataBuckets,omitempty"`
+	TenantId                 *string                    `json:"tenantId,omitempty"`
+	VpcResourceGroup         *string                    `json:"vpcResourceGroup,omitempty"`
+	K8sResourceGroup         *string                    `json:"k8sResourceGroup,omitempty"`
+	DnsResourceGroup         *string                    `json:"dnsResourceGroup,omitempty"`
 }
 
 type KafkaInstanceRequestPaymentPlan struct {
