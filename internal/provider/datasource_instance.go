@@ -77,7 +77,6 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 					"region":                     schema.StringAttribute{Computed: true},
 					"scope":                      schema.StringAttribute{Computed: true},
 					"vpc":                        schema.StringAttribute{Computed: true},
-					"domain":                     schema.StringAttribute{Computed: true},
 					"dns_zone":                   schema.StringAttribute{Computed: true},
 					"kubernetes_cluster_id":      schema.StringAttribute{Computed: true},
 					"kubernetes_namespace":       schema.StringAttribute{Computed: true},
@@ -136,11 +135,6 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"bucket_name": schema.StringAttribute{Computed: true},
-								"provider":    schema.StringAttribute{Computed: true},
-								"region":      schema.StringAttribute{Computed: true},
-								"scope":       schema.StringAttribute{Computed: true},
-								"credential":  schema.StringAttribute{Computed: true},
-								"endpoint":    schema.StringAttribute{Computed: true},
 							},
 						},
 					},
@@ -179,7 +173,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 					},
 					"metrics_exporter": schema.SingleNestedAttribute{
 						Computed:            true,
-						MarkdownDescription: "Metrics exporter configuration for Prometheus, CloudWatch, or Kafka sinks.",
+						MarkdownDescription: "Metrics exporter configuration for Prometheus or Kafka sinks.",
 						Attributes: map[string]schema.Attribute{
 							"prometheus": schema.SingleNestedAttribute{
 								Computed: true,
@@ -195,13 +189,6 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 										Computed:    true,
 										ElementType: types.StringType,
 									},
-								},
-							},
-							"cloudwatch": schema.SingleNestedAttribute{
-								Computed: true,
-								Attributes: map[string]schema.Attribute{
-									"enabled":   schema.BoolAttribute{Computed: true},
-									"namespace": schema.StringAttribute{Computed: true},
 								},
 							},
 							"kafka": schema.SingleNestedAttribute{
@@ -231,14 +218,6 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 							"user_principal":     schema.StringAttribute{Computed: true},
 							"keytab_file":        schema.StringAttribute{Computed: true, Sensitive: true},
 							"krb5conf_file":      schema.StringAttribute{Computed: true, Sensitive: true},
-						},
-					},
-					"s3_failover": schema.SingleNestedAttribute{
-						Computed: true,
-						Attributes: map[string]schema.Attribute{
-							"enabled":            schema.BoolAttribute{Computed: true},
-							"storage_type":       schema.StringAttribute{Computed: true},
-							"ebs_volume_size_gb": schema.Int64Attribute{Computed: true},
 						},
 					},
 					"inbound_rules": schema.ListNestedAttribute{

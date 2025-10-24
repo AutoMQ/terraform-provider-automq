@@ -66,12 +66,17 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 					Provider:    types.StringValue("aws"),
 					Region:      types.StringValue("us-east-1"),
 					Vpc:         types.StringValue("vpc-1"),
-					DataBuckets: []DataBucketModel{
-						{
-							BucketName: types.StringValue("data-bucket-1"),
-							Provider:   types.StringValue("aws"),
+					DataBuckets: types.ListValueMust(
+						DataBucketObjectType,
+						[]attr.Value{
+							types.ObjectValueMust(
+								DataBucketObjectType.AttrTypes,
+								map[string]attr.Value{
+									"bucket_name": types.StringValue("data-bucket-1"),
+								},
+							),
 						},
-					},
+					),
 					Networks: []NetworkModel{
 						{
 							Zone:    types.StringValue("zone-1"),
@@ -106,10 +111,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 								"env": types.StringValue("test"),
 							}),
 						},
-						CloudWatch: &CloudWatchExporterModel{
-							Enabled:   types.BoolValue(true),
-							Namespace: types.StringValue("AutoMQ/Metrics"),
-						},
 						Kafka: &KafkaMetricsExporterModel{
 							Enabled:          types.BoolValue(true),
 							BootstrapServers: types.StringValue("broker:9092"),
@@ -118,11 +119,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 					TableTopic: &TableTopicModel{
 						Warehouse:   types.StringValue("warehouse-1"),
 						CatalogType: types.StringValue("HIVE"),
-					},
-					S3Failover: &FailoverModel{
-						Enabled:           types.BoolValue(true),
-						StorageType:       types.StringValue("S3"),
-						EbsVolumeSizeInGB: types.Int64Value(200),
 					},
 					ExtendListeners: []InstanceListenerModel{
 						{
@@ -165,7 +161,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 					DataBuckets: []client.BucketProfileParam{
 						{
 							BucketName: "data-bucket-1",
-							Provider:   stringPtr("aws"),
 						},
 					},
 				},
@@ -196,10 +191,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 								{Name: "env", Value: "test"},
 							},
 						},
-						CloudWatch: &client.InstanceCloudWatchExporterParam{
-							Enabled:   boolPtr(true),
-							Namespace: stringPtr("AutoMQ/Metrics"),
-						},
 						Kafka: &client.InstanceKafkaMetricsExporterParam{
 							Enabled:          boolPtr(true),
 							BootstrapServers: stringPtr("broker:9092"),
@@ -208,11 +199,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 					TableTopic: &client.TableTopicParam{
 						Warehouse:   "warehouse-1",
 						CatalogType: "HIVE",
-					},
-					S3Failover: &client.InstanceFailoverParam{
-						Enabled:           boolPtr(true),
-						StorageType:       stringPtr("S3"),
-						EbsVolumeSizeInGB: int32Ptr(200),
 					},
 					ExtendListeners: []client.InstanceListenerParam{
 						{

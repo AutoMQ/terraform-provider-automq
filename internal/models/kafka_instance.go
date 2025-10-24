@@ -78,14 +78,13 @@ type ComputeSpecsModel struct {
 	Region                types.String           `tfsdk:"region"`
 	Scope                 types.String           `tfsdk:"scope"`
 	Vpc                   types.String           `tfsdk:"vpc"`
-	Domain                types.String           `tfsdk:"domain"`
 	DnsZone               types.String           `tfsdk:"dns_zone"`
 	KubernetesClusterID   types.String           `tfsdk:"kubernetes_cluster_id"`
 	KubernetesNamespace   types.String           `tfsdk:"kubernetes_namespace"`
 	KubernetesServiceAcct types.String           `tfsdk:"kubernetes_service_account"`
 	Credential            types.String           `tfsdk:"credential"`
 	InstanceRole          types.String           `tfsdk:"instance_role"`
-	DataBuckets           []DataBucketModel      `tfsdk:"data_buckets"`
+	DataBuckets           types.List             `tfsdk:"data_buckets"`
 	TenantID              types.String           `tfsdk:"tenant_id"`
 	VpcResourceGroup      types.String           `tfsdk:"vpc_resource_group"`
 	K8sResourceGroup      types.String           `tfsdk:"k8s_resource_group"`
@@ -103,11 +102,39 @@ type FileSystemParamModel struct {
 
 type DataBucketModel struct {
 	BucketName types.String `tfsdk:"bucket_name"`
-	Provider   types.String `tfsdk:"provider"`
-	Region     types.String `tfsdk:"region"`
-	Scope      types.String `tfsdk:"scope"`
-	Credential types.String `tfsdk:"credential"`
-	Endpoint   types.String `tfsdk:"endpoint"`
+}
+
+var DataBucketObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"bucket_name": types.StringType,
+	},
+}
+
+func DataBucketListToModels(ctx context.Context, list types.List) ([]DataBucketModel, diag.Diagnostics) {
+	if list.IsNull() || list.IsUnknown() {
+		return nil, nil
+	}
+	var buckets []DataBucketModel
+	diags := list.ElementsAs(ctx, &buckets, false)
+	return buckets, diags
+}
+
+func DataBucketModelsToList(ctx context.Context, buckets []DataBucketModel) (types.List, diag.Diagnostics) {
+	if len(buckets) == 0 {
+		return types.ListNull(DataBucketObjectType), nil
+	}
+	listValue, diags := types.ListValueFrom(ctx, DataBucketObjectType, buckets)
+	return listValue, diags
+}
+
+func coalesceStringAttr(apiValue *string, previous *types.String) types.String {
+	if apiValue != nil {
+		return types.StringValue(*apiValue)
+	}
+	if previous != nil && !previous.IsNull() && !previous.IsUnknown() {
+		return *previous
+	}
+	return types.StringNull()
 }
 
 type FeaturesModel struct {
@@ -117,7 +144,6 @@ type FeaturesModel struct {
 	Security        *SecurityModel          `tfsdk:"security"`
 	MetricsExporter *MetricsExporterModel   `tfsdk:"metrics_exporter"`
 	TableTopic      *TableTopicModel        `tfsdk:"table_topic"`
-	S3Failover      *FailoverModel          `tfsdk:"s3_failover"`
 	InboundRules    []InboundRuleModel      `tfsdk:"inbound_rules"`
 	ExtendListeners []InstanceListenerModel `tfsdk:"extend_listeners"`
 }
@@ -129,7 +155,6 @@ type FeaturesSummaryModel struct {
 	Security        *SecuritySummaryModel   `tfsdk:"security"`
 	MetricsExporter *MetricsExporterModel   `tfsdk:"metrics_exporter"`
 	TableTopic      *TableTopicModel        `tfsdk:"table_topic"`
-	S3Failover      *FailoverModel          `tfsdk:"s3_failover"`
 	InboundRules    []InboundRuleModel      `tfsdk:"inbound_rules"`
 	ExtendListeners []InstanceListenerModel `tfsdk:"extend_listeners"`
 }
@@ -155,7 +180,6 @@ type SecuritySummaryModel struct {
 
 type MetricsExporterModel struct {
 	Prometheus *PrometheusExporterModel   `tfsdk:"prometheus"`
-	CloudWatch *CloudWatchExporterModel   `tfsdk:"cloudwatch"`
 	Kafka      *KafkaMetricsExporterModel `tfsdk:"kafka"`
 }
 
@@ -170,11 +194,6 @@ type PrometheusExporterModel struct {
 	Labels        types.Map    `tfsdk:"labels"`
 }
 
-type CloudWatchExporterModel struct {
-	Enabled   types.Bool   `tfsdk:"enabled"`
-	Namespace types.String `tfsdk:"namespace"`
-}
-
 type KafkaMetricsExporterModel struct {
 	Enabled          types.Bool   `tfsdk:"enabled"`
 	BootstrapServers types.String `tfsdk:"bootstrap_servers"`
@@ -184,12 +203,6 @@ type KafkaMetricsExporterModel struct {
 	SaslMechanism    types.String `tfsdk:"sasl_mechanism"`
 	SaslUsername     types.String `tfsdk:"sasl_username"`
 	SaslPassword     types.String `tfsdk:"sasl_password"`
-}
-
-type FailoverModel struct {
-	Enabled           types.Bool   `tfsdk:"enabled"`
-	StorageType       types.String `tfsdk:"storage_type"`
-	EbsVolumeSizeInGB types.Int64  `tfsdk:"ebs_volume_size_gb"`
 }
 
 type TableTopicModel struct {
@@ -265,10 +278,6 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 		if !instance.ComputeSpecs.Vpc.IsNull() && !instance.ComputeSpecs.Vpc.IsUnknown() {
 			vpc := instance.ComputeSpecs.Vpc.ValueString()
 			request.Spec.Vpc = &vpc
-		}
-		if !instance.ComputeSpecs.Domain.IsNull() && !instance.ComputeSpecs.Domain.IsUnknown() {
-			domain := instance.ComputeSpecs.Domain.ValueString()
-			request.Spec.Domain = &domain
 		}
 		if !instance.ComputeSpecs.DnsZone.IsNull() && !instance.ComputeSpecs.DnsZone.IsUnknown() {
 			dns := instance.ComputeSpecs.DnsZone.ValueString()
@@ -353,34 +362,18 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 			request.Spec.BucketProfiles = bucketProfiles
 		}
 
-		if len(instance.ComputeSpecs.DataBuckets) > 0 {
-			dataBuckets := make([]client.BucketProfileParam, 0, len(instance.ComputeSpecs.DataBuckets))
-			for _, bucket := range instance.ComputeSpecs.DataBuckets {
+		if !instance.ComputeSpecs.DataBuckets.IsNull() && !instance.ComputeSpecs.DataBuckets.IsUnknown() {
+			dataBucketModels, dataBucketDiags := DataBucketListToModels(context.TODO(), instance.ComputeSpecs.DataBuckets)
+			if dataBucketDiags.HasError() {
+				return fmt.Errorf("failed to parse compute_specs.data_buckets: %v", dataBucketDiags.Errors())
+			}
+			dataBuckets := make([]client.BucketProfileParam, 0, len(dataBucketModels))
+			for _, bucket := range dataBucketModels {
 				if bucket.BucketName.IsNull() || bucket.BucketName.IsUnknown() {
 					return fmt.Errorf("compute_specs.data_buckets.bucket_name is required")
 				}
 				profile := client.BucketProfileParam{
 					BucketName: bucket.BucketName.ValueString(),
-				}
-				if !bucket.Provider.IsNull() && !bucket.Provider.IsUnknown() {
-					val := bucket.Provider.ValueString()
-					profile.Provider = &val
-				}
-				if !bucket.Region.IsNull() && !bucket.Region.IsUnknown() {
-					val := bucket.Region.ValueString()
-					profile.Region = &val
-				}
-				if !bucket.Scope.IsNull() && !bucket.Scope.IsUnknown() {
-					val := bucket.Scope.ValueString()
-					profile.Scope = &val
-				}
-				if !bucket.Credential.IsNull() && !bucket.Credential.IsUnknown() {
-					val := bucket.Credential.ValueString()
-					profile.Credential = &val
-				}
-				if !bucket.Endpoint.IsNull() && !bucket.Endpoint.IsUnknown() {
-					val := bucket.Endpoint.ValueString()
-					profile.Endpoint = &val
 				}
 				dataBuckets = append(dataBuckets, profile)
 			}
@@ -468,25 +461,6 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 			}
 		}
 
-		// S3 Failover
-		if instance.Features.S3Failover != nil {
-			failoverModel := instance.Features.S3Failover
-			failover := &client.InstanceFailoverParam{}
-			if !failoverModel.Enabled.IsNull() && !failoverModel.Enabled.IsUnknown() {
-				enabled := failoverModel.Enabled.ValueBool()
-				failover.Enabled = &enabled
-			}
-			if !failoverModel.StorageType.IsNull() && !failoverModel.StorageType.IsUnknown() {
-				storageType := failoverModel.StorageType.ValueString()
-				failover.StorageType = &storageType
-			}
-			if !failoverModel.EbsVolumeSizeInGB.IsNull() && !failoverModel.EbsVolumeSizeInGB.IsUnknown() {
-				size := int32(failoverModel.EbsVolumeSizeInGB.ValueInt64())
-				failover.EbsVolumeSizeInGB = &size
-			}
-			request.Features.S3Failover = failover
-		}
-
 		// Metrics exporter
 		if instance.Features.MetricsExporter != nil {
 			exporter := client.InstanceMetricsExporterParam{}
@@ -533,20 +507,6 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 					}
 				}
 				exporter.Prometheus = prom
-				hasConfig = true
-			}
-			if instance.Features.MetricsExporter.CloudWatch != nil {
-				cwConfig := instance.Features.MetricsExporter.CloudWatch
-				cw := &client.InstanceCloudWatchExporterParam{}
-				if !cwConfig.Enabled.IsNull() && !cwConfig.Enabled.IsUnknown() {
-					enabled := cwConfig.Enabled.ValueBool()
-					cw.Enabled = &enabled
-				}
-				if !cwConfig.Namespace.IsNull() && !cwConfig.Namespace.IsUnknown() {
-					ns := cwConfig.Namespace.ValueString()
-					cw.Namespace = &ns
-				}
-				exporter.CloudWatch = cw
 				hasConfig = true
 			}
 			if instance.Features.MetricsExporter.Kafka != nil {
@@ -717,7 +677,6 @@ func ConvertKafkaInstanceModel(resource *KafkaInstanceResourceModel, model *Kafk
 			Integrations:    resource.Features.Integrations,
 			MetricsExporter: resource.Features.MetricsExporter,
 			TableTopic:      resource.Features.TableTopic,
-			S3Failover:      resource.Features.S3Failover,
 			InboundRules:    resource.Features.InboundRules,
 			ExtendListeners: resource.Features.ExtendListeners,
 		}
@@ -830,12 +789,33 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 
 	// Compute Specs
 	if instance.Spec != nil {
+		var previousSpecs *ComputeSpecsModel
+		if resource.ComputeSpecs != nil {
+			prevCopy := *resource.ComputeSpecs
+			previousSpecs = &prevCopy
+		}
 		if resource.ComputeSpecs == nil {
 			resource.ComputeSpecs = &ComputeSpecsModel{
-				ReservedAku:          types.Int64Null(),
-				Networks:             []NetworkModel{},
-				KubernetesNodeGroups: []NodeGroupModel{},
-				BucketProfiles:       []BucketProfileIDModel{},
+				ReservedAku:           types.Int64Null(),
+				Networks:              []NetworkModel{},
+				KubernetesNodeGroups:  []NodeGroupModel{},
+				BucketProfiles:        []BucketProfileIDModel{},
+				DataBuckets:           types.ListNull(DataBucketObjectType),
+				DeployType:            types.StringNull(),
+				Provider:              types.StringNull(),
+				Region:                types.StringNull(),
+				Scope:                 types.StringNull(),
+				Vpc:                   types.StringNull(),
+				DnsZone:               types.StringNull(),
+				KubernetesClusterID:   types.StringNull(),
+				KubernetesNamespace:   types.StringNull(),
+				KubernetesServiceAcct: types.StringNull(),
+				Credential:            types.StringNull(),
+				InstanceRole:          types.StringNull(),
+				TenantID:              types.StringNull(),
+				VpcResourceGroup:      types.StringNull(),
+				K8sResourceGroup:      types.StringNull(),
+				DnsResourceGroup:      types.StringNull(),
 			}
 		}
 		resource.ComputeSpecs.FileSystemParam = nil
@@ -843,86 +823,41 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 		if instance.Spec.ReservedAku != nil {
 			resource.ComputeSpecs.ReservedAku = types.Int64Value(int64(*instance.Spec.ReservedAku))
 		}
-		if instance.Spec.DeployType != nil {
-			resource.ComputeSpecs.DeployType = types.StringValue(*instance.Spec.DeployType)
-		} else {
-			resource.ComputeSpecs.DeployType = types.StringNull()
+		var prevDeploy, prevProvider, prevRegion, prevScope, prevVpc, prevDnsZone *types.String
+		var prevClusterID, prevNamespace, prevServiceAccount, prevCredential, prevInstanceRole *types.String
+		var prevTenantID, prevVpcRG, prevK8sRG, prevDnsRG *types.String
+		if previousSpecs != nil {
+			prevDeploy = &previousSpecs.DeployType
+			prevProvider = &previousSpecs.Provider
+			prevRegion = &previousSpecs.Region
+			prevScope = &previousSpecs.Scope
+			prevVpc = &previousSpecs.Vpc
+			prevDnsZone = &previousSpecs.DnsZone
+			prevClusterID = &previousSpecs.KubernetesClusterID
+			prevNamespace = &previousSpecs.KubernetesNamespace
+			prevServiceAccount = &previousSpecs.KubernetesServiceAcct
+			prevCredential = &previousSpecs.Credential
+			prevInstanceRole = &previousSpecs.InstanceRole
+			prevTenantID = &previousSpecs.TenantID
+			prevVpcRG = &previousSpecs.VpcResourceGroup
+			prevK8sRG = &previousSpecs.K8sResourceGroup
+			prevDnsRG = &previousSpecs.DnsResourceGroup
 		}
-		if instance.Spec.Provider != nil {
-			resource.ComputeSpecs.Provider = types.StringValue(*instance.Spec.Provider)
-		} else {
-			resource.ComputeSpecs.Provider = types.StringNull()
-		}
-		if instance.Spec.Region != nil {
-			resource.ComputeSpecs.Region = types.StringValue(*instance.Spec.Region)
-		} else {
-			resource.ComputeSpecs.Region = types.StringNull()
-		}
-		if instance.Spec.Scope != nil {
-			resource.ComputeSpecs.Scope = types.StringValue(*instance.Spec.Scope)
-		} else {
-			resource.ComputeSpecs.Scope = types.StringNull()
-		}
-		if instance.Spec.Vpc != nil {
-			resource.ComputeSpecs.Vpc = types.StringValue(*instance.Spec.Vpc)
-		} else {
-			resource.ComputeSpecs.Vpc = types.StringNull()
-		}
-		if instance.Spec.Domain != nil {
-			resource.ComputeSpecs.Domain = types.StringValue(*instance.Spec.Domain)
-		} else {
-			resource.ComputeSpecs.Domain = types.StringNull()
-		}
-		if instance.Spec.DnsZone != nil {
-			resource.ComputeSpecs.DnsZone = types.StringValue(*instance.Spec.DnsZone)
-		} else {
-			resource.ComputeSpecs.DnsZone = types.StringNull()
-		}
-		if instance.Spec.KubernetesClusterId != nil {
-			resource.ComputeSpecs.KubernetesClusterID = types.StringValue(*instance.Spec.KubernetesClusterId)
-		} else {
-			resource.ComputeSpecs.KubernetesClusterID = types.StringNull()
-		}
-		if instance.Spec.KubernetesNamespace != nil {
-			resource.ComputeSpecs.KubernetesNamespace = types.StringValue(*instance.Spec.KubernetesNamespace)
-		} else {
-			resource.ComputeSpecs.KubernetesNamespace = types.StringNull()
-		}
-		if instance.Spec.KubernetesServiceAccount != nil {
-			resource.ComputeSpecs.KubernetesServiceAcct = types.StringValue(*instance.Spec.KubernetesServiceAccount)
-		} else {
-			resource.ComputeSpecs.KubernetesServiceAcct = types.StringNull()
-		}
-		if instance.Spec.Credential != nil {
-			resource.ComputeSpecs.Credential = types.StringValue(*instance.Spec.Credential)
-		} else {
-			resource.ComputeSpecs.Credential = types.StringNull()
-		}
-		if instance.Spec.InstanceRole != nil {
-			resource.ComputeSpecs.InstanceRole = types.StringValue(*instance.Spec.InstanceRole)
-		} else {
-			resource.ComputeSpecs.InstanceRole = types.StringNull()
-		}
-		if instance.Spec.TenantId != nil {
-			resource.ComputeSpecs.TenantID = types.StringValue(*instance.Spec.TenantId)
-		} else {
-			resource.ComputeSpecs.TenantID = types.StringNull()
-		}
-		if instance.Spec.VpcResourceGroup != nil {
-			resource.ComputeSpecs.VpcResourceGroup = types.StringValue(*instance.Spec.VpcResourceGroup)
-		} else {
-			resource.ComputeSpecs.VpcResourceGroup = types.StringNull()
-		}
-		if instance.Spec.K8sResourceGroup != nil {
-			resource.ComputeSpecs.K8sResourceGroup = types.StringValue(*instance.Spec.K8sResourceGroup)
-		} else {
-			resource.ComputeSpecs.K8sResourceGroup = types.StringNull()
-		}
-		if instance.Spec.DnsResourceGroup != nil {
-			resource.ComputeSpecs.DnsResourceGroup = types.StringValue(*instance.Spec.DnsResourceGroup)
-		} else {
-			resource.ComputeSpecs.DnsResourceGroup = types.StringNull()
-		}
+		resource.ComputeSpecs.DeployType = coalesceStringAttr(instance.Spec.DeployType, prevDeploy)
+		resource.ComputeSpecs.Provider = coalesceStringAttr(instance.Spec.Provider, prevProvider)
+		resource.ComputeSpecs.Region = coalesceStringAttr(instance.Spec.Region, prevRegion)
+		resource.ComputeSpecs.Scope = coalesceStringAttr(instance.Spec.Scope, prevScope)
+		resource.ComputeSpecs.Vpc = coalesceStringAttr(instance.Spec.Vpc, prevVpc)
+		resource.ComputeSpecs.DnsZone = coalesceStringAttr(instance.Spec.DnsZone, prevDnsZone)
+		resource.ComputeSpecs.KubernetesClusterID = coalesceStringAttr(instance.Spec.KubernetesClusterId, prevClusterID)
+		resource.ComputeSpecs.KubernetesNamespace = coalesceStringAttr(instance.Spec.KubernetesNamespace, prevNamespace)
+		resource.ComputeSpecs.KubernetesServiceAcct = coalesceStringAttr(instance.Spec.KubernetesServiceAccount, prevServiceAccount)
+		resource.ComputeSpecs.Credential = coalesceStringAttr(instance.Spec.Credential, prevCredential)
+		resource.ComputeSpecs.InstanceRole = coalesceStringAttr(instance.Spec.InstanceRole, prevInstanceRole)
+		resource.ComputeSpecs.TenantID = coalesceStringAttr(instance.Spec.TenantId, prevTenantID)
+		resource.ComputeSpecs.VpcResourceGroup = coalesceStringAttr(instance.Spec.VpcResourceGroup, prevVpcRG)
+		resource.ComputeSpecs.K8sResourceGroup = coalesceStringAttr(instance.Spec.K8sResourceGroup, prevK8sRG)
+		resource.ComputeSpecs.DnsResourceGroup = coalesceStringAttr(instance.Spec.DnsResourceGroup, prevDnsRG)
 
 		// Kubernetes Node Groups
 		if instance.Spec.KubernetesNodeGroups != nil {
@@ -958,40 +893,40 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 			resource.ComputeSpecs.BucketProfiles = bucketProfiles
 		}
 
+		var previousDataBuckets []DataBucketModel
+		if previousSpecs != nil {
+			prevBuckets, prevDiags := DataBucketListToModels(context.TODO(), previousSpecs.DataBuckets)
+			if prevDiags.HasError() {
+				diags.Append(prevDiags...)
+			}
+			previousDataBuckets = prevBuckets
+		}
 		if instance.Spec.DataBuckets != nil {
 			dataBuckets := make([]DataBucketModel, 0, len(instance.Spec.DataBuckets))
-			for _, bucket := range instance.Spec.DataBuckets {
-				model := DataBucketModel{
-					BucketName: types.StringNull(),
-					Provider:   types.StringNull(),
-					Region:     types.StringNull(),
-					Scope:      types.StringNull(),
-					Credential: types.StringNull(),
-					Endpoint:   types.StringNull(),
+			for idx, bucket := range instance.Spec.DataBuckets {
+				var base DataBucketModel
+				if idx < len(previousDataBuckets) {
+					base = previousDataBuckets[idx]
+				} else {
+					base = DataBucketModel{
+						BucketName: types.StringNull(),
+					}
 				}
 				if bucket.BucketName != nil {
-					model.BucketName = types.StringValue(*bucket.BucketName)
+					base.BucketName = types.StringValue(*bucket.BucketName)
 				}
-				if bucket.Provider != nil {
-					model.Provider = types.StringValue(*bucket.Provider)
-				}
-				if bucket.Region != nil {
-					model.Region = types.StringValue(*bucket.Region)
-				}
-				if bucket.Scope != nil {
-					model.Scope = types.StringValue(*bucket.Scope)
-				}
-				if bucket.Credential != nil {
-					model.Credential = types.StringValue(*bucket.Credential)
-				}
-				if bucket.Endpoint != nil {
-					model.Endpoint = types.StringValue(*bucket.Endpoint)
-				}
-				dataBuckets = append(dataBuckets, model)
+				dataBuckets = append(dataBuckets, base)
 			}
-			resource.ComputeSpecs.DataBuckets = dataBuckets
+			listValue, listDiags := DataBucketModelsToList(context.TODO(), dataBuckets)
+			if listDiags.HasError() {
+				diags.Append(listDiags...)
+			} else {
+				resource.ComputeSpecs.DataBuckets = listValue
+			}
+		} else if previousSpecs != nil {
+			resource.ComputeSpecs.DataBuckets = previousSpecs.DataBuckets
 		} else {
-			resource.ComputeSpecs.DataBuckets = nil
+			resource.ComputeSpecs.DataBuckets = types.ListNull(DataBucketObjectType)
 		}
 
 		if instance.Spec.FileSystem != nil {
@@ -1010,6 +945,11 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 	}
 
 	// Features
+	var previousFeatures *FeaturesModel
+	if resource.Features != nil {
+		prevCopy := *resource.Features
+		previousFeatures = &prevCopy
+	}
 	if instance.Features != nil {
 		if resource.Features == nil {
 			resource.Features = &FeaturesModel{}
@@ -1022,7 +962,14 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 
 		// Security
 		if instance.Features.Security != nil {
-			if resource.Features.Security == nil {
+			var previousSecurity *SecurityModel
+			if previousFeatures != nil {
+				previousSecurity = previousFeatures.Security
+			}
+			if previousSecurity != nil {
+				clone := *previousSecurity
+				resource.Features.Security = &clone
+			} else {
 				resource.Features.Security = &SecurityModel{}
 			}
 
@@ -1058,181 +1005,30 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 			}
 		}
 
-		// S3 Failover
-		if instance.Features.S3Failover != nil {
-			resource.Features.S3Failover = &FailoverModel{
-				Enabled:           types.BoolValue(instance.Features.S3Failover.Enabled),
-				StorageType:       types.StringNull(),
-				EbsVolumeSizeInGB: types.Int64Null(),
-			}
-			if instance.Features.S3Failover.StorageType != nil {
-				resource.Features.S3Failover.StorageType = types.StringValue(*instance.Features.S3Failover.StorageType)
-			}
-			if instance.Features.S3Failover.EbsVolumeSizeInGB != nil {
-				resource.Features.S3Failover.EbsVolumeSizeInGB = types.Int64Value(int64(*instance.Features.S3Failover.EbsVolumeSizeInGB))
-			}
-		} else {
-			resource.Features.S3Failover = nil
-		}
-
 		// Metrics exporter
-		if instance.Features.MetricsExporter != nil {
-			metrics := &MetricsExporterModel{}
-			if instance.Features.MetricsExporter.Prometheus != nil {
-				prom := &PrometheusExporterModel{
-					Enabled:       types.BoolValue(true),
-					AuthType:      types.StringNull(),
-					EndPoint:      types.StringNull(),
-					PrometheusArn: types.StringNull(),
-					Username:      types.StringNull(),
-					Password:      types.StringNull(),
-					Token:         types.StringNull(),
-					Labels:        types.MapNull(types.StringType),
-				}
-				if instance.Features.MetricsExporter.Prometheus.AuthType != nil {
-					prom.AuthType = types.StringValue(*instance.Features.MetricsExporter.Prometheus.AuthType)
-				}
-				if instance.Features.MetricsExporter.Prometheus.EndPoint != nil {
-					prom.EndPoint = types.StringValue(*instance.Features.MetricsExporter.Prometheus.EndPoint)
-				}
-				if instance.Features.MetricsExporter.Prometheus.PrometheusArn != nil {
-					prom.PrometheusArn = types.StringValue(*instance.Features.MetricsExporter.Prometheus.PrometheusArn)
-				}
-				if instance.Features.MetricsExporter.Prometheus.Username != nil {
-					prom.Username = types.StringValue(*instance.Features.MetricsExporter.Prometheus.Username)
-				}
-				if len(instance.Features.MetricsExporter.Prometheus.Labels) > 0 {
-					labelMap := make(map[string]string)
-					for _, label := range instance.Features.MetricsExporter.Prometheus.Labels {
-						if label.Name != nil && label.Value != nil {
-							labelMap[*label.Name] = *label.Value
-						}
-					}
-					if len(labelMap) > 0 {
-						labelsValue, mapDiags := types.MapValueFrom(context.Background(), types.StringType, labelMap)
-						if mapDiags.HasError() {
-							diags.Append(mapDiags...)
-						} else {
-							prom.Labels = labelsValue
-						}
-					}
-				}
-				metrics.Prometheus = prom
-			}
-			if instance.Features.MetricsExporter.CloudWatch != nil {
-				cw := &CloudWatchExporterModel{
-					Enabled:   types.BoolValue(true),
-					Namespace: types.StringNull(),
-				}
-				if instance.Features.MetricsExporter.CloudWatch.Namespace != nil {
-					cw.Namespace = types.StringValue(*instance.Features.MetricsExporter.CloudWatch.Namespace)
-				}
-				metrics.CloudWatch = cw
-			}
-			if instance.Features.MetricsExporter.Kafka != nil {
-				kafka := &KafkaMetricsExporterModel{
-					Enabled:          types.BoolValue(instance.Features.MetricsExporter.Kafka.Enabled),
-					BootstrapServers: types.StringNull(),
-					Topic:            types.StringNull(),
-					CollectionPeriod: types.Int64Null(),
-					SecurityProtocol: types.StringNull(),
-					SaslMechanism:    types.StringNull(),
-					SaslUsername:     types.StringNull(),
-					SaslPassword:     types.StringNull(),
-				}
-				if instance.Features.MetricsExporter.Kafka.BootstrapServers != nil {
-					kafka.BootstrapServers = types.StringValue(*instance.Features.MetricsExporter.Kafka.BootstrapServers)
-				}
-				if instance.Features.MetricsExporter.Kafka.Topic != nil {
-					kafka.Topic = types.StringValue(*instance.Features.MetricsExporter.Kafka.Topic)
-				}
-				if instance.Features.MetricsExporter.Kafka.CollectionPeriod != nil {
-					kafka.CollectionPeriod = types.Int64Value(int64(*instance.Features.MetricsExporter.Kafka.CollectionPeriod))
-				}
-				if instance.Features.MetricsExporter.Kafka.SecurityProtocol != nil {
-					kafka.SecurityProtocol = types.StringValue(*instance.Features.MetricsExporter.Kafka.SecurityProtocol)
-				}
-				if instance.Features.MetricsExporter.Kafka.SaslMechanism != nil {
-					kafka.SaslMechanism = types.StringValue(*instance.Features.MetricsExporter.Kafka.SaslMechanism)
-				}
-				if instance.Features.MetricsExporter.Kafka.SaslUsername != nil {
-					kafka.SaslUsername = types.StringValue(*instance.Features.MetricsExporter.Kafka.SaslUsername)
-				}
-				if instance.Features.MetricsExporter.Kafka.SaslPassword != nil {
-					kafka.SaslPassword = types.StringValue(*instance.Features.MetricsExporter.Kafka.SaslPassword)
-				}
-				metrics.Kafka = kafka
-			}
+		var previousMetrics *MetricsExporterModel
+		if previousFeatures != nil {
+			previousMetrics = previousFeatures.MetricsExporter
+		}
+		if instance.Features.MetricsExporter != nil && !isMetricsExporterVOEmpty(instance.Features.MetricsExporter) {
+			metrics, metricsDiags := flattenMetricsExporterVO(instance.Features.MetricsExporter, previousMetrics)
+			diags.Append(metricsDiags...)
 			resource.Features.MetricsExporter = metrics
+		} else if previousMetrics != nil {
+			resource.Features.MetricsExporter = previousMetrics
 		} else {
 			resource.Features.MetricsExporter = nil
 		}
 
 		// Table topic
-		if instance.Features.TableTopic != nil {
-			topic := &TableTopicModel{
-				Warehouse:         types.StringNull(),
-				CatalogType:       types.StringNull(),
-				MetastoreURI:      types.StringNull(),
-				HiveAuthMode:      types.StringNull(),
-				KerberosPrincipal: types.StringNull(),
-				UserPrincipal:     types.StringNull(),
-				KeytabFile:        types.StringNull(),
-				Krb5ConfFile:      types.StringNull(),
-			}
-			if instance.Features.TableTopic.Warehouse != nil {
-				topic.Warehouse = types.StringValue(*instance.Features.TableTopic.Warehouse)
-			}
-			if instance.Features.TableTopic.CatalogType != nil {
-				topic.CatalogType = types.StringValue(*instance.Features.TableTopic.CatalogType)
-			}
-			if instance.Features.TableTopic.MetastoreUri != nil {
-				topic.MetastoreURI = types.StringValue(*instance.Features.TableTopic.MetastoreUri)
-			}
-			if instance.Features.TableTopic.HiveAuthMode != nil {
-				topic.HiveAuthMode = types.StringValue(*instance.Features.TableTopic.HiveAuthMode)
-			}
-			if instance.Features.TableTopic.KerberosPrincipal != nil {
-				topic.KerberosPrincipal = types.StringValue(*instance.Features.TableTopic.KerberosPrincipal)
-			}
-			if instance.Features.TableTopic.UserPrincipal != nil {
-				topic.UserPrincipal = types.StringValue(*instance.Features.TableTopic.UserPrincipal)
-			}
-			if instance.Features.TableTopic.KeytabFile != nil {
-				topic.KeytabFile = types.StringValue(*instance.Features.TableTopic.KeytabFile)
-			}
-			if instance.Features.TableTopic.Krb5ConfFile != nil {
-				topic.Krb5ConfFile = types.StringValue(*instance.Features.TableTopic.Krb5ConfFile)
-			}
-			resource.Features.TableTopic = topic
-		} else {
-			resource.Features.TableTopic = nil
+		var previousTableTopic *TableTopicModel
+		if previousFeatures != nil {
+			previousTableTopic = previousFeatures.TableTopic
 		}
+		resource.Features.TableTopic = flattenTableTopicVO(instance.Features.TableTopic, previousTableTopic)
 
 		// Extended listeners
-		if instance.Features.ExtendListeners != nil {
-			listeners := make([]InstanceListenerModel, 0, len(instance.Features.ExtendListeners))
-			for _, listener := range instance.Features.ExtendListeners {
-				model := InstanceListenerModel{
-					ListenerName:     types.StringNull(),
-					SecurityProtocol: types.StringNull(),
-					Port:             types.Int64Null(),
-				}
-				if listener.ListenerName != nil {
-					model.ListenerName = types.StringValue(*listener.ListenerName)
-				}
-				if listener.SecurityProtocol != nil {
-					model.SecurityProtocol = types.StringValue(*listener.SecurityProtocol)
-				}
-				if listener.Port != nil {
-					model.Port = types.Int64Value(int64(*listener.Port))
-				}
-				listeners = append(listeners, model)
-			}
-			resource.Features.ExtendListeners = listeners
-		} else {
-			resource.Features.ExtendListeners = nil
-		}
+		resource.Features.ExtendListeners = flattenExtendListenersVO(instance.Features.ExtendListeners)
 
 		if instance.Features.InboundRules != nil {
 			rules := make([]InboundRuleModel, 0, len(instance.Features.InboundRules))
@@ -1273,6 +1069,225 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 	}
 
 	return diags
+}
+
+func isMetricsExporterVOEmpty(vo *client.InstanceMetricsExporterVO) bool {
+	if vo == nil {
+		return true
+	}
+	if vo.Prometheus != nil && !isPrometheusVOEmpty(vo.Prometheus) {
+		return false
+	}
+	if vo.Kafka != nil && !isKafkaVOEmpty(vo.Kafka) {
+		return false
+	}
+	return true
+}
+
+func flattenMetricsExporterVO(vo *client.InstanceMetricsExporterVO, previous *MetricsExporterModel) (*MetricsExporterModel, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	if vo == nil || isMetricsExporterVOEmpty(vo) {
+		return nil, diags
+	}
+
+	metrics := MetricsExporterModel{}
+	if previous != nil {
+		metrics = *previous
+	}
+
+	var previousProm *PrometheusExporterModel
+	var previousKafka *KafkaMetricsExporterModel
+	if previous != nil {
+		previousProm = previous.Prometheus
+		previousKafka = previous.Kafka
+	}
+
+	prom, promDiags := flattenPrometheusExporterVO(vo.Prometheus, previousProm)
+	diags.Append(promDiags...)
+	metrics.Prometheus = prom
+	metrics.Kafka = flattenKafkaExporterVO(vo.Kafka, previousKafka)
+
+	if metrics.Prometheus == nil && metrics.Kafka == nil {
+		return nil, diags
+	}
+	return &metrics, diags
+}
+
+func flattenPrometheusExporterVO(vo *client.InstancePrometheusExporterVO, previous *PrometheusExporterModel) (*PrometheusExporterModel, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	if vo == nil || isPrometheusVOEmpty(vo) {
+		return nil, diags
+	}
+
+	prom := PrometheusExporterModel{
+		Enabled:       types.BoolNull(),
+		AuthType:      types.StringNull(),
+		EndPoint:      types.StringNull(),
+		PrometheusArn: types.StringNull(),
+		Username:      types.StringNull(),
+		Password:      types.StringNull(),
+		Token:         types.StringNull(),
+		Labels:        types.MapNull(types.StringType),
+	}
+	if previous != nil {
+		prom = *previous
+	}
+
+	prom.AuthType = retainString(vo.AuthType, prom.AuthType)
+	prom.EndPoint = retainString(vo.EndPoint, prom.EndPoint)
+	prom.PrometheusArn = retainString(vo.PrometheusArn, prom.PrometheusArn)
+	prom.Username = retainString(vo.Username, prom.Username)
+	prom.Password = prom.Password
+	prom.Token = prom.Token
+
+	if len(vo.Labels) > 0 {
+		labelMap := make(map[string]string, len(vo.Labels))
+		for _, label := range vo.Labels {
+			if label.Name != nil && label.Value != nil {
+				labelMap[*label.Name] = *label.Value
+			}
+		}
+		if len(labelMap) > 0 {
+			labelsValue, mapDiags := types.MapValueFrom(context.Background(), types.StringType, labelMap)
+			diags.Append(mapDiags...)
+			if !mapDiags.HasError() {
+				prom.Labels = labelsValue
+			}
+		}
+	} else if previous == nil {
+		prom.Labels = types.MapNull(types.StringType)
+	}
+
+	return &prom, diags
+}
+
+func flattenKafkaExporterVO(vo *client.InstanceKafkaMetricsExporterVO, previous *KafkaMetricsExporterModel) *KafkaMetricsExporterModel {
+	if vo == nil || isKafkaVOEmpty(vo) {
+		return nil
+	}
+
+	kafka := KafkaMetricsExporterModel{
+		Enabled:          types.BoolNull(),
+		BootstrapServers: types.StringNull(),
+		Topic:            types.StringNull(),
+		CollectionPeriod: types.Int64Null(),
+		SecurityProtocol: types.StringNull(),
+		SaslMechanism:    types.StringNull(),
+		SaslUsername:     types.StringNull(),
+		SaslPassword:     types.StringNull(),
+	}
+	if previous != nil {
+		kafka = *previous
+	}
+
+	kafka.Enabled = types.BoolValue(vo.Enabled)
+	kafka.BootstrapServers = retainString(vo.BootstrapServers, kafka.BootstrapServers)
+	kafka.Topic = retainString(vo.Topic, kafka.Topic)
+	kafka.CollectionPeriod = retainInt(vo.CollectionPeriod, kafka.CollectionPeriod)
+	kafka.SecurityProtocol = retainString(vo.SecurityProtocol, kafka.SecurityProtocol)
+	kafka.SaslMechanism = retainString(vo.SaslMechanism, kafka.SaslMechanism)
+	kafka.SaslUsername = retainString(vo.SaslUsername, kafka.SaslUsername)
+	kafka.SaslPassword = retainString(vo.SaslPassword, kafka.SaslPassword)
+
+	return &kafka
+}
+
+func flattenTableTopicVO(vo *client.TableTopicVO, previous *TableTopicModel) *TableTopicModel {
+	if vo == nil || !vo.Enabled {
+		return nil
+	}
+
+	topic := TableTopicModel{
+		Warehouse:         types.StringNull(),
+		CatalogType:       types.StringNull(),
+		MetastoreURI:      types.StringNull(),
+		HiveAuthMode:      types.StringNull(),
+		KerberosPrincipal: types.StringNull(),
+		UserPrincipal:     types.StringNull(),
+		KeytabFile:        types.StringNull(),
+		Krb5ConfFile:      types.StringNull(),
+	}
+	if previous != nil {
+		topic = *previous
+	}
+
+	topic.Warehouse = retainString(vo.Warehouse, topic.Warehouse)
+	topic.CatalogType = retainString(vo.CatalogType, topic.CatalogType)
+	topic.MetastoreURI = retainString(vo.MetastoreUri, topic.MetastoreURI)
+	topic.HiveAuthMode = retainString(vo.HiveAuthMode, topic.HiveAuthMode)
+	topic.KerberosPrincipal = retainString(vo.KerberosPrincipal, topic.KerberosPrincipal)
+	topic.UserPrincipal = retainString(vo.UserPrincipal, topic.UserPrincipal)
+	topic.KeytabFile = retainString(vo.KeytabFile, topic.KeytabFile)
+	topic.Krb5ConfFile = retainString(vo.Krb5ConfFile, topic.Krb5ConfFile)
+
+	return &topic
+}
+
+func flattenExtendListenersVO(list []client.InstanceListenerVO) []InstanceListenerModel {
+	if len(list) == 0 {
+		return nil
+	}
+
+	listeners := make([]InstanceListenerModel, 0, len(list))
+	for _, listener := range list {
+		model := InstanceListenerModel{
+			ListenerName:     types.StringNull(),
+			SecurityProtocol: types.StringNull(),
+			Port:             types.Int64Null(),
+		}
+		if listener.ListenerName != nil {
+			model.ListenerName = types.StringValue(*listener.ListenerName)
+		}
+		if listener.SecurityProtocol != nil {
+			model.SecurityProtocol = types.StringValue(*listener.SecurityProtocol)
+		}
+		if listener.Port != nil {
+			model.Port = types.Int64Value(int64(*listener.Port))
+		}
+		listeners = append(listeners, model)
+	}
+
+	if len(listeners) == 0 {
+		return nil
+	}
+	return listeners
+}
+
+func retainString(api *string, previous types.String) types.String {
+	if api != nil {
+		return types.StringValue(*api)
+	}
+	return previous
+}
+
+func retainInt(api *int32, previous types.Int64) types.Int64 {
+	if api != nil {
+		return types.Int64Value(int64(*api))
+	}
+	return previous
+}
+
+func isPrometheusVOEmpty(vo *client.InstancePrometheusExporterVO) bool {
+	if vo == nil {
+		return true
+	}
+	if vo.AuthType != nil || vo.EndPoint != nil || vo.Username != nil || vo.PrometheusArn != nil {
+		return false
+	}
+	return len(vo.Labels) == 0
+}
+
+func isKafkaVOEmpty(vo *client.InstanceKafkaMetricsExporterVO) bool {
+	if vo == nil {
+		return true
+	}
+	if vo.Enabled {
+		return false
+	}
+	if vo.BootstrapServers != nil || vo.Topic != nil || vo.CollectionPeriod != nil || vo.SecurityProtocol != nil || vo.SaslMechanism != nil || vo.SaslUsername != nil || vo.SaslPassword != nil {
+		return false
+	}
+	return true
 }
 
 // FlattenKafkaInstanceModelWithIntegrations adds integration information to the KafkaInstanceResourceModel.

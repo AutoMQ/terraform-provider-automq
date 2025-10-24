@@ -14,12 +14,7 @@ const (
 	ReplaceInstanceIntergationPath = "/api/v1/instances/%s/integrations"
 	TurnOnInstanceAclPath          = "/api/v1/instances/%s/acls:enable"
 	GetInstanceEndpointsPath       = "/api/v1/instances/%s/endpoints"
-	UpdateInstanceBasicInfoPath    = "/api/v1/instances/%s/basic"
-	UpdateInstanceVersionPath      = "/api/v1/instances/%s/versions/%s"
-	UpdateInstanceComputeSpecsPath = "/api/v1/instances/%s/spec"
 	UpdateInstancePath             = "/api/v1/instances/%s"
-	UpdateInstanceCertificatePath  = "/api/v1/instances/%s/certificate"
-	UpdateInstanceFileSystemsPath  = "/api/v1/instances/%s/file-systems"
 )
 
 func (c *Client) CreateKafkaInstance(ctx context.Context, kafka InstanceCreateParam) (*InstanceSummaryVO, error) {
@@ -125,37 +120,8 @@ func (c *Client) GetInstanceConfigs(ctx context.Context, instanceId string) ([]C
 	return instance.List, nil
 }
 
-func (c *Client) UpdateKafkaInstanceVersion(ctx context.Context, instanceId string, version string) error {
-	updateParam := InstanceVersionUpgradeParam{Version: version}
-	_, err := c.Put(ctx, fmt.Sprintf(UpdateInstanceVersionPath, instanceId, version), updateParam)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (c *Client) UpdateKafkaInstanceBasicInfo(ctx context.Context, instanceId string, updateParam InstanceBasicParam) error {
-	return c.updateInstance(ctx, instanceId, updateParam, UpdateInstanceBasicInfoPath)
-}
-
-func (c *Client) UpdateKafkaInstanceConfig(ctx context.Context, instanceId string, updateParam InstanceConfigParam) error {
-	return c.updateInstance(ctx, instanceId, updateParam, InstanceConfigPath)
-}
-
-func (c *Client) UpdateKafkaInstanceComputeSpecs(ctx context.Context, instanceId string, updateParam InstanceUpdateParam) error {
+func (c *Client) UpdateKafkaInstance(ctx context.Context, instanceId string, updateParam InstanceUpdateParam) error {
 	return c.updateInstance(ctx, instanceId, updateParam, UpdateInstancePath)
-}
-
-func (c *Client) UpdateKafkaInstanceFileSystems(ctx context.Context, instanceId string, updateParam InstanceUpdateParam) error {
-	return c.updateInstance(ctx, instanceId, updateParam, UpdateInstanceFileSystemsPath)
-}
-
-func (c *Client) UpdateKafkaInstanceCertificate(ctx context.Context, instanceId string, updateParam InstanceCertificateParam) error {
-	_, err := c.Put(ctx, fmt.Sprintf(UpdateInstanceCertificatePath, instanceId), updateParam)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func (c *Client) updateInstance(ctx context.Context, instanceId string, updateParam interface{}, path string) error {

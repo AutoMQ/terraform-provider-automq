@@ -373,8 +373,11 @@ type InstanceCertificateParam struct {
 }
 
 type InstanceUpdateParam struct {
-	Version *string                   `json:"version,omitempty"`
-	Spec    *SpecificationUpdateParam `json:"spec,omitempty"`
+	Name        *string                   `json:"name,omitempty"`
+	Description *string                   `json:"description,omitempty"`
+	Version     *string                   `json:"version,omitempty"`
+	Spec        *SpecificationUpdateParam `json:"spec,omitempty"`
+	Features    *InstanceFeatureParam     `json:"features,omitempty"`
 }
 
 type InstanceBasicParam struct {

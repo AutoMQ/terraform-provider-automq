@@ -38,6 +38,7 @@ func WaitForKafkaClusterToDeleted(ctx context.Context, c *client.Client, cluster
 }
 
 func KafkaClusterStatus(ctx context.Context, c *client.Client, clusterId string, targetState string) retry.StateRefreshFunc {
+	var lastState string
 	return func() (result interface{}, s string, err error) {
 		cluster, err := c.GetKafkaInstance(ctx, clusterId)
 		if err != nil {
@@ -51,10 +52,27 @@ func KafkaClusterStatus(ctx context.Context, c *client.Client, clusterId string,
 			return nil, models.StateUnknown, fmt.Errorf("Kafka Cluster %q not found", clusterId)
 		}
 
-		tflog.Debug(ctx, fmt.Sprintf("Waiting for Kafka Cluster %q status to become %q: current status is %q", clusterId, targetState, *cluster.State))
-		if *cluster.State == models.StateError {
+		currentState := derefState(cluster.State)
+		if currentState != lastState {
+			message := fmt.Sprintf("Kafka Cluster %q state -> %s", clusterId, currentState)
+			if currentState == models.StateError {
+				tflog.Error(ctx, message)
+			} else {
+				tflog.Info(ctx, message)
+			}
+			lastState = currentState
+		}
+
+		if currentState == models.StateError {
 			return nil, models.StateError, fmt.Errorf("Kafka Cluster %q status is %q", clusterId, models.StateError)
 		}
-		return cluster, *cluster.State, nil
+		return cluster, currentState, nil
 	}
+}
+
+func derefState(statePtr *string) string {
+	if statePtr == nil {
+		return models.StateUnknown
+	}
+	return *statePtr
 }
