@@ -29,18 +29,12 @@ type SpecificationParam struct {
 	Region                   *string                    `json:"region,omitempty"`
 	Scope                    *string                    `json:"scope,omitempty"`
 	Vpc                      *string                    `json:"vpc,omitempty"`
-	Domain                   *string                    `json:"domain,omitempty"`
 	DnsZone                  *string                    `json:"dnsZone,omitempty"`
 	KubernetesClusterId      *string                    `json:"kubernetesClusterId,omitempty"`
 	KubernetesNamespace      *string                    `json:"kubernetesNamespace,omitempty"`
 	KubernetesServiceAccount *string                    `json:"kubernetesServiceAccount,omitempty"`
-	Credential               *string                    `json:"credential,omitempty"`
 	InstanceRole             *string                    `json:"instanceRole,omitempty"`
 	DataBuckets              []BucketProfileParam       `json:"dataBuckets,omitempty"`
-	TenantId                 *string                    `json:"tenantId,omitempty"`
-	VpcResourceGroup         *string                    `json:"vpcResourceGroup,omitempty"`
-	K8sResourceGroup         *string                    `json:"k8sResourceGroup,omitempty"`
-	DnsResourceGroup         *string                    `json:"dnsResourceGroup,omitempty"`
 }
 
 type BucketProfileBindParam struct {
@@ -104,9 +98,8 @@ type InstanceFailoverParam struct {
 }
 
 type InstanceMetricsExporterParam struct {
-	Prometheus *InstancePrometheusExporterParam   `json:"prometheus,omitempty"`
-	CloudWatch *InstanceCloudWatchExporterParam   `json:"cloudWatch,omitempty"`
-	Kafka      *InstanceKafkaMetricsExporterParam `json:"kafka,omitempty"`
+	Prometheus *InstancePrometheusExporterParam `json:"prometheus,omitempty"`
+	CloudWatch *InstanceCloudWatchExporterParam `json:"cloudWatch,omitempty"`
 }
 
 type InstancePrometheusExporterParam struct {
@@ -123,17 +116,6 @@ type InstancePrometheusExporterParam struct {
 type InstanceCloudWatchExporterParam struct {
 	Enabled   *bool   `json:"enabled,omitempty"`
 	Namespace *string `json:"namespace,omitempty"`
-}
-
-type InstanceKafkaMetricsExporterParam struct {
-	Enabled          *bool   `json:"enabled,omitempty"`
-	BootstrapServers *string `json:"bootstrapServers,omitempty"`
-	Topic            *string `json:"topic,omitempty"`
-	CollectionPeriod *int32  `json:"collectionPeriod,omitempty"`
-	SecurityProtocol *string `json:"securityProtocol,omitempty"`
-	SaslMechanism    *string `json:"saslMechanism,omitempty"`
-	SaslUsername     *string `json:"saslUsername,omitempty"`
-	SaslPassword     *string `json:"saslPassword,omitempty"`
 }
 
 type MetricsLabelParam struct {
@@ -243,18 +225,12 @@ type SpecificationVO struct {
 	Region                   *string                  `json:"region,omitempty"`
 	Scope                    *string                  `json:"scope,omitempty"`
 	Vpc                      *string                  `json:"vpc,omitempty"`
-	Domain                   *string                  `json:"domain,omitempty"`
 	DnsZone                  *string                  `json:"dnsZone,omitempty"`
 	KubernetesClusterId      *string                  `json:"kubernetesClusterId,omitempty"`
 	KubernetesNamespace      *string                  `json:"kubernetesNamespace,omitempty"`
 	KubernetesServiceAccount *string                  `json:"kubernetesServiceAccount,omitempty"`
 	InstanceRole             *string                  `json:"instanceRole,omitempty"`
 	DeployType               *string                  `json:"deployType,omitempty"`
-	Credential               *string                  `json:"credential,omitempty"`
-	TenantId                 *string                  `json:"tenantId,omitempty"`
-	VpcResourceGroup         *string                  `json:"vpcResourceGroup,omitempty"`
-	K8sResourceGroup         *string                  `json:"k8sResourceGroup,omitempty"`
-	DnsResourceGroup         *string                  `json:"dnsResourceGroup,omitempty"`
 }
 
 type NodeConfigVO struct {
@@ -305,10 +281,9 @@ type InstanceFailoverVO struct {
 }
 
 type InstanceMetricsExporterVO struct {
-	Oltp       *InstanceOLTPExporterVO         `json:"oltp,omitempty"`
-	Prometheus *InstancePrometheusExporterVO   `json:"prometheus,omitempty"`
-	CloudWatch *InstanceCloudWatchExporterVO   `json:"cloudWatch,omitempty"`
-	Kafka      *InstanceKafkaMetricsExporterVO `json:"kafka,omitempty"`
+	Oltp       *InstanceOLTPExporterVO       `json:"oltp,omitempty"`
+	Prometheus *InstancePrometheusExporterVO `json:"prometheus,omitempty"`
+	CloudWatch *InstanceCloudWatchExporterVO `json:"cloudWatch,omitempty"`
 }
 
 type InstancePrometheusExporterVO struct {
@@ -326,17 +301,6 @@ type MetricsLabelVO struct {
 
 type InstanceCloudWatchExporterVO struct {
 	Namespace *string `json:"namespace,omitempty"`
-}
-
-type InstanceKafkaMetricsExporterVO struct {
-	Enabled          bool    `json:"enabled"`
-	BootstrapServers *string `json:"bootstrapServers,omitempty"`
-	Topic            *string `json:"topic,omitempty"`
-	CollectionPeriod *int32  `json:"collectionPeriod,omitempty"`
-	SecurityProtocol *string `json:"securityProtocol,omitempty"`
-	SaslMechanism    *string `json:"saslMechanism,omitempty"`
-	SaslUsername     *string `json:"saslUsername,omitempty"`
-	SaslPassword     *string `json:"saslPassword,omitempty"`
 }
 
 type TableTopicVO struct {
@@ -406,18 +370,12 @@ type SpecificationUpdateParam struct {
 	Region                   *string                    `json:"region,omitempty"`
 	Scope                    *string                    `json:"scope,omitempty"`
 	Vpc                      *string                    `json:"vpc,omitempty"`
-	Domain                   *string                    `json:"domain,omitempty"`
 	DnsZone                  *string                    `json:"dnsZone,omitempty"`
 	KubernetesClusterId      *string                    `json:"kubernetesClusterId,omitempty"`
 	KubernetesNamespace      *string                    `json:"kubernetesNamespace,omitempty"`
 	KubernetesServiceAccount *string                    `json:"kubernetesServiceAccount,omitempty"`
-	Credential               *string                    `json:"credential,omitempty"`
 	InstanceRole             *string                    `json:"instanceRole,omitempty"`
 	DataBuckets              []BucketProfileParam       `json:"dataBuckets,omitempty"`
-	TenantId                 *string                    `json:"tenantId,omitempty"`
-	VpcResourceGroup         *string                    `json:"vpcResourceGroup,omitempty"`
-	K8sResourceGroup         *string                    `json:"k8sResourceGroup,omitempty"`
-	DnsResourceGroup         *string                    `json:"dnsResourceGroup,omitempty"`
 }
 
 type KafkaInstanceRequestPaymentPlan struct {

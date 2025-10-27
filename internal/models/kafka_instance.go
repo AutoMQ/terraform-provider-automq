@@ -73,6 +73,7 @@ type ComputeSpecsModel struct {
 	KubernetesNodeGroups  []NodeGroupModel       `tfsdk:"kubernetes_node_groups"`
 	BucketProfiles        []BucketProfileIDModel `tfsdk:"bucket_profiles"`
 	FileSystemParam       *FileSystemParamModel  `tfsdk:"file_system_param"`
+	SecurityGroup         types.String           `tfsdk:"security_group"`
 	DeployType            types.String           `tfsdk:"deploy_type"`
 	Provider              types.String           `tfsdk:"provider"`
 	Region                types.String           `tfsdk:"region"`
@@ -82,13 +83,8 @@ type ComputeSpecsModel struct {
 	KubernetesClusterID   types.String           `tfsdk:"kubernetes_cluster_id"`
 	KubernetesNamespace   types.String           `tfsdk:"kubernetes_namespace"`
 	KubernetesServiceAcct types.String           `tfsdk:"kubernetes_service_account"`
-	Credential            types.String           `tfsdk:"credential"`
 	InstanceRole          types.String           `tfsdk:"instance_role"`
 	DataBuckets           types.List             `tfsdk:"data_buckets"`
-	TenantID              types.String           `tfsdk:"tenant_id"`
-	VpcResourceGroup      types.String           `tfsdk:"vpc_resource_group"`
-	K8sResourceGroup      types.String           `tfsdk:"k8s_resource_group"`
-	DnsResourceGroup      types.String           `tfsdk:"dns_resource_group"`
 }
 
 type NodeGroupModel struct {
@@ -179,8 +175,7 @@ type SecuritySummaryModel struct {
 }
 
 type MetricsExporterModel struct {
-	Prometheus *PrometheusExporterModel   `tfsdk:"prometheus"`
-	Kafka      *KafkaMetricsExporterModel `tfsdk:"kafka"`
+	Prometheus *PrometheusExporterModel `tfsdk:"prometheus"`
 }
 
 type PrometheusExporterModel struct {
@@ -192,17 +187,6 @@ type PrometheusExporterModel struct {
 	Password      types.String `tfsdk:"password"`
 	Token         types.String `tfsdk:"token"`
 	Labels        types.Map    `tfsdk:"labels"`
-}
-
-type KafkaMetricsExporterModel struct {
-	Enabled          types.Bool   `tfsdk:"enabled"`
-	BootstrapServers types.String `tfsdk:"bootstrap_servers"`
-	Topic            types.String `tfsdk:"topic"`
-	CollectionPeriod types.Int64  `tfsdk:"collection_period"`
-	SecurityProtocol types.String `tfsdk:"security_protocol"`
-	SaslMechanism    types.String `tfsdk:"sasl_mechanism"`
-	SaslUsername     types.String `tfsdk:"sasl_username"`
-	SaslPassword     types.String `tfsdk:"sasl_password"`
 }
 
 type TableTopicModel struct {
@@ -295,31 +279,14 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 			serviceAccount := instance.ComputeSpecs.KubernetesServiceAcct.ValueString()
 			request.Spec.KubernetesServiceAccount = &serviceAccount
 		}
-		if !instance.ComputeSpecs.Credential.IsNull() && !instance.ComputeSpecs.Credential.IsUnknown() {
-			cred := instance.ComputeSpecs.Credential.ValueString()
-			request.Spec.Credential = &cred
+		if !instance.ComputeSpecs.SecurityGroup.IsNull() && !instance.ComputeSpecs.SecurityGroup.IsUnknown() {
+			securityGroup := instance.ComputeSpecs.SecurityGroup.ValueString()
+			request.Spec.SecurityGroup = &securityGroup
 		}
 		if !instance.ComputeSpecs.InstanceRole.IsNull() && !instance.ComputeSpecs.InstanceRole.IsUnknown() {
 			role := instance.ComputeSpecs.InstanceRole.ValueString()
 			request.Spec.InstanceRole = &role
 		}
-		if !instance.ComputeSpecs.TenantID.IsNull() && !instance.ComputeSpecs.TenantID.IsUnknown() {
-			tenant := instance.ComputeSpecs.TenantID.ValueString()
-			request.Spec.TenantId = &tenant
-		}
-		if !instance.ComputeSpecs.VpcResourceGroup.IsNull() && !instance.ComputeSpecs.VpcResourceGroup.IsUnknown() {
-			rg := instance.ComputeSpecs.VpcResourceGroup.ValueString()
-			request.Spec.VpcResourceGroup = &rg
-		}
-		if !instance.ComputeSpecs.K8sResourceGroup.IsNull() && !instance.ComputeSpecs.K8sResourceGroup.IsUnknown() {
-			k8sRg := instance.ComputeSpecs.K8sResourceGroup.ValueString()
-			request.Spec.K8sResourceGroup = &k8sRg
-		}
-		if !instance.ComputeSpecs.DnsResourceGroup.IsNull() && !instance.ComputeSpecs.DnsResourceGroup.IsUnknown() {
-			dnsRg := instance.ComputeSpecs.DnsResourceGroup.ValueString()
-			request.Spec.DnsResourceGroup = &dnsRg
-		}
-
 		// ignore Node Configs
 
 		// Networks
@@ -507,44 +474,6 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 					}
 				}
 				exporter.Prometheus = prom
-				hasConfig = true
-			}
-			if instance.Features.MetricsExporter.Kafka != nil {
-				kafkaConfig := instance.Features.MetricsExporter.Kafka
-				kafka := &client.InstanceKafkaMetricsExporterParam{}
-				if !kafkaConfig.Enabled.IsNull() && !kafkaConfig.Enabled.IsUnknown() {
-					enabled := kafkaConfig.Enabled.ValueBool()
-					kafka.Enabled = &enabled
-				}
-				if !kafkaConfig.BootstrapServers.IsNull() && !kafkaConfig.BootstrapServers.IsUnknown() {
-					servers := kafkaConfig.BootstrapServers.ValueString()
-					kafka.BootstrapServers = &servers
-				}
-				if !kafkaConfig.Topic.IsNull() && !kafkaConfig.Topic.IsUnknown() {
-					topic := kafkaConfig.Topic.ValueString()
-					kafka.Topic = &topic
-				}
-				if !kafkaConfig.CollectionPeriod.IsNull() && !kafkaConfig.CollectionPeriod.IsUnknown() {
-					period := int32(kafkaConfig.CollectionPeriod.ValueInt64())
-					kafka.CollectionPeriod = &period
-				}
-				if !kafkaConfig.SecurityProtocol.IsNull() && !kafkaConfig.SecurityProtocol.IsUnknown() {
-					protocol := kafkaConfig.SecurityProtocol.ValueString()
-					kafka.SecurityProtocol = &protocol
-				}
-				if !kafkaConfig.SaslMechanism.IsNull() && !kafkaConfig.SaslMechanism.IsUnknown() {
-					mechanism := kafkaConfig.SaslMechanism.ValueString()
-					kafka.SaslMechanism = &mechanism
-				}
-				if !kafkaConfig.SaslUsername.IsNull() && !kafkaConfig.SaslUsername.IsUnknown() {
-					username := kafkaConfig.SaslUsername.ValueString()
-					kafka.SaslUsername = &username
-				}
-				if !kafkaConfig.SaslPassword.IsNull() && !kafkaConfig.SaslPassword.IsUnknown() {
-					password := kafkaConfig.SaslPassword.ValueString()
-					kafka.SaslPassword = &password
-				}
-				exporter.Kafka = kafka
 				hasConfig = true
 			}
 			if hasConfig {
@@ -801,6 +730,7 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 				KubernetesNodeGroups:  []NodeGroupModel{},
 				BucketProfiles:        []BucketProfileIDModel{},
 				DataBuckets:           types.ListNull(DataBucketObjectType),
+				SecurityGroup:         types.StringNull(),
 				DeployType:            types.StringNull(),
 				Provider:              types.StringNull(),
 				Region:                types.StringNull(),
@@ -810,12 +740,7 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 				KubernetesClusterID:   types.StringNull(),
 				KubernetesNamespace:   types.StringNull(),
 				KubernetesServiceAcct: types.StringNull(),
-				Credential:            types.StringNull(),
 				InstanceRole:          types.StringNull(),
-				TenantID:              types.StringNull(),
-				VpcResourceGroup:      types.StringNull(),
-				K8sResourceGroup:      types.StringNull(),
-				DnsResourceGroup:      types.StringNull(),
 			}
 		}
 		resource.ComputeSpecs.FileSystemParam = nil
@@ -824,8 +749,7 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 			resource.ComputeSpecs.ReservedAku = types.Int64Value(int64(*instance.Spec.ReservedAku))
 		}
 		var prevDeploy, prevProvider, prevRegion, prevScope, prevVpc, prevDnsZone *types.String
-		var prevClusterID, prevNamespace, prevServiceAccount, prevCredential, prevInstanceRole *types.String
-		var prevTenantID, prevVpcRG, prevK8sRG, prevDnsRG *types.String
+		var prevSecurityGroup, prevClusterID, prevNamespace, prevServiceAccount, prevInstanceRole *types.String
 		if previousSpecs != nil {
 			prevDeploy = &previousSpecs.DeployType
 			prevProvider = &previousSpecs.Provider
@@ -833,15 +757,11 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 			prevScope = &previousSpecs.Scope
 			prevVpc = &previousSpecs.Vpc
 			prevDnsZone = &previousSpecs.DnsZone
+			prevSecurityGroup = &previousSpecs.SecurityGroup
 			prevClusterID = &previousSpecs.KubernetesClusterID
 			prevNamespace = &previousSpecs.KubernetesNamespace
 			prevServiceAccount = &previousSpecs.KubernetesServiceAcct
-			prevCredential = &previousSpecs.Credential
 			prevInstanceRole = &previousSpecs.InstanceRole
-			prevTenantID = &previousSpecs.TenantID
-			prevVpcRG = &previousSpecs.VpcResourceGroup
-			prevK8sRG = &previousSpecs.K8sResourceGroup
-			prevDnsRG = &previousSpecs.DnsResourceGroup
 		}
 		resource.ComputeSpecs.DeployType = coalesceStringAttr(instance.Spec.DeployType, prevDeploy)
 		resource.ComputeSpecs.Provider = coalesceStringAttr(instance.Spec.Provider, prevProvider)
@@ -849,15 +769,11 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 		resource.ComputeSpecs.Scope = coalesceStringAttr(instance.Spec.Scope, prevScope)
 		resource.ComputeSpecs.Vpc = coalesceStringAttr(instance.Spec.Vpc, prevVpc)
 		resource.ComputeSpecs.DnsZone = coalesceStringAttr(instance.Spec.DnsZone, prevDnsZone)
+		resource.ComputeSpecs.SecurityGroup = coalesceStringAttr(instance.Spec.SecurityGroupId, prevSecurityGroup)
 		resource.ComputeSpecs.KubernetesClusterID = coalesceStringAttr(instance.Spec.KubernetesClusterId, prevClusterID)
 		resource.ComputeSpecs.KubernetesNamespace = coalesceStringAttr(instance.Spec.KubernetesNamespace, prevNamespace)
 		resource.ComputeSpecs.KubernetesServiceAcct = coalesceStringAttr(instance.Spec.KubernetesServiceAccount, prevServiceAccount)
-		resource.ComputeSpecs.Credential = coalesceStringAttr(instance.Spec.Credential, prevCredential)
 		resource.ComputeSpecs.InstanceRole = coalesceStringAttr(instance.Spec.InstanceRole, prevInstanceRole)
-		resource.ComputeSpecs.TenantID = coalesceStringAttr(instance.Spec.TenantId, prevTenantID)
-		resource.ComputeSpecs.VpcResourceGroup = coalesceStringAttr(instance.Spec.VpcResourceGroup, prevVpcRG)
-		resource.ComputeSpecs.K8sResourceGroup = coalesceStringAttr(instance.Spec.K8sResourceGroup, prevK8sRG)
-		resource.ComputeSpecs.DnsResourceGroup = coalesceStringAttr(instance.Spec.DnsResourceGroup, prevDnsRG)
 
 		// Kubernetes Node Groups
 		if instance.Spec.KubernetesNodeGroups != nil {
@@ -1078,9 +994,6 @@ func isMetricsExporterVOEmpty(vo *client.InstanceMetricsExporterVO) bool {
 	if vo.Prometheus != nil && !isPrometheusVOEmpty(vo.Prometheus) {
 		return false
 	}
-	if vo.Kafka != nil && !isKafkaVOEmpty(vo.Kafka) {
-		return false
-	}
 	return true
 }
 
@@ -1096,18 +1009,15 @@ func flattenMetricsExporterVO(vo *client.InstanceMetricsExporterVO, previous *Me
 	}
 
 	var previousProm *PrometheusExporterModel
-	var previousKafka *KafkaMetricsExporterModel
 	if previous != nil {
 		previousProm = previous.Prometheus
-		previousKafka = previous.Kafka
 	}
 
 	prom, promDiags := flattenPrometheusExporterVO(vo.Prometheus, previousProm)
 	diags.Append(promDiags...)
 	metrics.Prometheus = prom
-	metrics.Kafka = flattenKafkaExporterVO(vo.Kafka, previousKafka)
 
-	if metrics.Prometheus == nil && metrics.Kafka == nil {
+	if metrics.Prometheus == nil {
 		return nil, diags
 	}
 	return &metrics, diags
@@ -1159,37 +1069,6 @@ func flattenPrometheusExporterVO(vo *client.InstancePrometheusExporterVO, previo
 	}
 
 	return &prom, diags
-}
-
-func flattenKafkaExporterVO(vo *client.InstanceKafkaMetricsExporterVO, previous *KafkaMetricsExporterModel) *KafkaMetricsExporterModel {
-	if vo == nil || isKafkaVOEmpty(vo) {
-		return nil
-	}
-
-	kafka := KafkaMetricsExporterModel{
-		Enabled:          types.BoolNull(),
-		BootstrapServers: types.StringNull(),
-		Topic:            types.StringNull(),
-		CollectionPeriod: types.Int64Null(),
-		SecurityProtocol: types.StringNull(),
-		SaslMechanism:    types.StringNull(),
-		SaslUsername:     types.StringNull(),
-		SaslPassword:     types.StringNull(),
-	}
-	if previous != nil {
-		kafka = *previous
-	}
-
-	kafka.Enabled = types.BoolValue(vo.Enabled)
-	kafka.BootstrapServers = retainString(vo.BootstrapServers, kafka.BootstrapServers)
-	kafka.Topic = retainString(vo.Topic, kafka.Topic)
-	kafka.CollectionPeriod = retainInt(vo.CollectionPeriod, kafka.CollectionPeriod)
-	kafka.SecurityProtocol = retainString(vo.SecurityProtocol, kafka.SecurityProtocol)
-	kafka.SaslMechanism = retainString(vo.SaslMechanism, kafka.SaslMechanism)
-	kafka.SaslUsername = retainString(vo.SaslUsername, kafka.SaslUsername)
-	kafka.SaslPassword = retainString(vo.SaslPassword, kafka.SaslPassword)
-
-	return &kafka
 }
 
 func flattenTableTopicVO(vo *client.TableTopicVO, previous *TableTopicModel) *TableTopicModel {
@@ -1260,13 +1139,6 @@ func retainString(api *string, previous types.String) types.String {
 	return previous
 }
 
-func retainInt(api *int32, previous types.Int64) types.Int64 {
-	if api != nil {
-		return types.Int64Value(int64(*api))
-	}
-	return previous
-}
-
 func isPrometheusVOEmpty(vo *client.InstancePrometheusExporterVO) bool {
 	if vo == nil {
 		return true
@@ -1275,19 +1147,6 @@ func isPrometheusVOEmpty(vo *client.InstancePrometheusExporterVO) bool {
 		return false
 	}
 	return len(vo.Labels) == 0
-}
-
-func isKafkaVOEmpty(vo *client.InstanceKafkaMetricsExporterVO) bool {
-	if vo == nil {
-		return true
-	}
-	if vo.Enabled {
-		return false
-	}
-	if vo.BootstrapServers != nil || vo.Topic != nil || vo.CollectionPeriod != nil || vo.SecurityProtocol != nil || vo.SaslMechanism != nil || vo.SaslUsername != nil || vo.SaslPassword != nil {
-		return false
-	}
-	return true
 }
 
 // FlattenKafkaInstanceModelWithIntegrations adds integration information to the KafkaInstanceResourceModel.

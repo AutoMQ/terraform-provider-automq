@@ -81,12 +81,8 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 					"kubernetes_cluster_id":      schema.StringAttribute{Computed: true},
 					"kubernetes_namespace":       schema.StringAttribute{Computed: true},
 					"kubernetes_service_account": schema.StringAttribute{Computed: true},
-					"credential":                 schema.StringAttribute{Computed: true},
+					"security_group":             schema.StringAttribute{Computed: true},
 					"instance_role":              schema.StringAttribute{Computed: true},
-					"tenant_id":                  schema.StringAttribute{Computed: true},
-					"vpc_resource_group":         schema.StringAttribute{Computed: true},
-					"k8s_resource_group":         schema.StringAttribute{Computed: true},
-					"dns_resource_group":         schema.StringAttribute{Computed: true},
 					"networks": schema.ListNestedAttribute{
 						Computed:    true,
 						Description: "To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones.",

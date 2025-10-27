@@ -168,31 +168,46 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						Optional:            true,
 						Computed:            true,
 						MarkdownDescription: "Cloud provider identifier, e.g. `aws`.",
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 					"region": schema.StringAttribute{
 						Optional:            true,
 						Computed:            true,
 						MarkdownDescription: "Region where the instance will be deployed.",
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 					"scope": schema.StringAttribute{
 						Optional:            true,
 						Computed:            true,
 						MarkdownDescription: "Cloud provider scope such as account ID or organization.",
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 					"vpc": schema.StringAttribute{
 						Optional:            true,
 						Computed:            true,
 						MarkdownDescription: "VPC identifier for the deployment target.",
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 					"dns_zone": schema.StringAttribute{
 						Optional:            true,
 						Computed:            true,
 						MarkdownDescription: "DNS zone used when creating custom records.",
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 					"networks": schema.ListNestedAttribute{
 						Optional:    true,
@@ -315,42 +330,15 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							stringplanmodifier.UseStateForUnknown(),
 						},
 					},
-					"credential": schema.StringAttribute{
-						Computed: true,
-						Optional: true,
+					"security_group": schema.StringAttribute{
+						Computed:            true,
+						Optional:            true,
+						MarkdownDescription: "Security group identifier associated with the instance infrastructure.",
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.UseStateForUnknown(),
 						},
 					},
 					"instance_role": schema.StringAttribute{
-						Computed: true,
-						Optional: true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
-						},
-					},
-					"tenant_id": schema.StringAttribute{
-						Computed: true,
-						Optional: true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
-						},
-					},
-					"vpc_resource_group": schema.StringAttribute{
-						Computed: true,
-						Optional: true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
-						},
-					},
-					"k8s_resource_group": schema.StringAttribute{
-						Computed: true,
-						Optional: true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
-						},
-					},
-					"dns_resource_group": schema.StringAttribute{
 						Computed: true,
 						Optional: true,
 						PlanModifiers: []planmodifier.String{
@@ -462,19 +450,6 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 										Optional:    true,
 										ElementType: types.StringType,
 									},
-								},
-							},
-							"kafka": schema.SingleNestedAttribute{
-								Optional: true,
-								Attributes: map[string]schema.Attribute{
-									"enabled":           schema.BoolAttribute{Optional: true},
-									"bootstrap_servers": schema.StringAttribute{Optional: true},
-									"topic":             schema.StringAttribute{Optional: true},
-									"collection_period": schema.Int64Attribute{Optional: true},
-									"security_protocol": schema.StringAttribute{Optional: true},
-									"sasl_mechanism":    schema.StringAttribute{Optional: true},
-									"sasl_username":     schema.StringAttribute{Optional: true},
-									"sasl_password":     schema.StringAttribute{Optional: true},
 								},
 							},
 						},
@@ -1196,9 +1171,6 @@ func metricsExporterChanged(plan, state *models.MetricsExporterModel) bool {
 	if !prometheusExporterEqual(plan.Prometheus, state.Prometheus) {
 		return true
 	}
-	if !kafkaExporterEqual(plan.Kafka, state.Kafka) {
-		return true
-	}
 	return false
 }
 
@@ -1207,9 +1179,6 @@ func hasMetricsExporterConfig(model *models.MetricsExporterModel) bool {
 		return false
 	}
 	if model.Prometheus != nil && prometheusExporterHasConfig(model.Prometheus) {
-		return true
-	}
-	if model.Kafka != nil && kafkaExporterHasConfig(model.Kafka) {
 		return true
 	}
 	return false
@@ -1277,68 +1246,6 @@ func prometheusExporterHasConfig(model *models.PrometheusExporterModel) bool {
 	return false
 }
 
-func kafkaExporterEqual(plan, state *models.KafkaMetricsExporterModel) bool {
-	if plan == nil || state == nil {
-		return plan == nil && state == nil
-	}
-	if !boolAttrEqual(plan.Enabled, state.Enabled) {
-		return false
-	}
-	if !stringAttrEqual(plan.BootstrapServers, state.BootstrapServers) {
-		return false
-	}
-	if !stringAttrEqual(plan.Topic, state.Topic) {
-		return false
-	}
-	if !int64AttrEqual(plan.CollectionPeriod, state.CollectionPeriod) {
-		return false
-	}
-	if !stringAttrEqual(plan.SecurityProtocol, state.SecurityProtocol) {
-		return false
-	}
-	if !stringAttrEqual(plan.SaslMechanism, state.SaslMechanism) {
-		return false
-	}
-	if !stringAttrEqual(plan.SaslUsername, state.SaslUsername) {
-		return false
-	}
-	if !stringAttrEqual(plan.SaslPassword, state.SaslPassword) {
-		return false
-	}
-	return true
-}
-
-func kafkaExporterHasConfig(model *models.KafkaMetricsExporterModel) bool {
-	if model == nil {
-		return false
-	}
-	if !model.Enabled.IsNull() && !model.Enabled.IsUnknown() {
-		return true
-	}
-	if !model.BootstrapServers.IsNull() && !model.BootstrapServers.IsUnknown() {
-		return true
-	}
-	if !model.Topic.IsNull() && !model.Topic.IsUnknown() {
-		return true
-	}
-	if !model.CollectionPeriod.IsNull() && !model.CollectionPeriod.IsUnknown() {
-		return true
-	}
-	if !model.SecurityProtocol.IsNull() && !model.SecurityProtocol.IsUnknown() {
-		return true
-	}
-	if !model.SaslMechanism.IsNull() && !model.SaslMechanism.IsUnknown() {
-		return true
-	}
-	if !model.SaslUsername.IsNull() && !model.SaslUsername.IsUnknown() {
-		return true
-	}
-	if !model.SaslPassword.IsNull() && !model.SaslPassword.IsUnknown() {
-		return true
-	}
-	return false
-}
-
 func buildMetricsExporterParam(model *models.MetricsExporterModel) (*client.InstanceMetricsExporterParam, bool) {
 	if model == nil {
 		return nil, false
@@ -1349,13 +1256,6 @@ func buildMetricsExporterParam(model *models.MetricsExporterModel) (*client.Inst
 		prom, ok := buildPrometheusExporterParam(model.Prometheus)
 		if ok {
 			exporter.Prometheus = prom
-			hasConfig = true
-		}
-	}
-	if model.Kafka != nil {
-		kafka, ok := buildKafkaExporterParam(model.Kafka)
-		if ok {
-			exporter.Kafka = kafka
 			hasConfig = true
 		}
 	}
@@ -1412,49 +1312,6 @@ func buildPrometheusExporterParam(model *models.PrometheusExporterModel) (*clien
 		}
 	}
 	return prom, true
-}
-
-func buildKafkaExporterParam(model *models.KafkaMetricsExporterModel) (*client.InstanceKafkaMetricsExporterParam, bool) {
-	if model == nil {
-		return nil, false
-	}
-	if !kafkaExporterHasConfig(model) {
-		return nil, false
-	}
-	kafka := &client.InstanceKafkaMetricsExporterParam{}
-	if !model.Enabled.IsNull() && !model.Enabled.IsUnknown() {
-		enabled := model.Enabled.ValueBool()
-		kafka.Enabled = &enabled
-	}
-	if !model.BootstrapServers.IsNull() && !model.BootstrapServers.IsUnknown() {
-		servers := model.BootstrapServers.ValueString()
-		kafka.BootstrapServers = &servers
-	}
-	if !model.Topic.IsNull() && !model.Topic.IsUnknown() {
-		topic := model.Topic.ValueString()
-		kafka.Topic = &topic
-	}
-	if !model.CollectionPeriod.IsNull() && !model.CollectionPeriod.IsUnknown() {
-		period := int32(model.CollectionPeriod.ValueInt64())
-		kafka.CollectionPeriod = &period
-	}
-	if !model.SecurityProtocol.IsNull() && !model.SecurityProtocol.IsUnknown() {
-		protocol := model.SecurityProtocol.ValueString()
-		kafka.SecurityProtocol = &protocol
-	}
-	if !model.SaslMechanism.IsNull() && !model.SaslMechanism.IsUnknown() {
-		mechanism := model.SaslMechanism.ValueString()
-		kafka.SaslMechanism = &mechanism
-	}
-	if !model.SaslUsername.IsNull() && !model.SaslUsername.IsUnknown() {
-		username := model.SaslUsername.ValueString()
-		kafka.SaslUsername = &username
-	}
-	if !model.SaslPassword.IsNull() && !model.SaslPassword.IsUnknown() {
-		password := model.SaslPassword.ValueString()
-		kafka.SaslPassword = &password
-	}
-	return kafka, true
 }
 
 func boolAttrEqual(plan, state types.Bool) bool {

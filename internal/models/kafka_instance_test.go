@@ -111,10 +111,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 								"env": types.StringValue("test"),
 							}),
 						},
-						Kafka: &KafkaMetricsExporterModel{
-							Enabled:          types.BoolValue(true),
-							BootstrapServers: types.StringValue("broker:9092"),
-						},
 					},
 					TableTopic: &TableTopicModel{
 						Warehouse:   types.StringValue("warehouse-1"),
@@ -190,10 +186,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 							Labels: []client.MetricsLabelParam{
 								{Name: "env", Value: "test"},
 							},
-						},
-						Kafka: &client.InstanceKafkaMetricsExporterParam{
-							Enabled:          boolPtr(true),
-							BootstrapServers: stringPtr("broker:9092"),
 						},
 					},
 					TableTopic: &client.TableTopicParam{
