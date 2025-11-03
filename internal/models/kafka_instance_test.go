@@ -63,9 +63,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku: types.Int64Value(4),
 					DeployType:  types.StringValue("IAAS"),
-					Provider:    types.StringValue("aws"),
-					Region:      types.StringValue("us-east-1"),
-					Vpc:         types.StringValue("vpc-1"),
 					DataBuckets: types.ListValueMust(
 						DataBucketObjectType,
 						[]attr.Value{
@@ -116,13 +113,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 						Warehouse:   types.StringValue("warehouse-1"),
 						CatalogType: types.StringValue("HIVE"),
 					},
-					ExtendListeners: []InstanceListenerModel{
-						{
-							ListenerName:     types.StringValue("PUBLIC"),
-							SecurityProtocol: types.StringValue("PLAINTEXT"),
-							Port:             types.Int64Value(19092),
-						},
-					},
 					InboundRules: []InboundRuleModel{
 						{
 							ListenerName: types.StringValue("PUBLIC"),
@@ -140,9 +130,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 					ReservedAku: 4,
 					NodeConfig:  &client.NodeConfigParam{},
 					DeployType:  stringPtr("IAAS"),
-					Provider:    stringPtr("aws"),
-					Region:      stringPtr("us-east-1"),
-					Vpc:         stringPtr("vpc-1"),
 					Networks: []client.InstanceNetworkParam{
 						{
 							Zone:   "zone-1",
@@ -191,13 +178,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 					TableTopic: &client.TableTopicParam{
 						Warehouse:   "warehouse-1",
 						CatalogType: "HIVE",
-					},
-					ExtendListeners: []client.InstanceListenerParam{
-						{
-							ListenerName:     "PUBLIC",
-							SecurityProtocol: stringPtr("PLAINTEXT"),
-							Port:             int32Ptr(19092),
-						},
 					},
 					InboundRules: []client.InboundRuleParam{
 						{

@@ -164,42 +164,6 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							stringvalidator.OneOf("IAAS", "K8S"),
 						},
 					},
-					"provider": schema.StringAttribute{
-						Optional:            true,
-						Computed:            true,
-						MarkdownDescription: "Cloud provider identifier, e.g. `aws`.",
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
-							stringplanmodifier.RequiresReplace(),
-						},
-					},
-					"region": schema.StringAttribute{
-						Optional:            true,
-						Computed:            true,
-						MarkdownDescription: "Region where the instance will be deployed.",
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
-							stringplanmodifier.RequiresReplace(),
-						},
-					},
-					"scope": schema.StringAttribute{
-						Optional:            true,
-						Computed:            true,
-						MarkdownDescription: "Cloud provider scope such as account ID or organization.",
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
-							stringplanmodifier.RequiresReplace(),
-						},
-					},
-					"vpc": schema.StringAttribute{
-						Optional:            true,
-						Computed:            true,
-						MarkdownDescription: "VPC identifier for the deployment target.",
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
-							stringplanmodifier.RequiresReplace(),
-						},
-					},
 					"dns_zone": schema.StringAttribute{
 						Optional:            true,
 						Computed:            true,
@@ -210,11 +174,12 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						},
 					},
 					"networks": schema.ListNestedAttribute{
-						Optional:    true,
+						Required:    true,
 						Description: "To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones.",
 						Validators: []validator.List{
 							listvalidator.UniqueValues(),
-							listvalidator.SizeBetween(1, 3),
+							listvalidator.SizeAtMost(3),
+							listvalidator.SizeAtLeast(1),
 						},
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
@@ -224,12 +189,11 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 									PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 								},
 								"subnets": schema.ListAttribute{
-									Required:    true,
+									Optional:    true,
 									Description: "Specify the subnet under the corresponding availability zone for deploying the instance. Currently, only one subnet can be set for each availability zone.",
 									ElementType: types.StringType,
 									Validators: []validator.List{
 										listvalidator.UniqueValues(),
-										listvalidator.SizeAtLeast(1),
 										listvalidator.SizeAtMost(1),
 									},
 									PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplace()},
@@ -484,29 +448,6 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 									ElementType: types.StringType,
 								},
 							},
-						},
-					},
-					"extend_listeners": schema.ListNestedAttribute{
-						Optional: true,
-						Validators: []validator.List{
-							listvalidator.SizeAtMost(5),
-						},
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"listener_name": schema.StringAttribute{
-									Required: true,
-								},
-								"security_protocol": schema.StringAttribute{Optional: true},
-								"port": schema.Int64Attribute{
-									Optional: true,
-									Validators: []validator.Int64{
-										int64validator.Between(1, 65535),
-									},
-								},
-							},
-						},
-						PlanModifiers: []planmodifier.List{
-							listplanmodifier.RequiresReplace(),
 						},
 					},
 				},

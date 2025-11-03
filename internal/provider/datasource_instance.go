@@ -73,10 +73,6 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 						Computed:            true,
 						MarkdownDescription: "Deployment platform for the instance.",
 					},
-					"provider":                   schema.StringAttribute{Computed: true},
-					"region":                     schema.StringAttribute{Computed: true},
-					"scope":                      schema.StringAttribute{Computed: true},
-					"vpc":                        schema.StringAttribute{Computed: true},
 					"dns_zone":                   schema.StringAttribute{Computed: true},
 					"kubernetes_cluster_id":      schema.StringAttribute{Computed: true},
 					"kubernetes_namespace":       schema.StringAttribute{Computed: true},
@@ -225,16 +221,6 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 									Computed:    true,
 									ElementType: types.StringType,
 								},
-							},
-						},
-					},
-					"extend_listeners": schema.ListNestedAttribute{
-						Computed: true,
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"listener_name":     schema.StringAttribute{Computed: true},
-								"security_protocol": schema.StringAttribute{Computed: true},
-								"port":              schema.Int64Attribute{Computed: true},
 							},
 						},
 					},

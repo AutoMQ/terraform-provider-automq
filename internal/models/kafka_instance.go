@@ -75,10 +75,6 @@ type ComputeSpecsModel struct {
 	FileSystemParam       *FileSystemParamModel  `tfsdk:"file_system_param"`
 	SecurityGroup         types.String           `tfsdk:"security_group"`
 	DeployType            types.String           `tfsdk:"deploy_type"`
-	Provider              types.String           `tfsdk:"provider"`
-	Region                types.String           `tfsdk:"region"`
-	Scope                 types.String           `tfsdk:"scope"`
-	Vpc                   types.String           `tfsdk:"vpc"`
 	DnsZone               types.String           `tfsdk:"dns_zone"`
 	KubernetesClusterID   types.String           `tfsdk:"kubernetes_cluster_id"`
 	KubernetesNamespace   types.String           `tfsdk:"kubernetes_namespace"`
@@ -134,25 +130,23 @@ func coalesceStringAttr(apiValue *string, previous *types.String) types.String {
 }
 
 type FeaturesModel struct {
-	WalMode         types.String            `tfsdk:"wal_mode"`
-	InstanceConfigs types.Map               `tfsdk:"instance_configs"`
-	Integrations    types.Set               `tfsdk:"integrations"`
-	Security        *SecurityModel          `tfsdk:"security"`
-	MetricsExporter *MetricsExporterModel   `tfsdk:"metrics_exporter"`
-	TableTopic      *TableTopicModel        `tfsdk:"table_topic"`
-	InboundRules    []InboundRuleModel      `tfsdk:"inbound_rules"`
-	ExtendListeners []InstanceListenerModel `tfsdk:"extend_listeners"`
+	WalMode         types.String          `tfsdk:"wal_mode"`
+	InstanceConfigs types.Map             `tfsdk:"instance_configs"`
+	Integrations    types.Set             `tfsdk:"integrations"`
+	Security        *SecurityModel        `tfsdk:"security"`
+	MetricsExporter *MetricsExporterModel `tfsdk:"metrics_exporter"`
+	TableTopic      *TableTopicModel      `tfsdk:"table_topic"`
+	InboundRules    []InboundRuleModel    `tfsdk:"inbound_rules"`
 }
 
 type FeaturesSummaryModel struct {
-	WalMode         types.String            `tfsdk:"wal_mode"`
-	InstanceConfigs types.Map               `tfsdk:"instance_configs"`
-	Integrations    types.Set               `tfsdk:"integrations"`
-	Security        *SecuritySummaryModel   `tfsdk:"security"`
-	MetricsExporter *MetricsExporterModel   `tfsdk:"metrics_exporter"`
-	TableTopic      *TableTopicModel        `tfsdk:"table_topic"`
-	InboundRules    []InboundRuleModel      `tfsdk:"inbound_rules"`
-	ExtendListeners []InstanceListenerModel `tfsdk:"extend_listeners"`
+	WalMode         types.String          `tfsdk:"wal_mode"`
+	InstanceConfigs types.Map             `tfsdk:"instance_configs"`
+	Integrations    types.Set             `tfsdk:"integrations"`
+	Security        *SecuritySummaryModel `tfsdk:"security"`
+	MetricsExporter *MetricsExporterModel `tfsdk:"metrics_exporter"`
+	TableTopic      *TableTopicModel      `tfsdk:"table_topic"`
+	InboundRules    []InboundRuleModel    `tfsdk:"inbound_rules"`
 }
 
 type BucketProfileIDModel struct {
@@ -205,12 +199,6 @@ type InboundRuleModel struct {
 	Cidrs        types.List   `tfsdk:"cidrs"`
 }
 
-type InstanceListenerModel struct {
-	ListenerName     types.String `tfsdk:"listener_name"`
-	SecurityProtocol types.String `tfsdk:"security_protocol"`
-	Port             types.Int64  `tfsdk:"port"`
-}
-
 // ExpandKafkaInstanceResource converts a KafkaInstanceResourceModel to a client.InstanceCreateParam.
 // It handles the conversion of all nested structures and validates required fields.
 func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *client.InstanceCreateParam) error {
@@ -246,22 +234,6 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 		if !instance.ComputeSpecs.DeployType.IsNull() && !instance.ComputeSpecs.DeployType.IsUnknown() {
 			deployType := instance.ComputeSpecs.DeployType.ValueString()
 			request.Spec.DeployType = &deployType
-		}
-		if !instance.ComputeSpecs.Provider.IsNull() && !instance.ComputeSpecs.Provider.IsUnknown() {
-			provider := instance.ComputeSpecs.Provider.ValueString()
-			request.Spec.Provider = &provider
-		}
-		if !instance.ComputeSpecs.Region.IsNull() && !instance.ComputeSpecs.Region.IsUnknown() {
-			region := instance.ComputeSpecs.Region.ValueString()
-			request.Spec.Region = &region
-		}
-		if !instance.ComputeSpecs.Scope.IsNull() && !instance.ComputeSpecs.Scope.IsUnknown() {
-			scope := instance.ComputeSpecs.Scope.ValueString()
-			request.Spec.Scope = &scope
-		}
-		if !instance.ComputeSpecs.Vpc.IsNull() && !instance.ComputeSpecs.Vpc.IsUnknown() {
-			vpc := instance.ComputeSpecs.Vpc.ValueString()
-			request.Spec.Vpc = &vpc
 		}
 		if !instance.ComputeSpecs.DnsZone.IsNull() && !instance.ComputeSpecs.DnsZone.IsUnknown() {
 			dns := instance.ComputeSpecs.DnsZone.ValueString()
@@ -300,7 +272,8 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 				})
 			}
 			request.Spec.KubernetesNodeGroups = nodeGroups
-		} else if len(instance.ComputeSpecs.Networks) > 0 {
+		}
+		if len(instance.ComputeSpecs.Networks) > 0 {
 			networks := make([]client.InstanceNetworkParam, 0, len(instance.ComputeSpecs.Networks))
 			for _, network := range instance.ComputeSpecs.Networks {
 				subnet := ""
@@ -540,29 +513,6 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 			request.Features.InboundRules = rules
 		}
 
-		// Extended listeners
-		if len(instance.Features.ExtendListeners) > 0 {
-			listeners := make([]client.InstanceListenerParam, 0, len(instance.Features.ExtendListeners))
-			for _, listener := range instance.Features.ExtendListeners {
-				if listener.ListenerName.IsNull() || listener.ListenerName.IsUnknown() {
-					return fmt.Errorf("features.extend_listeners.listener_name is required")
-				}
-				param := client.InstanceListenerParam{
-					ListenerName: listener.ListenerName.ValueString(),
-				}
-				if !listener.SecurityProtocol.IsNull() && !listener.SecurityProtocol.IsUnknown() {
-					protocol := listener.SecurityProtocol.ValueString()
-					param.SecurityProtocol = &protocol
-				}
-				if !listener.Port.IsNull() && !listener.Port.IsUnknown() {
-					port := int32(listener.Port.ValueInt64())
-					param.Port = &port
-				}
-				listeners = append(listeners, param)
-			}
-			request.Features.ExtendListeners = listeners
-		}
-
 		// Integrations
 		if !instance.Features.Integrations.IsNull() && len(instance.Features.Integrations.Elements()) > 0 {
 			ids := ExpandSetValueList(instance.Features.Integrations)
@@ -607,7 +557,6 @@ func ConvertKafkaInstanceModel(resource *KafkaInstanceResourceModel, model *Kafk
 			MetricsExporter: resource.Features.MetricsExporter,
 			TableTopic:      resource.Features.TableTopic,
 			InboundRules:    resource.Features.InboundRules,
-			ExtendListeners: resource.Features.ExtendListeners,
 		}
 		if resource.Features.Security != nil {
 			features.Security = &SecuritySummaryModel{
@@ -732,10 +681,6 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 				DataBuckets:           types.ListNull(DataBucketObjectType),
 				SecurityGroup:         types.StringNull(),
 				DeployType:            types.StringNull(),
-				Provider:              types.StringNull(),
-				Region:                types.StringNull(),
-				Scope:                 types.StringNull(),
-				Vpc:                   types.StringNull(),
 				DnsZone:               types.StringNull(),
 				KubernetesClusterID:   types.StringNull(),
 				KubernetesNamespace:   types.StringNull(),
@@ -748,14 +693,10 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 		if instance.Spec.ReservedAku != nil {
 			resource.ComputeSpecs.ReservedAku = types.Int64Value(int64(*instance.Spec.ReservedAku))
 		}
-		var prevDeploy, prevProvider, prevRegion, prevScope, prevVpc, prevDnsZone *types.String
+		var prevDeploy, prevDnsZone *types.String
 		var prevSecurityGroup, prevClusterID, prevNamespace, prevServiceAccount, prevInstanceRole *types.String
 		if previousSpecs != nil {
 			prevDeploy = &previousSpecs.DeployType
-			prevProvider = &previousSpecs.Provider
-			prevRegion = &previousSpecs.Region
-			prevScope = &previousSpecs.Scope
-			prevVpc = &previousSpecs.Vpc
 			prevDnsZone = &previousSpecs.DnsZone
 			prevSecurityGroup = &previousSpecs.SecurityGroup
 			prevClusterID = &previousSpecs.KubernetesClusterID
@@ -764,10 +705,6 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 			prevInstanceRole = &previousSpecs.InstanceRole
 		}
 		resource.ComputeSpecs.DeployType = coalesceStringAttr(instance.Spec.DeployType, prevDeploy)
-		resource.ComputeSpecs.Provider = coalesceStringAttr(instance.Spec.Provider, prevProvider)
-		resource.ComputeSpecs.Region = coalesceStringAttr(instance.Spec.Region, prevRegion)
-		resource.ComputeSpecs.Scope = coalesceStringAttr(instance.Spec.Scope, prevScope)
-		resource.ComputeSpecs.Vpc = coalesceStringAttr(instance.Spec.Vpc, prevVpc)
 		resource.ComputeSpecs.DnsZone = coalesceStringAttr(instance.Spec.DnsZone, prevDnsZone)
 		resource.ComputeSpecs.SecurityGroup = coalesceStringAttr(instance.Spec.SecurityGroupId, prevSecurityGroup)
 		resource.ComputeSpecs.KubernetesClusterID = coalesceStringAttr(instance.Spec.KubernetesClusterId, prevClusterID)
@@ -787,7 +724,8 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 			}
 			resource.ComputeSpecs.KubernetesNodeGroups = nodeGroups
 			// Networks
-		} else if instance.Spec.Networks != nil {
+		}
+		if instance.Spec.Networks != nil {
 			networks, networkDiags := flattenNetworks(instance.Spec.Networks)
 			if networkDiags.HasError() {
 				diags.Append(networkDiags...)
@@ -943,9 +881,6 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 		}
 		resource.Features.TableTopic = flattenTableTopicVO(instance.Features.TableTopic, previousTableTopic)
 
-		// Extended listeners
-		resource.Features.ExtendListeners = flattenExtendListenersVO(instance.Features.ExtendListeners)
-
 		if instance.Features.InboundRules != nil {
 			rules := make([]InboundRuleModel, 0, len(instance.Features.InboundRules))
 			for _, rule := range instance.Features.InboundRules {
@@ -1100,36 +1035,6 @@ func flattenTableTopicVO(vo *client.TableTopicVO, previous *TableTopicModel) *Ta
 	topic.Krb5ConfFile = retainString(vo.Krb5ConfFile, topic.Krb5ConfFile)
 
 	return &topic
-}
-
-func flattenExtendListenersVO(list []client.InstanceListenerVO) []InstanceListenerModel {
-	if len(list) == 0 {
-		return nil
-	}
-
-	listeners := make([]InstanceListenerModel, 0, len(list))
-	for _, listener := range list {
-		model := InstanceListenerModel{
-			ListenerName:     types.StringNull(),
-			SecurityProtocol: types.StringNull(),
-			Port:             types.Int64Null(),
-		}
-		if listener.ListenerName != nil {
-			model.ListenerName = types.StringValue(*listener.ListenerName)
-		}
-		if listener.SecurityProtocol != nil {
-			model.SecurityProtocol = types.StringValue(*listener.SecurityProtocol)
-		}
-		if listener.Port != nil {
-			model.Port = types.Int64Value(int64(*listener.Port))
-		}
-		listeners = append(listeners, model)
-	}
-
-	if len(listeners) == 0 {
-		return nil
-	}
-	return listeners
 }
 
 func retainString(api *string, previous types.String) types.String {
