@@ -3,7 +3,6 @@ package models
 import (
 	"context"
 	"fmt"
-	"strings"
 	"terraform-provider-automq/client"
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
@@ -1073,21 +1072,13 @@ func flattenNetworks(networks []client.InstanceZoneNetworkVO) ([]NetworkModel, d
 		zone := types.StringValue(*network.Zone)
 		subnets := make([]attr.Value, 0)
 		if network.Subnet != nil {
-			if subnet := strings.TrimSpace(*network.Subnet); subnet != "" {
-				subnets = append(subnets, types.StringValue(subnet))
-			}
+			subnets = append(subnets, types.StringValue(*network.Subnet))
 		}
 
-		var subnetList types.List
-		if len(subnets) == 0 {
-			subnetList = types.ListNull(types.StringType)
-		} else {
-			var listDiags diag.Diagnostics
-			subnetList, listDiags = types.ListValue(types.StringType, subnets)
-			if listDiags.HasError() {
-				diags.Append(listDiags...)
-				continue
-			}
+		subnetList, listDiags := types.ListValue(types.StringType, subnets)
+		if listDiags.HasError() {
+			diags.Append(listDiags...)
+			continue
 		}
 
 		networksModel = append(networksModel, NetworkModel{
