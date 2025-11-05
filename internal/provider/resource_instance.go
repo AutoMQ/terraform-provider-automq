@@ -279,8 +279,8 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						Computed: true,
 						Optional: true,
 						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
 							stringplanmodifier.RequiresReplace(),
+							stringplanmodifier.UseStateForUnknown(),
 						},
 					},
 				},
@@ -619,6 +619,11 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 	}
 	// Flatten API response into Terraform state
 	resp.Diagnostics.Append(models.FlattenKafkaInstanceBasicModel(out, &instance)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	// Persist the initial state so Terraform is aware of the in-flight resource
+	resp.Diagnostics.Append(resp.State.Set(ctx, &instance)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
