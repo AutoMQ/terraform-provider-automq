@@ -377,7 +377,6 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							"prometheus": schema.SingleNestedAttribute{
 								Optional: true,
 								Attributes: map[string]schema.Attribute{
-									"enabled":        schema.BoolAttribute{Optional: true},
 									"auth_type":      schema.StringAttribute{Optional: true},
 									"end_point":      schema.StringAttribute{Optional: true},
 									"prometheus_arn": schema.StringAttribute{Optional: true},
@@ -820,17 +819,16 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		}
 		if metricsExporterChanged(plan.Features.MetricsExporter, stateMetrics) {
 			exporter, hasExporter := buildMetricsExporterParam(plan.Features.MetricsExporter)
-			if !hasExporter {
-				if stateMetrics != nil {
-					resp.Diagnostics.AddError(
-						"Config Update Error",
-						"Removing the metrics_exporter block is not supported. Disable exporters by setting their enabled flag to false instead.",
-					)
-					return
-				}
-			} else {
-				features := ensureFeatures()
+			features := ensureFeatures()
+			if hasExporter {
 				features.MetricsExporter = exporter
+				hasUpdate = true
+				shouldWait = true
+			} else if stateMetrics != nil {
+				enabled := false
+				features.MetricsExporter = &client.InstanceMetricsExporterParam{
+					Prometheus: &client.InstancePrometheusExporterParam{Enabled: &enabled},
+				}
 				hasUpdate = true
 				shouldWait = true
 			}
@@ -1072,9 +1070,6 @@ func prometheusExporterEqual(plan, state *models.PrometheusExporterModel) bool {
 	if plan == nil || state == nil {
 		return plan == nil && state == nil
 	}
-	if !boolAttrEqual(plan.Enabled, state.Enabled) {
-		return false
-	}
 	if !stringAttrEqual(plan.AuthType, state.AuthType) {
 		return false
 	}
@@ -1102,9 +1097,6 @@ func prometheusExporterEqual(plan, state *models.PrometheusExporterModel) bool {
 func prometheusExporterHasConfig(model *models.PrometheusExporterModel) bool {
 	if model == nil {
 		return false
-	}
-	if !model.Enabled.IsNull() && !model.Enabled.IsUnknown() {
-		return true
 	}
 	if !model.AuthType.IsNull() && !model.AuthType.IsUnknown() {
 		return true
@@ -1157,10 +1149,8 @@ func buildPrometheusExporterParam(model *models.PrometheusExporterModel) (*clien
 		return nil, false
 	}
 	prom := &client.InstancePrometheusExporterParam{}
-	if !model.Enabled.IsNull() && !model.Enabled.IsUnknown() {
-		enabled := model.Enabled.ValueBool()
-		prom.Enabled = &enabled
-	}
+	enabled := true
+	prom.Enabled = &enabled
 	if !model.AuthType.IsNull() && !model.AuthType.IsUnknown() {
 		auth := model.AuthType.ValueString()
 		prom.AuthType = &auth

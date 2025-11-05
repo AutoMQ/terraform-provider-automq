@@ -155,7 +155,6 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 							"prometheus": schema.SingleNestedAttribute{
 								Computed: true,
 								Attributes: map[string]schema.Attribute{
-									"enabled":        schema.BoolAttribute{Computed: true},
 									"auth_type":      schema.StringAttribute{Computed: true},
 									"end_point":      schema.StringAttribute{Computed: true},
 									"prometheus_arn": schema.StringAttribute{Computed: true},

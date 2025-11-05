@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"fmt"
+	"strings"
 	"terraform-provider-automq/client"
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
@@ -164,7 +165,6 @@ type MetricsExporterModel struct {
 }
 
 type PrometheusExporterModel struct {
-	Enabled       types.Bool   `tfsdk:"enabled"`
 	AuthType      types.String `tfsdk:"auth_type"`
 	EndPoint      types.String `tfsdk:"end_point"`
 	PrometheusArn types.String `tfsdk:"prometheus_arn"`
@@ -374,13 +374,10 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 		if instance.Features.MetricsExporter != nil {
 			exporter := client.InstanceMetricsExporterParam{}
 			hasConfig := false
-			if instance.Features.MetricsExporter.Prometheus != nil {
-				promConfig := instance.Features.MetricsExporter.Prometheus
+			if promConfig := instance.Features.MetricsExporter.Prometheus; promConfig != nil {
 				prom := &client.InstancePrometheusExporterParam{}
-				if !promConfig.Enabled.IsNull() && !promConfig.Enabled.IsUnknown() {
-					enabled := promConfig.Enabled.ValueBool()
-					prom.Enabled = &enabled
-				}
+				enabled := true
+				prom.Enabled = &enabled
 				if !promConfig.AuthType.IsNull() && !promConfig.AuthType.IsUnknown() {
 					auth := promConfig.AuthType.ValueString()
 					prom.AuthType = &auth
@@ -869,7 +866,6 @@ func flattenPrometheusExporterVO(vo *client.InstancePrometheusExporterVO, previo
 	}
 
 	prom := PrometheusExporterModel{
-		Enabled:       types.BoolValue(true),
 		AuthType:      types.StringNull(),
 		EndPoint:      types.StringNull(),
 		PrometheusArn: types.StringNull(),
@@ -880,13 +876,12 @@ func flattenPrometheusExporterVO(vo *client.InstancePrometheusExporterVO, previo
 	}
 	if previous != nil {
 		prom = *previous
-		prom.Enabled = types.BoolValue(true)
 	}
 
-	prom.AuthType = retainString(vo.AuthType, prom.AuthType)
-	prom.EndPoint = retainString(vo.EndPoint, prom.EndPoint)
-	prom.PrometheusArn = retainString(vo.PrometheusArn, prom.PrometheusArn)
-	prom.Username = retainString(vo.Username, prom.Username)
+	prom.AuthType = retainString(cleanAPIString(vo.AuthType), prom.AuthType)
+	prom.EndPoint = retainString(cleanAPIString(vo.EndPoint), prom.EndPoint)
+	prom.PrometheusArn = retainString(cleanAPIString(vo.PrometheusArn), prom.PrometheusArn)
+	prom.Username = retainString(cleanAPIString(vo.Username), prom.Username)
 	prom.Password = prom.Password
 	prom.Token = prom.Token
 
@@ -947,6 +942,17 @@ func retainString(api *string, previous types.String) types.String {
 		return types.StringValue(*api)
 	}
 	return previous
+}
+
+func cleanAPIString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
 }
 
 func isPrometheusVOEmpty(vo *client.InstancePrometheusExporterVO) bool {

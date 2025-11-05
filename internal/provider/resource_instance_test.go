@@ -93,7 +93,6 @@ type accTableTopic struct {
 }
 
 type accMetricsExporter struct {
-	Enabled       bool
 	AuthType      string
 	EndPoint      string
 	PrometheusARN string
@@ -339,7 +338,6 @@ func TestAccKafkaInstance_VM_Update(t *testing.T) {
 		"num.partitions":            "3",
 	}
 	updatedCfg.MetricsExporter = &accMetricsExporter{
-		Enabled:  true,
 		EndPoint: "https://metrics.example.com/write",
 		Labels: map[string]string{
 			"env":  "acc",
@@ -348,7 +346,7 @@ func TestAccKafkaInstance_VM_Update(t *testing.T) {
 	}
 
 	disableMetricsCfg := updatedCfg
-	disableMetricsCfg.MetricsExporter = &accMetricsExporter{Enabled: false}
+	disableMetricsCfg.MetricsExporter = nil
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t); env.requireVM(t) },
@@ -375,7 +373,6 @@ func TestAccKafkaInstance_VM_Update(t *testing.T) {
 					resource.TestCheckResourceAttr("automq_kafka_instance.test", "description", updatedCfg.Description),
 					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.reserved_aku", fmt.Sprintf("%d", updatedCfg.ReservedAKU)),
 					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.instance_configs.num.partitions", "3"),
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.metrics_exporter.prometheus.enabled", "true"),
 					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.metrics_exporter.prometheus.end_point", updatedCfg.MetricsExporter.EndPoint),
 				),
 			},
@@ -383,7 +380,7 @@ func TestAccKafkaInstance_VM_Update(t *testing.T) {
 				Config: renderKafkaInstanceConfig(env, disableMetricsCfg),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckKafkaInstanceExists("automq_kafka_instance.test"),
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.metrics_exporter.prometheus.enabled", "false"),
+					resource.TestCheckNoResourceAttr("automq_kafka_instance.test", "features.metrics_exporter.prometheus"),
 				),
 			},
 			{
@@ -744,7 +741,6 @@ func renderKafkaInstanceConfig(env accConfig, cfg accInstanceConfig) string {
 	if cfg.MetricsExporter != nil {
 		b.WriteString("    metrics_exporter = {\n")
 		b.WriteString("      prometheus = {\n")
-		fmt.Fprintf(&b, "        enabled = %t\n", cfg.MetricsExporter.Enabled)
 		if cfg.MetricsExporter.AuthType != "" {
 			fmt.Fprintf(&b, "        auth_type = %q\n", cfg.MetricsExporter.AuthType)
 		}

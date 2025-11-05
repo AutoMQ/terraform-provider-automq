@@ -68,7 +68,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 					}),
 					MetricsExporter: &MetricsExporterModel{
 						Prometheus: &PrometheusExporterModel{
-							Enabled:  types.BoolValue(true),
 							EndPoint: types.StringValue("http://prometheus"),
 							Labels: types.MapValueMust(types.StringType, map[string]attr.Value{
 								"env": types.StringValue("test"),
