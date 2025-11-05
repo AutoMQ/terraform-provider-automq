@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
@@ -256,26 +257,6 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							listplanmodifier.UseStateForUnknown(),
 						},
 					},
-					"file_system_param": schema.SingleNestedAttribute{
-						Optional:    true,
-						Description: "File system configuration required when WAL mode is FSWAL.",
-						Attributes: map[string]schema.Attribute{
-							"throughput_mibps_per_file_system": schema.Int64Attribute{
-								Required:    true,
-								Description: "Provisioned throughput in MiB/s for each file system.",
-								Validators: []validator.Int64{
-									int64validator.AtLeast(1),
-								},
-							},
-							"file_system_count": schema.Int64Attribute{
-								Required:    true,
-								Description: "Number of file systems allocated for WAL storage.",
-								Validators: []validator.Int64{
-									int64validator.AtLeast(1),
-								},
-							},
-						},
-					},
 					"kubernetes_cluster_id": schema.StringAttribute{
 						Optional:            true,
 						MarkdownDescription: "Identifier for the target Kubernetes cluster when deploy_type is KUBERNETES.",
@@ -294,19 +275,12 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							stringplanmodifier.UseStateForUnknown(),
 						},
 					},
-					"security_group": schema.StringAttribute{
-						Computed:            true,
-						Optional:            true,
-						MarkdownDescription: "Security group identifier associated with the instance infrastructure.",
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
-						},
-					},
 					"instance_role": schema.StringAttribute{
 						Computed: true,
 						Optional: true,
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.UseStateForUnknown(),
+							stringplanmodifier.RequiresReplace(),
 						},
 					},
 				},
@@ -316,9 +290,9 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				Attributes: map[string]schema.Attribute{
 					"wal_mode": schema.StringAttribute{
 						Required:    true,
-						Description: "Write-Ahead Logging mode: EBSWAL (using EBS as write buffer), S3WAL (using object storage as write buffer), or FSWAL (using file systems as write buffer). Defaults to EBSWAL.",
+						Description: "Write-Ahead Logging mode: EBSWAL (using EBS as write buffer) or S3WAL (using object storage as write buffer). Defaults to EBSWAL.",
 						Validators: []validator.String{
-							stringvalidator.OneOf("EBSWAL", "S3WAL", "FSWAL"),
+							stringvalidator.OneOf("EBSWAL", "S3WAL"),
 						},
 						// Default:       stringdefault.StaticString("EBSWAL"),
 						PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
@@ -435,19 +409,8 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							"keytab_file":        schema.StringAttribute{Optional: true},
 							"krb5conf_file":      schema.StringAttribute{Optional: true},
 						},
-					},
-					"inbound_rules": schema.ListNestedAttribute{
-						Optional: true,
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"listener_name": schema.StringAttribute{
-									Required: true,
-								},
-								"cidrs": schema.ListAttribute{
-									Required:    true,
-									ElementType: types.StringType,
-								},
-							},
+						PlanModifiers: []planmodifier.Object{
+							objectplanmodifier.RequiresReplace(),
 						},
 					},
 				},
@@ -901,31 +864,6 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		}
 	}
 
-	if plan.Features != nil && plan.Features.WalMode.ValueString() == "FSWAL" && plan.ComputeSpecs != nil {
-		planFS, planOK := extractFileSystemConfig(plan.ComputeSpecs)
-		if !planOK {
-			resp.Diagnostics.AddError(
-				"Invalid Configuration",
-				"When `features.wal_mode` is set to `FSWAL`, `compute_specs.file_system_param` must include both throughput and file system count values.",
-			)
-			return
-		}
-		var stateSpecs *models.ComputeSpecsModel
-		if state.ComputeSpecs != nil {
-			stateSpecs = state.ComputeSpecs
-		}
-		stateFS, stateOK := extractFileSystemConfig(stateSpecs)
-		if !stateOK || planFS != stateFS {
-			spec := ensureSpec()
-			spec.FileSystem = &client.FileSystemParam{
-				ThroughputMiBpsPerFileSystem: int32(planFS.ThroughputMiBpsPerFileSystem),
-				FileSystemCount:              int32(planFS.FileSystemCount),
-			}
-			hasUpdate = true
-			shouldWait = true
-		}
-	}
-
 	if instanceConfigsChanged && plan.Features != nil {
 		if state.Features == nil {
 			state.Features = &models.FeaturesModel{}
@@ -1305,28 +1243,6 @@ func mapAttrEqual(plan, state types.Map) bool {
 		return false
 	}
 	return plan.Equal(state)
-}
-
-type fileSystemConfig struct {
-	ThroughputMiBpsPerFileSystem int64
-	FileSystemCount              int64
-}
-
-func extractFileSystemConfig(specs *models.ComputeSpecsModel) (fileSystemConfig, bool) {
-	if specs == nil || specs.FileSystemParam == nil {
-		return fileSystemConfig{}, false
-	}
-	fs := specs.FileSystemParam
-	if fs.ThroughputMiBpsPerFileSystem.IsNull() || fs.ThroughputMiBpsPerFileSystem.IsUnknown() {
-		return fileSystemConfig{}, false
-	}
-	if fs.FileSystemCount.IsNull() || fs.FileSystemCount.IsUnknown() {
-		return fileSystemConfig{}, false
-	}
-	return fileSystemConfig{
-		ThroughputMiBpsPerFileSystem: fs.ThroughputMiBpsPerFileSystem.ValueInt64(),
-		FileSystemCount:              fs.FileSystemCount.ValueInt64(),
-	}, true
 }
 
 var waitForKafkaClusterToProvisionFunc = framework.WaitForKafkaClusterToProvision

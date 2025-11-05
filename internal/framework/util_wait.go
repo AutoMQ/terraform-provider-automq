@@ -24,6 +24,16 @@ func WaitForKafkaClusterState(ctx context.Context, c *client.Client, clusterId, 
 
 	tflog.Debug(ctx, fmt.Sprintf("Waiting for Kafka Cluster %q status to become %q", clusterId, targetState))
 	if _, err := stateConf.WaitForStateContext(ctx); err != nil {
+		if unexpected, ok := err.(*retry.UnexpectedStateError); ok && unexpected.LastError == nil {
+			return fmt.Errorf("Kafka Cluster %q entered unexpected state %q while waiting for state %q", clusterId, unexpected.State, targetState)
+		}
+		if timeout, ok := err.(*retry.TimeoutError); ok && timeout.LastError == nil {
+			lastState := timeout.LastState
+			if lastState == "" {
+				lastState = models.StateUnknown
+			}
+			return fmt.Errorf("Kafka Cluster %q did not reach state %q (last state %q, timeout %s)", clusterId, targetState, lastState, timeout.Timeout)
+		}
 		return err
 	}
 	return nil

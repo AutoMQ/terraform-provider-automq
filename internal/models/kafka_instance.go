@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"fmt"
+	"strings"
 	"terraform-provider-automq/client"
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
@@ -72,8 +73,6 @@ type ComputeSpecsModel struct {
 	Networks              []NetworkModel         `tfsdk:"networks"`
 	KubernetesNodeGroups  []NodeGroupModel       `tfsdk:"kubernetes_node_groups"`
 	BucketProfiles        []BucketProfileIDModel `tfsdk:"bucket_profiles"`
-	FileSystemParam       *FileSystemParamModel  `tfsdk:"file_system_param"`
-	SecurityGroup         types.String           `tfsdk:"security_group"`
 	DeployType            types.String           `tfsdk:"deploy_type"`
 	DnsZone               types.String           `tfsdk:"dns_zone"`
 	KubernetesClusterID   types.String           `tfsdk:"kubernetes_cluster_id"`
@@ -85,11 +84,6 @@ type ComputeSpecsModel struct {
 
 type NodeGroupModel struct {
 	ID types.String `tfsdk:"id"`
-}
-
-type FileSystemParamModel struct {
-	ThroughputMiBpsPerFileSystem types.Int64 `tfsdk:"throughput_mibps_per_file_system"`
-	FileSystemCount              types.Int64 `tfsdk:"file_system_count"`
 }
 
 type DataBucketModel struct {
@@ -136,7 +130,6 @@ type FeaturesModel struct {
 	Security        *SecurityModel        `tfsdk:"security"`
 	MetricsExporter *MetricsExporterModel `tfsdk:"metrics_exporter"`
 	TableTopic      *TableTopicModel      `tfsdk:"table_topic"`
-	InboundRules    []InboundRuleModel    `tfsdk:"inbound_rules"`
 }
 
 type FeaturesSummaryModel struct {
@@ -146,7 +139,6 @@ type FeaturesSummaryModel struct {
 	Security        *SecuritySummaryModel `tfsdk:"security"`
 	MetricsExporter *MetricsExporterModel `tfsdk:"metrics_exporter"`
 	TableTopic      *TableTopicModel      `tfsdk:"table_topic"`
-	InboundRules    []InboundRuleModel    `tfsdk:"inbound_rules"`
 }
 
 type BucketProfileIDModel struct {
@@ -192,11 +184,6 @@ type TableTopicModel struct {
 	UserPrincipal     types.String `tfsdk:"user_principal"`
 	KeytabFile        types.String `tfsdk:"keytab_file"`
 	Krb5ConfFile      types.String `tfsdk:"krb5conf_file"`
-}
-
-type InboundRuleModel struct {
-	ListenerName types.String `tfsdk:"listener_name"`
-	Cidrs        types.List   `tfsdk:"cidrs"`
 }
 
 // ExpandKafkaInstanceResource converts a KafkaInstanceResourceModel to a client.InstanceCreateParam.
@@ -250,10 +237,6 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 		if !instance.ComputeSpecs.KubernetesServiceAcct.IsNull() && !instance.ComputeSpecs.KubernetesServiceAcct.IsUnknown() {
 			serviceAccount := instance.ComputeSpecs.KubernetesServiceAcct.ValueString()
 			request.Spec.KubernetesServiceAccount = &serviceAccount
-		}
-		if !instance.ComputeSpecs.SecurityGroup.IsNull() && !instance.ComputeSpecs.SecurityGroup.IsUnknown() {
-			securityGroup := instance.ComputeSpecs.SecurityGroup.ValueString()
-			request.Spec.SecurityGroup = &securityGroup
 		}
 		if !instance.ComputeSpecs.InstanceRole.IsNull() && !instance.ComputeSpecs.InstanceRole.IsUnknown() {
 			role := instance.ComputeSpecs.InstanceRole.ValueString()
@@ -320,19 +303,6 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 			request.Spec.DataBuckets = dataBuckets
 		}
 
-		if instance.ComputeSpecs.FileSystemParam != nil {
-			fsParam := instance.ComputeSpecs.FileSystemParam
-			if fsParam.ThroughputMiBpsPerFileSystem.IsNull() || fsParam.ThroughputMiBpsPerFileSystem.IsUnknown() {
-				return fmt.Errorf("compute_specs.file_system_param.throughput_mibps_per_file_system must be provided when file_system_param is set")
-			}
-			if fsParam.FileSystemCount.IsNull() || fsParam.FileSystemCount.IsUnknown() {
-				return fmt.Errorf("compute_specs.file_system_param.file_system_count must be provided when file_system_param is set")
-			}
-			request.Spec.FileSystem = &client.FileSystemParam{
-				ThroughputMiBpsPerFileSystem: int32(fsParam.ThroughputMiBpsPerFileSystem.ValueInt64()),
-				FileSystemCount:              int32(fsParam.FileSystemCount.ValueInt64()),
-			}
-		}
 	}
 
 	// Features
@@ -494,25 +464,6 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 			request.Features.TableTopic = topic
 		}
 
-		// Inbound rules
-		if len(instance.Features.InboundRules) > 0 {
-			rules := make([]client.InboundRuleParam, 0, len(instance.Features.InboundRules))
-			for _, rule := range instance.Features.InboundRules {
-				if rule.ListenerName.IsNull() || rule.ListenerName.IsUnknown() {
-					return fmt.Errorf("features.inbound_rules.listener_name is required")
-				}
-				cidrs := []string{}
-				if !rule.Cidrs.IsNull() && !rule.Cidrs.IsUnknown() {
-					cidrs = ExpandStringValueList(rule.Cidrs)
-				}
-				rules = append(rules, client.InboundRuleParam{
-					ListenerName: rule.ListenerName.ValueString(),
-					Cidrs:        cidrs,
-				})
-			}
-			request.Features.InboundRules = rules
-		}
-
 		// Integrations
 		if !instance.Features.Integrations.IsNull() && len(instance.Features.Integrations.Elements()) > 0 {
 			ids := ExpandSetValueList(instance.Features.Integrations)
@@ -556,7 +507,6 @@ func ConvertKafkaInstanceModel(resource *KafkaInstanceResourceModel, model *Kafk
 			Integrations:    resource.Features.Integrations,
 			MetricsExporter: resource.Features.MetricsExporter,
 			TableTopic:      resource.Features.TableTopic,
-			InboundRules:    resource.Features.InboundRules,
 		}
 		if resource.Features.Security != nil {
 			features.Security = &SecuritySummaryModel{
@@ -679,7 +629,6 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 				KubernetesNodeGroups:  []NodeGroupModel{},
 				BucketProfiles:        []BucketProfileIDModel{},
 				DataBuckets:           types.ListNull(DataBucketObjectType),
-				SecurityGroup:         types.StringNull(),
 				DeployType:            types.StringNull(),
 				DnsZone:               types.StringNull(),
 				KubernetesClusterID:   types.StringNull(),
@@ -688,17 +637,15 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 				InstanceRole:          types.StringNull(),
 			}
 		}
-		resource.ComputeSpecs.FileSystemParam = nil
 		// Reserved AKU
 		if instance.Spec.ReservedAku != nil {
 			resource.ComputeSpecs.ReservedAku = types.Int64Value(int64(*instance.Spec.ReservedAku))
 		}
 		var prevDeploy, prevDnsZone *types.String
-		var prevSecurityGroup, prevClusterID, prevNamespace, prevServiceAccount, prevInstanceRole *types.String
+		var prevClusterID, prevNamespace, prevServiceAccount, prevInstanceRole *types.String
 		if previousSpecs != nil {
 			prevDeploy = &previousSpecs.DeployType
 			prevDnsZone = &previousSpecs.DnsZone
-			prevSecurityGroup = &previousSpecs.SecurityGroup
 			prevClusterID = &previousSpecs.KubernetesClusterID
 			prevNamespace = &previousSpecs.KubernetesNamespace
 			prevServiceAccount = &previousSpecs.KubernetesServiceAcct
@@ -706,7 +653,6 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 		}
 		resource.ComputeSpecs.DeployType = coalesceStringAttr(instance.Spec.DeployType, prevDeploy)
 		resource.ComputeSpecs.DnsZone = coalesceStringAttr(instance.Spec.DnsZone, prevDnsZone)
-		resource.ComputeSpecs.SecurityGroup = coalesceStringAttr(instance.Spec.SecurityGroupId, prevSecurityGroup)
 		resource.ComputeSpecs.KubernetesClusterID = coalesceStringAttr(instance.Spec.KubernetesClusterId, prevClusterID)
 		resource.ComputeSpecs.KubernetesNamespace = coalesceStringAttr(instance.Spec.KubernetesNamespace, prevNamespace)
 		resource.ComputeSpecs.KubernetesServiceAcct = coalesceStringAttr(instance.Spec.KubernetesServiceAccount, prevServiceAccount)
@@ -783,19 +729,6 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 			resource.ComputeSpecs.DataBuckets = types.ListNull(DataBucketObjectType)
 		}
 
-		if instance.Spec.FileSystem != nil {
-			resource.ComputeSpecs.FileSystemParam = &FileSystemParamModel{}
-			if instance.Spec.FileSystem.ThroughputMiBpsPerFileSystem != nil {
-				resource.ComputeSpecs.FileSystemParam.ThroughputMiBpsPerFileSystem = types.Int64Value(int64(*instance.Spec.FileSystem.ThroughputMiBpsPerFileSystem))
-			} else {
-				resource.ComputeSpecs.FileSystemParam.ThroughputMiBpsPerFileSystem = types.Int64Null()
-			}
-			if instance.Spec.FileSystem.FileSystemCount != nil {
-				resource.ComputeSpecs.FileSystemParam.FileSystemCount = types.Int64Value(int64(*instance.Spec.FileSystem.FileSystemCount))
-			} else {
-				resource.ComputeSpecs.FileSystemParam.FileSystemCount = types.Int64Null()
-			}
-		}
 	}
 
 	// Features
@@ -881,34 +814,6 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 		}
 		resource.Features.TableTopic = flattenTableTopicVO(instance.Features.TableTopic, previousTableTopic)
 
-		if instance.Features.InboundRules != nil {
-			rules := make([]InboundRuleModel, 0, len(instance.Features.InboundRules))
-			for _, rule := range instance.Features.InboundRules {
-				model := InboundRuleModel{
-					ListenerName: types.StringNull(),
-					Cidrs:        types.ListNull(types.StringType),
-				}
-				if rule.ListenerName != nil {
-					model.ListenerName = types.StringValue(*rule.ListenerName)
-				}
-				if len(rule.Cidrs) > 0 {
-					cidrValues := make([]attr.Value, len(rule.Cidrs))
-					for i, cidr := range rule.Cidrs {
-						cidrValues[i] = types.StringValue(cidr)
-					}
-					cidrList, listDiags := types.ListValue(types.StringType, cidrValues)
-					if listDiags.HasError() {
-						diags.Append(listDiags...)
-					} else {
-						model.Cidrs = cidrList
-					}
-				}
-				rules = append(rules, model)
-			}
-			resource.Features.InboundRules = rules
-		} else {
-			resource.Features.InboundRules = nil
-		}
 	}
 
 	// Timestamps
@@ -965,7 +870,7 @@ func flattenPrometheusExporterVO(vo *client.InstancePrometheusExporterVO, previo
 	}
 
 	prom := PrometheusExporterModel{
-		Enabled:       types.BoolNull(),
+		Enabled:       types.BoolValue(true),
 		AuthType:      types.StringNull(),
 		EndPoint:      types.StringNull(),
 		PrometheusArn: types.StringNull(),
@@ -976,6 +881,7 @@ func flattenPrometheusExporterVO(vo *client.InstancePrometheusExporterVO, previo
 	}
 	if previous != nil {
 		prom = *previous
+		prom.Enabled = types.BoolValue(true)
 	}
 
 	prom.AuthType = retainString(vo.AuthType, prom.AuthType)
@@ -1167,13 +1073,21 @@ func flattenNetworks(networks []client.InstanceZoneNetworkVO) ([]NetworkModel, d
 		zone := types.StringValue(*network.Zone)
 		subnets := make([]attr.Value, 0)
 		if network.Subnet != nil {
-			subnets = append(subnets, types.StringValue(*network.Subnet))
+			if subnet := strings.TrimSpace(*network.Subnet); subnet != "" {
+				subnets = append(subnets, types.StringValue(subnet))
+			}
 		}
 
-		subnetList, listDiags := types.ListValue(types.StringType, subnets)
-		if listDiags.HasError() {
-			diags.Append(listDiags...)
-			continue
+		var subnetList types.List
+		if len(subnets) == 0 {
+			subnetList = types.ListNull(types.StringType)
+		} else {
+			var listDiags diag.Diagnostics
+			subnetList, listDiags = types.ListValue(types.StringType, subnets)
+			if listDiags.HasError() {
+				diags.Append(listDiags...)
+				continue
+			}
 		}
 
 		networksModel = append(networksModel, NetworkModel{

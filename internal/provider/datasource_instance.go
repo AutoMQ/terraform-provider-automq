@@ -77,7 +77,6 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 					"kubernetes_cluster_id":      schema.StringAttribute{Computed: true},
 					"kubernetes_namespace":       schema.StringAttribute{Computed: true},
 					"kubernetes_service_account": schema.StringAttribute{Computed: true},
-					"security_group":             schema.StringAttribute{Computed: true},
 					"instance_role":              schema.StringAttribute{Computed: true},
 					"networks": schema.ListNestedAttribute{
 						Computed:    true,
@@ -130,20 +129,6 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 							},
 						},
 					},
-					"file_system_param": schema.SingleNestedAttribute{
-						Computed:    true,
-						Description: "File system configuration for FSWAL clusters.",
-						Attributes: map[string]schema.Attribute{
-							"throughput_mibps_per_file_system": schema.Int64Attribute{
-								Computed:    true,
-								Description: "Provisioned throughput in MiB/s for each file system.",
-							},
-							"file_system_count": schema.Int64Attribute{
-								Computed:    true,
-								Description: "Number of file systems allocated for WAL storage.",
-							},
-						},
-					},
 				},
 			},
 			"features": schema.SingleNestedAttribute{
@@ -151,7 +136,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 				Attributes: map[string]schema.Attribute{
 					"wal_mode": schema.StringAttribute{
 						Computed:    true,
-						Description: "Write-Ahead Logging mode: EBSWAL (using EBS as write buffer), S3WAL (using object storage as write buffer), or FSWAL (using file systems as write buffer). Defaults to EBSWAL.",
+						Description: "Write-Ahead Logging mode: EBSWAL (using EBS as write buffer) or S3WAL (using object storage as write buffer). Defaults to EBSWAL.",
 					},
 					"instance_configs": schema.MapAttribute{
 						ElementType:         types.StringType,
@@ -210,18 +195,6 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 							"user_principal":     schema.StringAttribute{Computed: true},
 							"keytab_file":        schema.StringAttribute{Computed: true, Sensitive: true},
 							"krb5conf_file":      schema.StringAttribute{Computed: true, Sensitive: true},
-						},
-					},
-					"inbound_rules": schema.ListNestedAttribute{
-						Computed: true,
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"listener_name": schema.StringAttribute{Computed: true},
-								"cidrs": schema.ListAttribute{
-									Computed:    true,
-									ElementType: types.StringType,
-								},
-							},
 						},
 					},
 					"security": schema.SingleNestedAttribute{

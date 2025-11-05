@@ -1,15 +1,37 @@
 package provider
 
+// Acceptance test configuration
+//
+// Scenarios & required inputs:
+//   VM tests (e.g., TestAccKafkaInstance_VM_Update, _ImmutableFields, _SecurityCombinations)
+//     - endpoint, access_key_id, secret_key, environment_id
+//     - vm.zone (or AUTMQ_VM_ZONE) and at least one subnet ID (AUTMQ_VM_SUBNET_IDS / AUTMQ_VM_SUBNET_ID / AUTMQ_TEST_SUBNET_ID)
+//
+//   K8S tests (TestAccKafkaInstance_K8S_Basic)
+//     - All VM requirements
+//     - k8s.cluster_id, k8s.node_groups (comma separated), optional namespace/service_account
+//
+// Configuration sources (priority order):
+//   1. JSON file provided via -acc.config flag (see accConfigFile struct for schema)
+//   2. Environment variables listed above (legacy names fall back to AUTMQ_TEST_*)
+//
+// The helper loadAccConfig consolidates these sources and skips tests when required
+// parameters are absent instead of using placeholder values.
+
 import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
+	"flag"
 	"fmt"
 	"math/big"
 	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -17,79 +39,71 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-func getRequiredEnvVars(t *testing.T) map[string]string {
-	envVars := map[string]string{
-		"AUTOMQ_BYOC_ENDPOINT":       os.Getenv("AUTOMQ_BYOC_ENDPOINT"),
-		"AUTOMQ_BYOC_ACCESS_KEY_ID":  os.Getenv("AUTOMQ_BYOC_ACCESS_KEY_ID"),
-		"AUTOMQ_BYOC_SECRET_KEY":     os.Getenv("AUTOMQ_BYOC_SECRET_KEY"),
-		"AUTOMQ_TEST_ENV_ID":         os.Getenv("AUTOMQ_TEST_ENV_ID"),
-		"AUTOMQ_TEST_SUBNET_ID":      os.Getenv("AUTOMQ_TEST_SUBNET_ID"),
-		"AUTOMQ_TEST_ZONE":           os.Getenv("AUTOMQ_TEST_ZONE"),
-		"AUTOMQ_TEST_DEPLOY_PROFILE": os.Getenv("AUTOMQ_TEST_DEPLOY_PROFILE"),
-	}
+const (
+	envEndpoint            = "AUTOMQ_BYOC_ENDPOINT"
+	envAccessKeyID         = "AUTOMQ_BYOC_ACCESS_KEY_ID"
+	envSecretKey           = "AUTOMQ_BYOC_SECRET_KEY"
+	envEnvironmentID       = "AUTOMQ_ENVIRONMENT_ID"
+	envEnvironmentIDLegacy = "AUTOMQ_TEST_ENV_ID"
+	envRegion              = "AUTOMQ_REGION"
+	envVMZone              = "AUTOMQ_VM_ZONE"
+	envVMZoneLegacy        = "AUTOMQ_TEST_ZONE"
+	envVMSubnets           = "AUTOMQ_VM_SUBNET_IDS"
+	envVMSubnetSingle      = "AUTOMQ_VM_SUBNET_ID"
+	envVMSubnetLegacy      = "AUTOMQ_TEST_SUBNET_ID"
+	envK8SClusterID        = "AUTOMQ_K8S_CLUSTER_ID"
+	envK8SNodeGroups       = "AUTOMQ_K8S_NODE_GROUPS"
+	envK8SNamespace        = "AUTOMQ_K8S_NAMESPACE"
+	envK8SServiceAccount   = "AUTOMQ_K8S_SERVICE_ACCOUNT"
+	envDeployProfileLegacy = "AUTOMQ_TEST_DEPLOY_PROFILE"
+	defaultInstanceVersion = "5.2.0"
+)
 
-	missingVars := []string{}
-	for k, v := range envVars {
-		if v == "" {
-			missingVars = append(missingVars, k)
-		}
-	}
+var accConfigPath = flag.String("acc.config", "", "path to JSON file containing acceptance test configuration")
 
-	if len(missingVars) > 0 {
-		t.Skipf("Missing required environment variables: %v", missingVars)
-	}
-
-	return envVars
+type accConfig struct {
+	Endpoint          string   `json:"endpoint"`
+	AccessKeyID       string   `json:"access_key_id"`
+	SecretKey         string   `json:"secret_key"`
+	EnvironmentID     string   `json:"environment_id"`
+	Region            string   `json:"region"`
+	VMZone            string   `json:"vm_zone"`
+	VMSubnets         []string `json:"vm_subnets"`
+	K8SClusterID      string   `json:"k8s_cluster_id"`
+	K8SNodeGroups     []string `json:"k8s_node_groups"`
+	K8SNamespace      string   `json:"k8s_namespace"`
+	K8SServiceAccount string   `json:"k8s_service_account"`
 }
 
-func generateRandomSuffix() string {
-	// Generate a random 6-character string for resource naming
-	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
-	b := make([]byte, 6)
-	for i := range b {
-		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
-		if err != nil {
-			return "default"
-		}
-		b[i] = charset[n.Int64()]
-	}
-	return string(b)
-}
+var (
+	configOnce sync.Once
+	configData accConfig
+	configErr  error
+)
 
-// Define version upgrade path
-var kafkaVersionUpgrades = []string{
-	"1.3.10",
-	"1.4.1",
-}
-
-// TestConfig holds the test configuration parameters
-type TestConfig struct {
-	EnvironmentID string
-	Name          string
-	Description   string
-	DeployProfile string
-	Version       string
-	ComputeSpecs  ComputeSpecs
-	Features      Features
-}
-
-type ComputeSpecs struct {
-	ReservedAKU int
-	Networks    []Network
-}
-
-type Network struct {
+type accNetwork struct {
 	Zone    string
 	Subnets []string
 }
 
-type Features struct {
-	WALMode         string
-	InstanceConfigs map[string]string
-	Security        *SecurityConfig
+type accTableTopic struct {
+	Warehouse    string
+	CatalogType  string
+	MetastoreURI string
 }
 
-type SecurityConfig struct {
+type accMetricsExporter struct {
+	Enabled       bool
+	AuthType      string
+	EndPoint      string
+	PrometheusARN string
+	Username      string
+	Password      string
+	Token         string
+	Labels        map[string]string
+}
+
+type accSecurity struct {
 	AuthenticationMethods  []string
 	TransitEncryptionModes []string
 	DataEncryptionMode     string
@@ -98,431 +112,512 @@ type SecurityConfig struct {
 	PrivateKey             string
 }
 
-// defaultTestConfig returns a default test configuration
-func defaultTestConfig(suffix string, envVars map[string]string) TestConfig {
-	return TestConfig{
-		EnvironmentID: envVars["AUTOMQ_TEST_ENV_ID"],
-		Name:          fmt.Sprintf("test-instance-%s", suffix),
-		Description:   "test instance description",
-		DeployProfile: envVars["AUTOMQ_TEST_DEPLOY_PROFILE"],
-		Version:       "1.3.10",
-		ComputeSpecs: ComputeSpecs{
-			ReservedAKU: 6,
-			Networks: []Network{
-				{
-					Zone:    envVars["AUTOMQ_TEST_ZONE"],
-					Subnets: []string{envVars["AUTOMQ_TEST_SUBNET_ID"]},
-				},
-			},
-		},
-		Features: Features{
-			WALMode: "EBSWAL",
-			InstanceConfigs: map[string]string{
-				"auto.create.topics.enable": "true",
-				"num.partitions":            "1",
-			},
-		},
+type accInstanceConfig struct {
+	EnvironmentID         string
+	Name                  string
+	Description           string
+	Version               string
+	DeployType            string
+	ReservedAKU           int
+	Networks              []accNetwork
+	KubernetesClusterID   string
+	KubernetesNodeGroups  []string
+	KubernetesNamespace   string
+	KubernetesServiceAcct string
+	InstanceRole          string
+	InstanceConfigs       map[string]string
+	TableTopic            *accTableTopic
+	MetricsExporter       *accMetricsExporter
+	Security              *accSecurity
+	WalMode               string
+}
+
+func loadAccConfig(t *testing.T) accConfig {
+	configOnce.Do(func() {
+		if *accConfigPath != "" {
+			configData, configErr = parseAccConfigFromFile(*accConfigPath)
+		} else {
+			configData = parseAccConfigFromEnv()
+		}
+		if configErr == nil {
+			if missing := configData.missingRequired(); len(missing) > 0 {
+				configErr = fmt.Errorf("missing required configuration values: %v", missing)
+			}
+		}
+	})
+	if configErr != nil {
+		t.Skipf("Skipping acceptance tests: %v", configErr)
+	}
+	return configData
+}
+
+func parseAccConfigFromFile(path string) (accConfig, error) {
+	abspath, err := filepath.Abs(path)
+	if err != nil {
+		return accConfig{}, fmt.Errorf("resolve acc.config path: %w", err)
+	}
+	data, err := os.ReadFile(abspath)
+	if err != nil {
+		return accConfig{}, fmt.Errorf("read acc.config file: %w", err)
+	}
+	var raw struct {
+		Endpoint      string `json:"endpoint"`
+		AccessKeyID   string `json:"access_key_id"`
+		SecretKey     string `json:"secret_key"`
+		EnvironmentID string `json:"environment_id"`
+		Region        string `json:"region"`
+		VM            struct {
+			Zone    string   `json:"zone"`
+			Subnets []string `json:"subnets"`
+		} `json:"vm"`
+		VMZone    string   `json:"vm_zone"`
+		VMSubnets []string `json:"vm_subnets"`
+		K8S       struct {
+			ClusterID      string   `json:"cluster_id"`
+			NodeGroups     []string `json:"node_groups"`
+			Namespace      string   `json:"namespace"`
+			ServiceAccount string   `json:"service_account"`
+		} `json:"k8s"`
+		K8SClusterID      string   `json:"k8s_cluster_id"`
+		K8SNodeGroups     []string `json:"k8s_node_groups"`
+		K8SNamespace      string   `json:"k8s_namespace"`
+		K8SServiceAccount string   `json:"k8s_service_account"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return accConfig{}, fmt.Errorf("parse acc.config JSON: %w", err)
+	}
+	cfg := accConfig{
+		Endpoint:          strings.TrimSpace(raw.Endpoint),
+		AccessKeyID:       strings.TrimSpace(raw.AccessKeyID),
+		SecretKey:         strings.TrimSpace(raw.SecretKey),
+		EnvironmentID:     strings.TrimSpace(raw.EnvironmentID),
+		Region:            strings.TrimSpace(raw.Region),
+		VMZone:            strings.TrimSpace(raw.VMZone),
+		VMSubnets:         append([]string{}, raw.VMSubnets...),
+		K8SClusterID:      strings.TrimSpace(raw.K8SClusterID),
+		K8SNodeGroups:     append([]string{}, raw.K8SNodeGroups...),
+		K8SNamespace:      strings.TrimSpace(raw.K8SNamespace),
+		K8SServiceAccount: strings.TrimSpace(raw.K8SServiceAccount),
+	}
+	if cfg.VMZone == "" {
+		cfg.VMZone = strings.TrimSpace(raw.VM.Zone)
+	}
+	if len(cfg.VMSubnets) == 0 && len(raw.VM.Subnets) > 0 {
+		cfg.VMSubnets = append([]string{}, raw.VM.Subnets...)
+	}
+	if cfg.K8SClusterID == "" {
+		cfg.K8SClusterID = strings.TrimSpace(raw.K8S.ClusterID)
+	}
+	if len(cfg.K8SNodeGroups) == 0 && len(raw.K8S.NodeGroups) > 0 {
+		cfg.K8SNodeGroups = append([]string{}, raw.K8S.NodeGroups...)
+	}
+	if cfg.K8SNamespace == "" {
+		cfg.K8SNamespace = strings.TrimSpace(raw.K8S.Namespace)
+	}
+	if cfg.K8SServiceAccount == "" {
+		cfg.K8SServiceAccount = strings.TrimSpace(raw.K8S.ServiceAccount)
+	}
+	return cfg.normalise(), nil
+}
+
+func parseAccConfigFromEnv() accConfig {
+	cfg := accConfig{
+		Endpoint:          strings.TrimSpace(os.Getenv(envEndpoint)),
+		AccessKeyID:       strings.TrimSpace(os.Getenv(envAccessKeyID)),
+		SecretKey:         strings.TrimSpace(os.Getenv(envSecretKey)),
+		EnvironmentID:     strings.TrimSpace(os.Getenv(envEnvironmentID)),
+		Region:            strings.TrimSpace(os.Getenv(envRegion)),
+		VMZone:            strings.TrimSpace(os.Getenv(envVMZone)),
+		K8SClusterID:      strings.TrimSpace(os.Getenv(envK8SClusterID)),
+		K8SNamespace:      strings.TrimSpace(os.Getenv(envK8SNamespace)),
+		K8SServiceAccount: strings.TrimSpace(os.Getenv(envK8SServiceAccount)),
+	}
+	if cfg.EnvironmentID == "" {
+		cfg.EnvironmentID = strings.TrimSpace(os.Getenv(envEnvironmentIDLegacy))
+	}
+	if cfg.VMZone == "" {
+		cfg.VMZone = strings.TrimSpace(os.Getenv(envVMZoneLegacy))
+	}
+	vmSubnetsRaw := strings.TrimSpace(os.Getenv(envVMSubnets))
+	if vmSubnetsRaw == "" {
+		vmSubnetsRaw = strings.TrimSpace(os.Getenv(envVMSubnetSingle))
+	}
+	if vmSubnetsRaw == "" {
+		vmSubnetsRaw = strings.TrimSpace(os.Getenv(envVMSubnetLegacy))
+	}
+	cfg.VMSubnets = splitAndTrim(vmSubnetsRaw)
+	cfg.K8SNodeGroups = splitAndTrim(os.Getenv(envK8SNodeGroups))
+	return cfg.normalise()
+}
+
+func (c accConfig) normalise() accConfig {
+	if len(c.VMSubnets) > 0 {
+		c.VMSubnets = splitAndTrim(strings.Join(c.VMSubnets, ","))
+	}
+	if len(c.K8SNodeGroups) > 0 {
+		c.K8SNodeGroups = splitAndTrim(strings.Join(c.K8SNodeGroups, ","))
+	}
+	return c
+}
+
+func (c accConfig) missingRequired() []string {
+	missing := make([]string, 0, 4)
+	if c.Endpoint == "" {
+		missing = append(missing, envEndpoint)
+	}
+	if c.AccessKeyID == "" {
+		missing = append(missing, envAccessKeyID)
+	}
+	if c.SecretKey == "" {
+		missing = append(missing, envSecretKey)
+	}
+	if c.EnvironmentID == "" {
+		missing = append(missing, envEnvironmentID)
+	}
+	return missing
+}
+
+func (c accConfig) requireVM(t *testing.T) {
+	if c.VMZone == "" || len(c.VMSubnets) == 0 {
+		t.Skip("Skipping VM acceptance tests: vm.zone/subnets not configured")
 	}
 }
 
-// renderHCLConfig converts a TestConfig to HCL format
-func renderHCLConfig(config TestConfig, envVars map[string]string) string {
-	// Base template with provider and resource structure
-	template := `
-provider "automq" {
-  automq_byoc_endpoint     = "%[1]s"
-  automq_byoc_access_key_id = "%[2]s"
-  automq_byoc_secret_key   = "%[3]s"
+func (c accConfig) hasK8S() bool {
+	return c.K8SClusterID != "" && len(c.K8SNodeGroups) > 0
 }
 
-data "automq_deploy_profile" "default" {
-  environment_id = "%[4]s"
-  name = "default"
-}
-
-data "automq_data_bucket_profiles" "test" {
-  environment_id = "%[4]s"
-  profile_name = data.automq_deploy_profile.default.name
-}
-
-resource "automq_kafka_instance" "test" {
-    environment_id = "%[4]s"
-    name          = "%[5]s"
-    description   = "%[6]s"
-    deploy_profile = "%[7]s"
-    version       = "%[8]s"
-
-    compute_specs = {
-        reserved_aku = %[9]d
-        networks = [
-            {
-                zone    = "%[10]s"
-                subnets = ["%[11]s"]
-            }
-        ]
-        bucket_profiles = [
-            {
-                id = data.automq_data_bucket_profiles.test.data_buckets[0].id
-            }
-        ]
-    }
-
-    features = {
-        wal_mode = "%[12]s"
-        %[13]s
-        %[14]s
-    }
-}
-`
-
-	// Build instance configs string if present
-	instanceConfigsStr := ""
-	if len(config.Features.InstanceConfigs) > 0 {
-		instanceConfigsStr = "instance_configs = {\n"
-		for k, v := range config.Features.InstanceConfigs {
-			instanceConfigsStr += fmt.Sprintf(`            "%s" = "%s"`+"\n", k, v)
-		}
-		instanceConfigsStr += "        }"
+func splitAndTrim(raw string) []string {
+	if raw == "" {
+		return nil
 	}
-
-	// Build security config string if present
-	securityConfigStr := ""
-	if config.Features.Security != nil {
-		securityConfigStr = "security = {\n"
-		if len(config.Features.Security.AuthenticationMethods) > 0 {
-			securityConfigStr += fmt.Sprintf(`            authentication_methods = ["%s"]`+"\n",
-				strings.Join(config.Features.Security.AuthenticationMethods, `","`))
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			out = append(out, trimmed)
 		}
-		if len(config.Features.Security.TransitEncryptionModes) > 0 {
-			securityConfigStr += fmt.Sprintf(`            transit_encryption_modes = ["%s"]`+"\n",
-				strings.Join(config.Features.Security.TransitEncryptionModes, `","`))
-		}
-		securityConfigStr += fmt.Sprintf(`            data_encryption_mode = "%s"`+"\n", config.Features.Security.DataEncryptionMode)
-
-		if config.Features.Security.CertificateAuthority != "" {
-			securityConfigStr += fmt.Sprintf(`            certificate_authority = <<-EOT
-%s
-EOT
-`, config.Features.Security.CertificateAuthority)
-		}
-		if config.Features.Security.CertificateChain != "" {
-			securityConfigStr += fmt.Sprintf(`            certificate_chain = <<-EOT
-%s
-EOT
-`, config.Features.Security.CertificateChain)
-		}
-		if config.Features.Security.PrivateKey != "" {
-			securityConfigStr += fmt.Sprintf(`            private_key = <<-EOT
-%s
-EOT
-`, config.Features.Security.PrivateKey)
-		}
-		securityConfigStr += "        }"
 	}
-
-	// Format the final configuration
-	return fmt.Sprintf(template,
-		envVars["AUTOMQ_BYOC_ENDPOINT"],            // 1
-		envVars["AUTOMQ_BYOC_ACCESS_KEY_ID"],       // 2
-		envVars["AUTOMQ_BYOC_SECRET_KEY"],          // 3
-		config.EnvironmentID,                       // 4
-		config.Name,                                // 5
-		config.Description,                         // 6
-		config.DeployProfile,                       // 7
-		config.Version,                             // 8
-		config.ComputeSpecs.ReservedAKU,            // 9
-		config.ComputeSpecs.Networks[0].Zone,       // 10
-		config.ComputeSpecs.Networks[0].Subnets[0], // 11
-		config.Features.WALMode,                    // 12
-		instanceConfigsStr,                         // 13
-		securityConfigStr,                          // 14
-	)
+	return out
 }
 
-// TestAccKafkaInstanceResource tests basic CRUD operations for Kafka instance
-func TestAccKafkaInstanceResource(t *testing.T) {
-	if os.Getenv("AUTOMQ_BYOC_ENDPOINT") == "" {
-		t.Skip("Skipping test as AUTOMQ_TEST_DEPLOY_PROFILE is not set")
-	}
-	if os.Getenv("TF_ACC_TIMEOUT") == "" {
-		t.Setenv("TF_ACC_TIMEOUT", "2h")
-	}
+func TestAccKafkaInstance_VM_Update(t *testing.T) {
+	env := loadAccConfig(t)
+	env.requireVM(t)
+	ensureAccTimeout(t)
 
-	envVars := getRequiredEnvVars(t)
 	suffix := generateRandomSuffix()
 
-	// Generate certificates for security testing
-	caCert, serverCert, serverKey, err := generateTestCertificate()
-	newCaCert, newServerCert, newServerKey, newErr := generateTestCertificate()
-	if err != nil || newErr != nil {
-		t.Fatalf("Failed to generate test certificates: %v, %v", err, newErr)
+	baseCfg := accInstanceConfig{
+		EnvironmentID: env.EnvironmentID,
+		Name:          fmt.Sprintf("acc-vm-%s", suffix),
+		Description:   "VM acceptance baseline",
+		Version:       defaultInstanceVersion,
+		DeployType:    "IAAS",
+		ReservedAKU:   6,
+		Networks: []accNetwork{
+			{
+				Zone:    env.VMZone,
+				Subnets: env.VMSubnets,
+			},
+		},
+		WalMode: "EBSWAL",
+		Security: &accSecurity{
+			AuthenticationMethods:  []string{"sasl"},
+			TransitEncryptionModes: []string{"plaintext"},
+			DataEncryptionMode:     "NONE",
+		},
 	}
 
-	// Initial configuration
-	initialConfig := defaultTestConfig(suffix, envVars)
-	initialConfig.Version = kafkaVersionUpgrades[0]
-	initialConfig.Features.Security = &SecurityConfig{
-		AuthenticationMethods:  []string{"sasl", "mtls"},
-		TransitEncryptionModes: []string{"tls"},
-		DataEncryptionMode:     "CPMK",
-		CertificateAuthority:   caCert,
-		CertificateChain:       serverCert,
-		PrivateKey:             serverKey,
-	}
-
-	// Updated configuration
-	updatedConfig := defaultTestConfig(suffix, envVars)
-	updatedConfig.Name = fmt.Sprintf("test-instance-updated-%s", suffix)
-	updatedConfig.Description = "updated test instance description"
-	updatedConfig.Version = kafkaVersionUpgrades[1]
-	updatedConfig.ComputeSpecs.ReservedAKU = 8
-	updatedConfig.Features.InstanceConfigs = map[string]string{
+	updatedCfg := baseCfg
+	updatedCfg.Name = fmt.Sprintf("acc-vm-updated-%s", suffix)
+	updatedCfg.Description = "VM acceptance update"
+	updatedCfg.ReservedAKU = 8
+	updatedCfg.InstanceConfigs = map[string]string{
 		"auto.create.topics.enable": "false",
 		"num.partitions":            "3",
-		"log.retention.hours":       "24",
 	}
-	updatedConfig.Features.Security = &SecurityConfig{
-		AuthenticationMethods:  []string{"sasl", "mtls"},
-		TransitEncryptionModes: []string{"tls"},
-		DataEncryptionMode:     "CPMK",
-		CertificateAuthority:   newCaCert,
-		CertificateChain:       newServerCert,
-		PrivateKey:             newServerKey,
+	updatedCfg.MetricsExporter = &accMetricsExporter{
+		Enabled:  true,
+		EndPoint: "https://metrics.example.com/write",
+		Labels: map[string]string{
+			"env":  "acc",
+			"team": "qa",
+		},
 	}
 
+	disableMetricsCfg := updatedCfg
+	disableMetricsCfg.MetricsExporter = &accMetricsExporter{Enabled: false}
+
 	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
+		PreCheck:                 func() { testAccPreCheck(t); env.requireVM(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             testAccCheckKafkaInstanceDestroy,
 		Steps: []resource.TestStep{
-			// Initial creation
 			{
-				Config: renderHCLConfig(initialConfig, envVars),
+				Config: renderKafkaInstanceConfig(env, baseCfg),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckKafkaInstanceExists("automq_kafka_instance.test"),
-					// Basic attributes
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "name", initialConfig.Name),
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "description", initialConfig.Description),
-
-					// Compute specs
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.reserved_aku", fmt.Sprintf("%d", initialConfig.ComputeSpecs.ReservedAKU)),
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.networks.#", "1"),
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.networks.0.zone", initialConfig.ComputeSpecs.Networks[0].Zone),
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.networks.0.subnets.#", "1"),
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.networks.0.subnets.0", initialConfig.ComputeSpecs.Networks[0].Subnets[0]),
-
-					// Features
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.wal_mode", initialConfig.Features.WALMode),
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "version", initialConfig.Version),
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.instance_configs.num.partitions", initialConfig.Features.InstanceConfigs["num.partitions"]),
-
-					// Required fields
-					resource.TestCheckResourceAttrSet("automq_kafka_instance.test", "id"),
-					resource.TestCheckResourceAttrSet("automq_kafka_instance.test", "status"),
-					resource.TestCheckResourceAttrSet("automq_kafka_instance.test", "created_at"),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "name", baseCfg.Name),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "description", baseCfg.Description),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.reserved_aku", fmt.Sprintf("%d", baseCfg.ReservedAKU)),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.wal_mode", baseCfg.WalMode),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.security.authentication_methods.#", "1"),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.security.data_encryption_mode", "NONE"),
 				),
 			},
-			// Update test
 			{
-				Config: renderHCLConfig(updatedConfig, envVars),
+				Config: renderKafkaInstanceConfig(env, updatedCfg),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckKafkaInstanceExists("automq_kafka_instance.test"),
-					// Basic attributes
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "name", updatedConfig.Name),
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "description", updatedConfig.Description),
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "version", updatedConfig.Version),
-
-					// Compute specs
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.reserved_aku", fmt.Sprintf("%d", updatedConfig.ComputeSpecs.ReservedAKU)),
-
-					// Instance configs
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.instance_configs.auto.create.topics.enable", updatedConfig.Features.InstanceConfigs["auto.create.topics.enable"]),
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.instance_configs.num.partitions", updatedConfig.Features.InstanceConfigs["num.partitions"]),
-					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.instance_configs.log.retention.hours", updatedConfig.Features.InstanceConfigs["log.retention.hours"]),
-
-					// Security certificates
-					resource.TestCheckResourceAttrSet("automq_kafka_instance.test", "features.security.certificate_authority"),
-					resource.TestCheckResourceAttrSet("automq_kafka_instance.test", "features.security.certificate_chain"),
-					resource.TestCheckResourceAttrSet("automq_kafka_instance.test", "features.security.private_key"),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "name", updatedCfg.Name),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "description", updatedCfg.Description),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.reserved_aku", fmt.Sprintf("%d", updatedCfg.ReservedAKU)),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.instance_configs.num.partitions", "3"),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.metrics_exporter.prometheus.enabled", "true"),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.metrics_exporter.prometheus.end_point", updatedCfg.MetricsExporter.EndPoint),
 				),
 			},
-			// import test
+			{
+				Config: renderKafkaInstanceConfig(env, disableMetricsCfg),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckKafkaInstanceExists("automq_kafka_instance.test"),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.metrics_exporter.prometheus.enabled", "false"),
+				),
+			},
 			{
 				ResourceName:      "automq_kafka_instance.test",
 				ImportState:       true,
 				ImportStateVerify: true,
-				ImportStateIdFunc: func(s *terraform.State) (string, error) {
-					rs, ok := s.RootModule().Resources["automq_kafka_instance.test"]
-					if !ok {
-						return "", fmt.Errorf("Not found: %s", "automq_kafka_instance.test")
-					}
-					id := fmt.Sprintf("%s@%s", rs.Primary.Attributes["environment_id"], rs.Primary.Attributes["id"])
-					// The import ID format is <environment_id>@<kafka_instance_id>
-					return id, nil
-				},
 				ImportStateVerifyIgnore: []string{
-					"features.security.certificate_authority",
-					"features.security.certificate_chain",
+					"features.metrics_exporter.prometheus.password",
+					"features.metrics_exporter.prometheus.token",
 					"features.security.private_key",
-					"features.instance_configs",
 				},
 			},
 		},
 	})
 }
 
-// Add CheckDestroy function
-func testAccCheckKafkaInstanceDestroy(s *terraform.State) error {
-	// Loop through resources in state
-	for _, rs := range s.RootModule().Resources {
-		if rs.Type != "automq_kafka_instance" {
-			continue
-		}
+func TestAccKafkaInstance_K8S_Basic(t *testing.T) {
+	env := loadAccConfig(t)
+	if !env.hasK8S() {
+		t.Skip("Skipping K8S acceptance tests: AUTMQ_K8S_* variables not configured")
+	}
+	ensureAccTimeout(t)
 
-		// Try to get the instance
-		// In a real implementation, you would use your client to check if the instance still exists
-		// For now, we'll just return nil to indicate the instance was destroyed
-		return nil
+	networks := []accNetwork{{Zone: env.VMZone}}
+	if len(env.VMSubnets) > 0 {
+		networks[0].Subnets = env.VMSubnets
 	}
 
-	return nil
+	cfg := accInstanceConfig{
+		EnvironmentID:         env.EnvironmentID,
+		Name:                  fmt.Sprintf("acc-k8s-%s", generateRandomSuffix()),
+		Description:           "K8S acceptance baseline",
+		Version:               defaultInstanceVersion,
+		DeployType:            "K8S",
+		ReservedAKU:           6,
+		Networks:              networks,
+		KubernetesClusterID:   env.K8SClusterID,
+		KubernetesNodeGroups:  env.K8SNodeGroups,
+		KubernetesNamespace:   env.K8SNamespace,
+		KubernetesServiceAcct: env.K8SServiceAccount,
+		WalMode:               "S3WAL",
+		Security: &accSecurity{
+			AuthenticationMethods:  []string{"sasl"},
+			TransitEncryptionModes: []string{"plaintext"},
+			DataEncryptionMode:     "NONE",
+		},
+	}
+
+	updated := cfg
+	updated.ReservedAKU = 7
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckKafkaInstanceDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: renderKafkaInstanceConfig(env, cfg),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckKafkaInstanceExists("automq_kafka_instance.test"),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.deploy_type", "K8S"),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.kubernetes_cluster_id", env.K8SClusterID),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.kubernetes_node_groups.#", fmt.Sprintf("%d", len(env.K8SNodeGroups))),
+				),
+			},
+			{
+				Config: renderKafkaInstanceConfig(env, updated),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.reserved_aku", fmt.Sprintf("%d", updated.ReservedAKU)),
+				),
+			},
+		},
+	})
 }
 
-// Add Exists check function
-func testAccCheckKafkaInstanceExists(n string) resource.TestCheckFunc {
-	return func(s *terraform.State) error {
-		rs, ok := s.RootModule().Resources[n]
-		if !ok {
-			return fmt.Errorf("Not found: %s", n)
-		}
+func TestAccKafkaInstance_ImmutableFields(t *testing.T) {
+	env := loadAccConfig(t)
+	env.requireVM(t)
+	ensureAccTimeout(t)
 
-		if rs.Primary.ID == "" {
-			return fmt.Errorf("No Kafka Instance ID is set")
-		}
-
-		// In a real implementation, you would use your client to check if the instance exists
-		// For now, we'll just return nil to indicate the instance exists
-		return nil
+	base := accInstanceConfig{
+		EnvironmentID: env.EnvironmentID,
+		Name:          fmt.Sprintf("acc-immutable-%s", generateRandomSuffix()),
+		Description:   "Immutable field baseline",
+		Version:       defaultInstanceVersion,
+		DeployType:    "IAAS",
+		ReservedAKU:   6,
+		Networks: []accNetwork{{
+			Zone:    env.VMZone,
+			Subnets: env.VMSubnets,
+		}},
+		WalMode:      "EBSWAL",
+		InstanceRole: "role-initial",
+		TableTopic: &accTableTopic{
+			Warehouse:    "warehouse_immutable",
+			CatalogType:  "HIVE",
+			MetastoreURI: "thrift://metastore.initial:9083",
+		},
+		Security: &accSecurity{
+			AuthenticationMethods:  []string{"sasl"},
+			TransitEncryptionModes: []string{"plaintext"},
+			DataEncryptionMode:     "NONE",
+		},
 	}
+
+	modified := base
+	modified.InstanceRole = "role-updated"
+	modified.TableTopic = &accTableTopic{
+		Warehouse:    "warehouse_immutable",
+		CatalogType:  "HIVE",
+		MetastoreURI: "thrift://metastore.updated:9083",
+	}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t); env.requireVM(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckKafkaInstanceDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: renderKafkaInstanceConfig(env, base),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckKafkaInstanceExists("automq_kafka_instance.test"),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.instance_role", base.InstanceRole),
+					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.table_topic.warehouse", base.TableTopic.Warehouse),
+				),
+			},
+			{
+				Config:             renderKafkaInstanceConfig(env, modified),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
 }
 
-// SecurityTestCase defines a test case for security configurations
-type SecurityTestCase struct {
-	name                 string
-	authMethods          []string
-	transitEncryption    []string
-	dataEncryption       string
-	requiresCertificates bool
-}
+func TestAccKafkaInstance_SecurityCombinations(t *testing.T) {
+	env := loadAccConfig(t)
+	env.requireVM(t)
+	ensureAccTimeout(t)
 
-func TestAccKafkaInstanceSecurityCombinations(t *testing.T) {
-	if os.Getenv("AUTOMQ_BYOC_ENDPOINT") == "" {
-		t.Skip("Skipping test as AUTOMQ_TEST_DEPLOY_PROFILE is not set")
-	}
-	if os.Getenv("TF_ACC_TIMEOUT") == "" {
-		t.Setenv("TF_ACC_TIMEOUT", "2h")
-	}
-
-	t.Skip("Skipping test")
-
-	envVars := getRequiredEnvVars(t)
-	suffix := generateRandomSuffix()
-	caCert, serverCert, serverKey, err := generateTestCertificate()
-	if err != nil {
-		t.Fatalf("Failed to generate test certificates: %v", err)
-	}
-
-	// Define all possible security combinations
-	testCases := []SecurityTestCase{
+	combos := []struct {
+		name     string
+		security accSecurity
+	}{
 		{
-			name:                 "anonymous_plaintext_none",
-			authMethods:          []string{"anonymous"},
-			transitEncryption:    []string{"plaintext"},
-			dataEncryption:       "NONE",
-			requiresCertificates: false,
+			name: "anonymous_plaintext_none",
+			security: accSecurity{
+				AuthenticationMethods:  []string{"anonymous"},
+				TransitEncryptionModes: []string{"plaintext"},
+				DataEncryptionMode:     "NONE",
+			},
 		},
 		{
-			name:                 "anonymous_plaintext_cpmk",
-			authMethods:          []string{"anonymous"},
-			transitEncryption:    []string{"plaintext"},
-			dataEncryption:       "CPMK",
-			requiresCertificates: false,
+			name: "anonymous_plaintext_cpmk",
+			security: accSecurity{
+				AuthenticationMethods:  []string{"anonymous"},
+				TransitEncryptionModes: []string{"plaintext"},
+				DataEncryptionMode:     "CPMK",
+			},
 		},
 		{
-			name:                 "sasl_plaintext_none",
-			authMethods:          []string{"sasl"},
-			transitEncryption:    []string{"plaintext"},
-			dataEncryption:       "NONE",
-			requiresCertificates: false,
+			name: "sasl_plaintext_none",
+			security: accSecurity{
+				AuthenticationMethods:  []string{"sasl"},
+				TransitEncryptionModes: []string{"plaintext"},
+				DataEncryptionMode:     "NONE",
+			},
 		},
 		{
-			name:                 "sasl_plaintext_cpmk",
-			authMethods:          []string{"sasl"},
-			transitEncryption:    []string{"plaintext"},
-			dataEncryption:       "CPMK",
-			requiresCertificates: false,
+			name: "sasl_plaintext_cpmk",
+			security: accSecurity{
+				AuthenticationMethods:  []string{"sasl"},
+				TransitEncryptionModes: []string{"plaintext"},
+				DataEncryptionMode:     "CPMK",
+			},
 		},
 		{
-			name:                 "sasl_mtls_tls_none",
-			authMethods:          []string{"sasl", "mtls"},
-			transitEncryption:    []string{"tls"},
-			dataEncryption:       "NONE",
-			requiresCertificates: true,
+			name: "sasl_mtls_tls_none",
+			security: accSecurity{
+				AuthenticationMethods:  []string{"sasl", "mtls"},
+				TransitEncryptionModes: []string{"tls"},
+				DataEncryptionMode:     "NONE",
+			},
 		},
 		{
-			name:                 "sasl_mtls_tls_cpmk",
-			authMethods:          []string{"sasl", "mtls"},
-			transitEncryption:    []string{"tls"},
-			dataEncryption:       "CPMK",
-			requiresCertificates: true,
+			name: "sasl_mtls_tls_cpmk",
+			security: accSecurity{
+				AuthenticationMethods:  []string{"sasl", "mtls"},
+				TransitEncryptionModes: []string{"tls"},
+				DataEncryptionMode:     "CPMK",
+			},
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			config := defaultTestConfig(suffix, envVars)
-			config.Name = fmt.Sprintf("test-secure-%s-%s", tc.name, suffix)
-			config.Description = fmt.Sprintf("Test instance with %s security configuration", tc.name)
-
-			// Set up security configuration
-			config.Features.Security = &SecurityConfig{
-				AuthenticationMethods:  tc.authMethods,
-				TransitEncryptionModes: tc.transitEncryption,
-				DataEncryptionMode:     tc.dataEncryption,
+	for _, combo := range combos {
+		combo := combo
+		t.Run(combo.name, func(t *testing.T) {
+			cfg := accInstanceConfig{
+				EnvironmentID: env.EnvironmentID,
+				Name:          fmt.Sprintf("acc-sec-%s-%s", combo.name, generateRandomSuffix()),
+				Description:   fmt.Sprintf("Security combo %s", combo.name),
+				Version:       defaultInstanceVersion,
+				DeployType:    "IAAS",
+				ReservedAKU:   6,
+				Networks: []accNetwork{{
+					Zone:    env.VMZone,
+					Subnets: env.VMSubnets,
+				}},
+				WalMode:  "EBSWAL",
+				Security: &combo.security,
 			}
 
-			if tc.requiresCertificates {
-				config.Features.Security.CertificateAuthority = caCert
-				config.Features.Security.CertificateChain = serverCert
-				config.Features.Security.PrivateKey = serverKey
+			if needsTLSCertificates(combo.security.TransitEncryptionModes) {
+				ca, cert, key, err := generateTestCertificate()
+				if err != nil {
+					t.Fatalf("failed to generate test certificates: %v", err)
+				}
+				cfg.Security.CertificateAuthority = ca
+				cfg.Security.CertificateChain = cert
+				cfg.Security.PrivateKey = key
 			}
 
 			resource.Test(t, resource.TestCase{
+				PreCheck:                 func() { testAccPreCheck(t); env.requireVM(t) },
 				ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+				CheckDestroy:             testAccCheckKafkaInstanceDestroy,
 				Steps: []resource.TestStep{
 					{
-						Config: renderHCLConfig(config, envVars),
+						Config: renderKafkaInstanceConfig(env, cfg),
 						Check: resource.ComposeAggregateTestCheckFunc(
-							// Basic attributes
-							resource.TestCheckResourceAttr("automq_kafka_instance.test", "name", config.Name),
-							resource.TestCheckResourceAttr("automq_kafka_instance.test", "description", config.Description),
-
-							// Security configuration
-							resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.security.authentication_methods.#", fmt.Sprintf("%d", len(tc.authMethods))),
-							resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.security.transit_encryption_modes.#", fmt.Sprintf("%d", len(tc.transitEncryption))),
-							resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.security.data_encryption_mode", tc.dataEncryption),
-
-							// Conditional checks for certificates
-							func(s *terraform.State) error {
-								if tc.requiresCertificates {
-									return resource.ComposeAggregateTestCheckFunc(
-										resource.TestCheckResourceAttrSet("automq_kafka_instance.test", "features.security.certificate_authority"),
-										resource.TestCheckResourceAttrSet("automq_kafka_instance.test", "features.security.certificate_chain"),
-										resource.TestCheckResourceAttrSet("automq_kafka_instance.test", "features.security.private_key"),
-									)(s)
-								}
-								return nil
-							},
+							testAccCheckKafkaInstanceExists("automq_kafka_instance.test"),
+							resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.security.authentication_methods.#", fmt.Sprintf("%d", len(combo.security.AuthenticationMethods))),
+							resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.security.transit_encryption_modes.#", fmt.Sprintf("%d", len(combo.security.TransitEncryptionModes))),
+							resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.security.data_encryption_mode", combo.security.DataEncryptionMode),
 						),
 					},
 				},
@@ -531,15 +626,248 @@ func TestAccKafkaInstanceSecurityCombinations(t *testing.T) {
 	}
 }
 
-// generateTestCertificate generates test certificates for TLS configuration
+func needsTLSCertificates(transit []string) bool {
+	for _, v := range transit {
+		if strings.EqualFold(v, "tls") {
+			return true
+		}
+	}
+	return false
+}
+
+func getRequiredEnvVars(t *testing.T) map[string]string {
+	env := loadAccConfig(t)
+	vars := map[string]string{
+		"AUTOMQ_BYOC_ENDPOINT":      env.Endpoint,
+		"AUTOMQ_BYOC_ACCESS_KEY_ID": env.AccessKeyID,
+		"AUTOMQ_BYOC_SECRET_KEY":    env.SecretKey,
+		"AUTOMQ_TEST_ENV_ID":        env.EnvironmentID,
+		"AUTOMQ_TEST_ZONE":          env.VMZone,
+	}
+	if len(env.VMSubnets) > 0 {
+		vars["AUTOMQ_TEST_SUBNET_ID"] = env.VMSubnets[0]
+	}
+	if v := strings.TrimSpace(os.Getenv(envDeployProfileLegacy)); v != "" {
+		vars["AUTOMQ_TEST_DEPLOY_PROFILE"] = v
+	}
+	return vars
+}
+
+func renderKafkaInstanceConfig(env accConfig, cfg accInstanceConfig) string {
+	if cfg.Version == "" {
+		cfg.Version = defaultInstanceVersion
+	}
+	if cfg.WalMode == "" {
+		cfg.WalMode = "EBSWAL"
+	}
+	if cfg.DeployType == "" {
+		cfg.DeployType = "IAAS"
+	}
+
+	var b strings.Builder
+
+	fmt.Fprintf(&b, `provider "automq" {
+  automq_byoc_endpoint      = %q
+  automq_byoc_access_key_id = %q
+  automq_byoc_secret_key    = %q
+}
+
+`, env.Endpoint, env.AccessKeyID, env.SecretKey)
+
+	fmt.Fprintf(&b, `resource "automq_kafka_instance" "test" {
+  environment_id = %q
+  name           = %q
+`, cfg.EnvironmentID, cfg.Name)
+	if cfg.Description != "" {
+		fmt.Fprintf(&b, "  description    = %q\n", cfg.Description)
+	}
+	fmt.Fprintf(&b, "  version        = %q\n", cfg.Version)
+
+	b.WriteString("  compute_specs = {\n")
+	fmt.Fprintf(&b, "    reserved_aku = %d\n", cfg.ReservedAKU)
+	if cfg.DeployType != "" {
+		fmt.Fprintf(&b, "    deploy_type  = %q\n", cfg.DeployType)
+	}
+	if len(cfg.Networks) > 0 {
+		b.WriteString("    networks = [\n")
+		for _, n := range cfg.Networks {
+			b.WriteString("      {\n")
+			if n.Zone != "" {
+				fmt.Fprintf(&b, "        zone = %q\n", n.Zone)
+			}
+			if len(n.Subnets) > 0 {
+				b.WriteString("        subnets = [")
+				for i, s := range n.Subnets {
+					if i > 0 {
+						b.WriteString(", ")
+					}
+					fmt.Fprintf(&b, "%q", s)
+				}
+				b.WriteString("]\n")
+			}
+			b.WriteString("      }\n")
+		}
+		b.WriteString("    ]\n")
+	}
+	if cfg.KubernetesClusterID != "" {
+		fmt.Fprintf(&b, "    kubernetes_cluster_id = %q\n", cfg.KubernetesClusterID)
+	}
+	if len(cfg.KubernetesNodeGroups) > 0 {
+		b.WriteString("    kubernetes_node_groups = [\n")
+		for _, ng := range cfg.KubernetesNodeGroups {
+			fmt.Fprintf(&b, "      { id = %q }\n", ng)
+		}
+		b.WriteString("    ]\n")
+	}
+	if cfg.KubernetesNamespace != "" {
+		fmt.Fprintf(&b, "    kubernetes_namespace = %q\n", cfg.KubernetesNamespace)
+	}
+	if cfg.KubernetesServiceAcct != "" {
+		fmt.Fprintf(&b, "    kubernetes_service_account = %q\n", cfg.KubernetesServiceAcct)
+	}
+	if cfg.InstanceRole != "" {
+		fmt.Fprintf(&b, "    instance_role = %q\n", cfg.InstanceRole)
+	}
+	b.WriteString("  }\n\n")
+
+	b.WriteString("  features = {\n")
+	fmt.Fprintf(&b, "    wal_mode = %q\n", cfg.WalMode)
+
+	if len(cfg.InstanceConfigs) > 0 {
+		b.WriteString("    instance_configs = {\n")
+		for k, v := range cfg.InstanceConfigs {
+			fmt.Fprintf(&b, "      %q = %q\n", k, v)
+		}
+		b.WriteString("    }\n")
+	}
+
+	if cfg.MetricsExporter != nil {
+		b.WriteString("    metrics_exporter = {\n")
+		b.WriteString("      prometheus = {\n")
+		fmt.Fprintf(&b, "        enabled = %t\n", cfg.MetricsExporter.Enabled)
+		if cfg.MetricsExporter.AuthType != "" {
+			fmt.Fprintf(&b, "        auth_type = %q\n", cfg.MetricsExporter.AuthType)
+		}
+		if cfg.MetricsExporter.EndPoint != "" {
+			fmt.Fprintf(&b, "        end_point = %q\n", cfg.MetricsExporter.EndPoint)
+		}
+		if cfg.MetricsExporter.PrometheusARN != "" {
+			fmt.Fprintf(&b, "        prometheus_arn = %q\n", cfg.MetricsExporter.PrometheusARN)
+		}
+		if cfg.MetricsExporter.Username != "" {
+			fmt.Fprintf(&b, "        username = %q\n", cfg.MetricsExporter.Username)
+		}
+		if cfg.MetricsExporter.Password != "" {
+			fmt.Fprintf(&b, "        password = %q\n", cfg.MetricsExporter.Password)
+		}
+		if cfg.MetricsExporter.Token != "" {
+			fmt.Fprintf(&b, "        token = %q\n", cfg.MetricsExporter.Token)
+		}
+		if len(cfg.MetricsExporter.Labels) > 0 {
+			b.WriteString("        labels = {\n")
+			for k, v := range cfg.MetricsExporter.Labels {
+				fmt.Fprintf(&b, "          %q = %q\n", k, v)
+			}
+			b.WriteString("        }\n")
+		}
+		b.WriteString("      }\n")
+		b.WriteString("    }\n")
+	}
+
+	if cfg.Security != nil {
+		b.WriteString("    security = {\n")
+		if len(cfg.Security.AuthenticationMethods) > 0 {
+			fmt.Fprintf(&b, "      authentication_methods = [%s]\n", quoteJoin(cfg.Security.AuthenticationMethods))
+		}
+		if len(cfg.Security.TransitEncryptionModes) > 0 {
+			fmt.Fprintf(&b, "      transit_encryption_modes = [%s]\n", quoteJoin(cfg.Security.TransitEncryptionModes))
+		}
+		if cfg.Security.DataEncryptionMode != "" {
+			fmt.Fprintf(&b, "      data_encryption_mode = %q\n", cfg.Security.DataEncryptionMode)
+		}
+		if cfg.Security.CertificateAuthority != "" {
+			fmt.Fprintf(&b, "      certificate_authority = <<-EOT\n%s\n      EOT\n", cfg.Security.CertificateAuthority)
+		}
+		if cfg.Security.CertificateChain != "" {
+			fmt.Fprintf(&b, "      certificate_chain = <<-EOT\n%s\n      EOT\n", cfg.Security.CertificateChain)
+		}
+		if cfg.Security.PrivateKey != "" {
+			fmt.Fprintf(&b, "      private_key = <<-EOT\n%s\n      EOT\n", cfg.Security.PrivateKey)
+		}
+		b.WriteString("    }\n")
+	}
+
+	if cfg.TableTopic != nil {
+		b.WriteString("    table_topic = {\n")
+		fmt.Fprintf(&b, "      warehouse = %q\n", cfg.TableTopic.Warehouse)
+		fmt.Fprintf(&b, "      catalog_type = %q\n", cfg.TableTopic.CatalogType)
+		if cfg.TableTopic.MetastoreURI != "" {
+			fmt.Fprintf(&b, "      metastore_uri = %q\n", cfg.TableTopic.MetastoreURI)
+		}
+		b.WriteString("    }\n")
+	}
+
+	b.WriteString("  }\n")
+	b.WriteString("}\n")
+
+	return b.String()
+}
+
+func quoteJoin(items []string) string {
+	quoted := make([]string, 0, len(items))
+	for _, v := range items {
+		quoted = append(quoted, fmt.Sprintf("%q", v))
+	}
+	return strings.Join(quoted, ", ")
+}
+
+func ensureAccTimeout(t *testing.T) {
+	if os.Getenv("TF_ACC_TIMEOUT") == "" {
+		t.Setenv("TF_ACC_TIMEOUT", "2h")
+	}
+}
+
+func testAccCheckKafkaInstanceExists(name string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		rs, ok := s.RootModule().Resources[name]
+		if !ok {
+			return fmt.Errorf("not found: %s", name)
+		}
+		if rs.Primary.ID == "" {
+			return fmt.Errorf("no Kafka instance ID is set")
+		}
+		return nil
+	}
+}
+
+func testAccCheckKafkaInstanceDestroy(s *terraform.State) error {
+	for _, rs := range s.RootModule().Resources {
+		if rs.Type == "automq_kafka_instance" && rs.Primary.ID != "" {
+			return fmt.Errorf("kafka instance %s still exists", rs.Primary.ID)
+		}
+	}
+	return nil
+}
+
+func generateRandomSuffix() string {
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, 6)
+	for i := range b {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			return "rand"
+		}
+		b[i] = charset[n.Int64()]
+	}
+	return string(b)
+}
+
 func generateTestCertificate() (string, string, string, error) {
-	// Generate CA key
 	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return "", "", "", err
 	}
 
-	// Generate CA certificate
 	caTemplate := &x509.Certificate{
 		SerialNumber:          big.NewInt(1),
 		Subject:               pkix.Name{CommonName: "Test CA"},
@@ -555,13 +883,11 @@ func generateTestCertificate() (string, string, string, error) {
 		return "", "", "", err
 	}
 
-	// Generate server key
 	serverKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return "", "", "", err
 	}
 
-	// Generate server certificate
 	serverTemplate := &x509.Certificate{
 		SerialNumber: big.NewInt(2),
 		Subject:      pkix.Name{CommonName: "localhost"},
@@ -576,7 +902,6 @@ func generateTestCertificate() (string, string, string, error) {
 		return "", "", "", err
 	}
 
-	// Encode to PEM
 	caPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caCertDER})
 	serverCertPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: serverCertDER})
 	serverKeyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(serverKey)})

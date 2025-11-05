@@ -7,14 +7,12 @@ import (
 )
 
 const (
-	InstancePath                   = "/api/v1/instances"
-	InstanceConfigPath             = "/api/v1/instances/%s/configurations"
-	GetInstancePath                = "/api/v1/instances/%s"
-	DeleteInstancePath             = "/api/v1/instances/%s"
-	ReplaceInstanceIntergationPath = "/api/v1/instances/%s/integrations"
-	TurnOnInstanceAclPath          = "/api/v1/instances/%s/acls:enable"
-	GetInstanceEndpointsPath       = "/api/v1/instances/%s/endpoints"
-	UpdateInstancePath             = "/api/v1/instances/%s"
+	InstancePath             = "/api/v1/instances"
+	InstanceConfigPath       = "/api/v1/instances/%s/configurations"
+	GetInstancePath          = "/api/v1/instances/%s"
+	DeleteInstancePath       = "/api/v1/instances/%s"
+	GetInstanceEndpointsPath = "/api/v1/instances/%s/endpoints"
+	UpdateInstancePath       = "/api/v1/instances/%s"
 )
 
 func (c *Client) CreateKafkaInstance(ctx context.Context, kafka InstanceCreateParam) (*InstanceSummaryVO, error) {
@@ -68,24 +66,6 @@ func (c *Client) GetKafkaInstanceByName(ctx context.Context, name string) (*Inst
 
 func (c *Client) DeleteKafkaInstance(ctx context.Context, instanceId string) error {
 	_, err := c.Delete(ctx, fmt.Sprintf(DeleteInstancePath, instanceId))
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (c *Client) ReplaceInstanceIntergation(ctx context.Context, instanceId string, param IntegrationInstanceParam) error {
-	path := fmt.Sprintf(ReplaceInstanceIntergationPath, instanceId)
-	_, err := c.Put(ctx, path, param)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (c *Client) TurnOnInstanceAcl(ctx context.Context, instanceId string) error {
-	path := fmt.Sprintf(TurnOnInstanceAclPath, instanceId)
-	_, err := c.Post(ctx, path, nil)
 	if err != nil {
 		return err
 	}
