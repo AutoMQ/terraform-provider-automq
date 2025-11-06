@@ -1027,22 +1027,6 @@ func areNodeGroupsEqual(plan, state []models.NodeGroupModel) bool {
 	return true
 }
 
-func stringSetsEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	set := make(map[string]struct{}, len(a))
-	for _, v := range a {
-		set[v] = struct{}{}
-	}
-	for _, v := range b {
-		if _, ok := set[v]; !ok {
-			return false
-		}
-	}
-	return true
-}
-
 func metricsExporterChanged(plan, state *models.MetricsExporterModel) bool {
 	if plan == nil {
 		return state != nil
@@ -1188,19 +1172,6 @@ func buildPrometheusExporterParam(model *models.PrometheusExporterModel) (*clien
 	return prom, true
 }
 
-func boolAttrEqual(plan, state types.Bool) bool {
-	if plan.IsUnknown() {
-		return true
-	}
-	if plan.IsNull() {
-		return state.IsNull() || state.IsUnknown()
-	}
-	if state.IsNull() || state.IsUnknown() {
-		return false
-	}
-	return plan.ValueBool() == state.ValueBool()
-}
-
 func stringAttrEqual(plan, state types.String) bool {
 	if plan.IsUnknown() {
 		return true
@@ -1212,19 +1183,6 @@ func stringAttrEqual(plan, state types.String) bool {
 		return false
 	}
 	return plan.ValueString() == state.ValueString()
-}
-
-func int64AttrEqual(plan, state types.Int64) bool {
-	if plan.IsUnknown() {
-		return true
-	}
-	if plan.IsNull() {
-		return state.IsNull() || state.IsUnknown()
-	}
-	if state.IsNull() || state.IsUnknown() {
-		return false
-	}
-	return plan.ValueInt64() == state.ValueInt64()
 }
 
 func mapAttrEqual(plan, state types.Map) bool {

@@ -875,6 +875,7 @@ func flattenPrometheusExporterVO(vo *client.InstancePrometheusExporterVO, previo
 		Labels:        types.MapNull(types.StringType),
 	}
 	if previous != nil {
+		// Preserve any sensitive values (e.g. password/token) that are not returned by the API.
 		prom = *previous
 	}
 
@@ -882,8 +883,6 @@ func flattenPrometheusExporterVO(vo *client.InstancePrometheusExporterVO, previo
 	prom.EndPoint = retainString(cleanAPIString(vo.EndPoint), prom.EndPoint)
 	prom.PrometheusArn = retainString(cleanAPIString(vo.PrometheusArn), prom.PrometheusArn)
 	prom.Username = retainString(cleanAPIString(vo.Username), prom.Username)
-	prom.Password = prom.Password
-	prom.Token = prom.Token
 
 	if len(vo.Labels) > 0 {
 		labelMap := make(map[string]string, len(vo.Labels))

@@ -117,8 +117,16 @@ func TestValidateKafkaInstanceConfiguration_DataBucketsMissingName(t *testing.T)
 
 func TestWalModeValidatorRejectsUnsupportedValue(t *testing.T) {
 	s := getKafkaInstanceResourceSchema(t)
-	featuresAttr := s.Attributes["features"].(schema.SingleNestedAttribute)
-	walAttr := featuresAttr.Attributes["wal_mode"].(schema.StringAttribute)
+	featuresAttrRaw, ok := s.Attributes["features"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("features attribute has unexpected type %T", s.Attributes["features"])
+	}
+	featuresAttr := featuresAttrRaw
+	walAttrRaw, ok := featuresAttr.Attributes["wal_mode"].(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("wal_mode attribute has unexpected type %T", featuresAttr.Attributes["wal_mode"])
+	}
+	walAttr := walAttrRaw
 	if len(walAttr.Validators) == 0 {
 		t.Fatalf("wal_mode validators missing")
 	}
@@ -145,16 +153,32 @@ func TestWalModeValidatorRejectsUnsupportedValue(t *testing.T) {
 
 func TestImmutableAttributesHaveRequiresReplace(t *testing.T) {
 	s := getKafkaInstanceResourceSchema(t)
-	featuresAttr := s.Attributes["features"].(schema.SingleNestedAttribute)
-	computeAttr := s.Attributes["compute_specs"].(schema.SingleNestedAttribute)
+	featuresAttrRaw, ok := s.Attributes["features"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("features attribute has unexpected type %T", s.Attributes["features"])
+	}
+	featuresAttr := featuresAttrRaw
+	computeAttrRaw, ok := s.Attributes["compute_specs"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("compute_specs attribute has unexpected type %T", s.Attributes["compute_specs"])
+	}
+	computeAttr := computeAttrRaw
 
 	// features.table_topic
-	tableTopicAttr := featuresAttr.Attributes["table_topic"].(schema.SingleNestedAttribute)
+	tableTopicAttrRaw, ok := featuresAttr.Attributes["table_topic"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("table_topic attribute has unexpected type %T", featuresAttr.Attributes["table_topic"])
+	}
+	tableTopicAttr := tableTopicAttrRaw
 	if !hasObjectRequiresReplace(tableTopicAttr.PlanModifiers) {
 		t.Fatalf("expected table_topic to require replacement, modifiers: %v", tableTopicAttr.PlanModifiers)
 	}
 	// compute_specs.instance_role
-	instanceRoleAttr := computeAttr.Attributes["instance_role"].(schema.StringAttribute)
+	instanceRoleAttrRaw, ok := computeAttr.Attributes["instance_role"].(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("instance_role attribute has unexpected type %T", computeAttr.Attributes["instance_role"])
+	}
+	instanceRoleAttr := instanceRoleAttrRaw
 	if !hasStringRequiresReplace(instanceRoleAttr.PlanModifiers) {
 		t.Fatalf("expected instance_role to require replacement, modifiers: %v", instanceRoleAttr.PlanModifiers)
 	}
@@ -162,7 +186,11 @@ func TestImmutableAttributesHaveRequiresReplace(t *testing.T) {
 
 func getKafkaInstanceResourceSchema(t *testing.T) schema.Schema {
 	t.Helper()
-	res := NewKafkaInstanceResource().(*KafkaInstanceResource)
+	resIface := NewKafkaInstanceResource()
+	res, ok := resIface.(*KafkaInstanceResource)
+	if !ok {
+		t.Fatalf("NewKafkaInstanceResource returned unexpected type %T", resIface)
+	}
 	resp := resource.SchemaResponse{}
 	res.Schema(context.Background(), resource.SchemaRequest{}, &resp)
 	if resp.Diagnostics.HasError() {

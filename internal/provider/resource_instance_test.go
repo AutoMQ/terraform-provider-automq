@@ -356,7 +356,7 @@ func TestAccKafkaInstance_VM_Update(t *testing.T) {
 			{
 				Config: renderKafkaInstanceConfig(env, baseCfg),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					testAccCheckKafkaInstanceExists("automq_kafka_instance.test"),
+					testAccCheckKafkaInstanceExists(),
 					resource.TestCheckResourceAttr("automq_kafka_instance.test", "name", baseCfg.Name),
 					resource.TestCheckResourceAttr("automq_kafka_instance.test", "description", baseCfg.Description),
 					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.reserved_aku", fmt.Sprintf("%d", baseCfg.ReservedAKU)),
@@ -368,7 +368,7 @@ func TestAccKafkaInstance_VM_Update(t *testing.T) {
 			{
 				Config: renderKafkaInstanceConfig(env, updatedCfg),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					testAccCheckKafkaInstanceExists("automq_kafka_instance.test"),
+					testAccCheckKafkaInstanceExists(),
 					resource.TestCheckResourceAttr("automq_kafka_instance.test", "name", updatedCfg.Name),
 					resource.TestCheckResourceAttr("automq_kafka_instance.test", "description", updatedCfg.Description),
 					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.reserved_aku", fmt.Sprintf("%d", updatedCfg.ReservedAKU)),
@@ -379,7 +379,7 @@ func TestAccKafkaInstance_VM_Update(t *testing.T) {
 			{
 				Config: renderKafkaInstanceConfig(env, disableMetricsCfg),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					testAccCheckKafkaInstanceExists("automq_kafka_instance.test"),
+					testAccCheckKafkaInstanceExists(),
 					resource.TestCheckNoResourceAttr("automq_kafka_instance.test", "features.metrics_exporter.prometheus"),
 				),
 			},
@@ -440,7 +440,7 @@ func TestAccKafkaInstance_K8S_Basic(t *testing.T) {
 			{
 				Config: renderKafkaInstanceConfig(env, cfg),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					testAccCheckKafkaInstanceExists("automq_kafka_instance.test"),
+					testAccCheckKafkaInstanceExists(),
 					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.deploy_type", "K8S"),
 					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.kubernetes_cluster_id", env.K8SClusterID),
 					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.kubernetes_node_groups.#", fmt.Sprintf("%d", len(env.K8SNodeGroups))),
@@ -502,7 +502,7 @@ func TestAccKafkaInstance_ImmutableFields(t *testing.T) {
 			{
 				Config: renderKafkaInstanceConfig(env, base),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					testAccCheckKafkaInstanceExists("automq_kafka_instance.test"),
+					testAccCheckKafkaInstanceExists(),
 					resource.TestCheckResourceAttr("automq_kafka_instance.test", "compute_specs.instance_role", base.InstanceRole),
 					resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.table_topic.warehouse", base.TableTopic.Warehouse),
 				),
@@ -611,7 +611,7 @@ func TestAccKafkaInstance_SecurityCombinations(t *testing.T) {
 					{
 						Config: renderKafkaInstanceConfig(env, cfg),
 						Check: resource.ComposeAggregateTestCheckFunc(
-							testAccCheckKafkaInstanceExists("automq_kafka_instance.test"),
+							testAccCheckKafkaInstanceExists(),
 							resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.security.authentication_methods.#", fmt.Sprintf("%d", len(combo.security.AuthenticationMethods))),
 							resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.security.transit_encryption_modes.#", fmt.Sprintf("%d", len(combo.security.TransitEncryptionModes))),
 							resource.TestCheckResourceAttr("automq_kafka_instance.test", "features.security.data_encryption_mode", combo.security.DataEncryptionMode),
@@ -823,11 +823,13 @@ func ensureAccTimeout(t *testing.T) {
 	}
 }
 
-func testAccCheckKafkaInstanceExists(name string) resource.TestCheckFunc {
+const kafkaInstanceResourceName = "automq_kafka_instance.test"
+
+func testAccCheckKafkaInstanceExists() resource.TestCheckFunc {
 	return func(s *terraform.State) error {
-		rs, ok := s.RootModule().Resources[name]
+		rs, ok := s.RootModule().Resources[kafkaInstanceResourceName]
 		if !ok {
-			return fmt.Errorf("not found: %s", name)
+			return fmt.Errorf("not found: %s", kafkaInstanceResourceName)
 		}
 		if rs.Primary.ID == "" {
 			return fmt.Errorf("no Kafka instance ID is set")

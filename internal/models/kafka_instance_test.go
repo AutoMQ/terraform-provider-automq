@@ -436,7 +436,3 @@ func timePtr(s string) *time.Time {
 	t, _ := time.Parse(time.RFC3339, s)
 	return &t
 }
-
-func int32Ptr(v int32) *int32 {
-	return &v
-}
