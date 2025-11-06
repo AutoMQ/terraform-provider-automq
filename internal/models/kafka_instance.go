@@ -907,7 +907,7 @@ func flattenPrometheusExporterVO(vo *client.InstancePrometheusExporterVO, previo
 }
 
 func flattenTableTopicVO(vo *client.TableTopicVO, previous *TableTopicModel) *TableTopicModel {
-	if vo == nil || !vo.Enabled {
+	if vo == nil || vo.CatalogType == nil {
 		return nil
 	}
 
