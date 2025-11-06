@@ -62,27 +62,16 @@ output "example-id" {
 Read-Only:
 
 - `bucket_profiles` (Attributes List, Deprecated) (Deprecated) Bucket profile bindings. (see [below for nested schema](#nestedatt--compute_specs--bucket_profiles))
-- `credential` (String)
 - `data_buckets` (Attributes List) Inline bucket configuration replacing legacy bucket profiles. (see [below for nested schema](#nestedatt--compute_specs--data_buckets))
 - `deploy_type` (String) Deployment platform for the instance.
-- `dns_resource_group` (String)
 - `dns_zone` (String)
-- `domain` (String)
-- `file_system_param` (Attributes) File system configuration for FSWAL clusters. (see [below for nested schema](#nestedatt--compute_specs--file_system_param))
 - `instance_role` (String)
-- `k8s_resource_group` (String)
 - `kubernetes_cluster_id` (String)
 - `kubernetes_namespace` (String)
 - `kubernetes_node_groups` (Attributes List) Kubernetes node groups configuration (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
 - `kubernetes_service_account` (String)
 - `networks` (Attributes List) To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones. (see [below for nested schema](#nestedatt--compute_specs--networks))
-- `provider` (String)
-- `region` (String)
 - `reserved_aku` (Number) AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.
-- `scope` (String)
-- `tenant_id` (String)
-- `vpc` (String)
-- `vpc_resource_group` (String)
 
 <a id="nestedatt--compute_specs--bucket_profiles"></a>
 ### Nested Schema for `compute_specs.bucket_profiles`
@@ -98,20 +87,6 @@ Read-Only:
 Read-Only:
 
 - `bucket_name` (String)
-- `credential` (String)
-- `endpoint` (String)
-- `provider` (String)
-- `region` (String)
-- `scope` (String)
-
-
-<a id="nestedatt--compute_specs--file_system_param"></a>
-### Nested Schema for `compute_specs.file_system_param`
-
-Read-Only:
-
-- `file_system_count` (Number) Number of file systems allocated for WAL storage.
-- `throughput_mibps_per_file_system` (Number) Provisioned throughput in MiB/s for each file system.
 
 
 <a id="nestedatt--compute_specs--kubernetes_node_groups"></a>
@@ -149,66 +124,19 @@ Read-Only:
 
 Read-Only:
 
-- `extend_listeners` (Attributes List) (see [below for nested schema](#nestedatt--features--extend_listeners))
-- `inbound_rules` (Attributes List) (see [below for nested schema](#nestedatt--features--inbound_rules))
 - `instance_configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
 - `integrations` (Set of String) (Deprecated) Integration identifiers returned for compatibility.
-- `metrics_exporter` (Attributes) Metrics exporter configuration for Prometheus, CloudWatch, or Kafka sinks. (see [below for nested schema](#nestedatt--features--metrics_exporter))
-- `s3_failover` (Attributes) (see [below for nested schema](#nestedatt--features--s3_failover))
+- `metrics_exporter` (Attributes) Metrics exporter configuration for Prometheus. (see [below for nested schema](#nestedatt--features--metrics_exporter))
 - `security` (Attributes) (see [below for nested schema](#nestedatt--features--security))
 - `table_topic` (Attributes) Table topic configuration (warehouse/catalog settings). (see [below for nested schema](#nestedatt--features--table_topic))
-- `wal_mode` (String) Write-Ahead Logging mode: EBSWAL (using EBS as write buffer), S3WAL (using object storage as write buffer), or FSWAL (using file systems as write buffer). Defaults to EBSWAL.
-
-<a id="nestedatt--features--extend_listeners"></a>
-### Nested Schema for `features.extend_listeners`
-
-Read-Only:
-
-- `listener_name` (String)
-- `port` (Number)
-- `security_protocol` (String)
-
-
-<a id="nestedatt--features--inbound_rules"></a>
-### Nested Schema for `features.inbound_rules`
-
-Read-Only:
-
-- `cidrs` (List of String)
-- `listener_name` (String)
-
+- `wal_mode` (String) Write-Ahead Logging mode: EBSWAL (using EBS as write buffer) or S3WAL (using object storage as write buffer). Defaults to EBSWAL.
 
 <a id="nestedatt--features--metrics_exporter"></a>
 ### Nested Schema for `features.metrics_exporter`
 
 Read-Only:
 
-- `cloudwatch` (Attributes) (see [below for nested schema](#nestedatt--features--metrics_exporter--cloudwatch))
-- `kafka` (Attributes) (see [below for nested schema](#nestedatt--features--metrics_exporter--kafka))
 - `prometheus` (Attributes) (see [below for nested schema](#nestedatt--features--metrics_exporter--prometheus))
-
-<a id="nestedatt--features--metrics_exporter--cloudwatch"></a>
-### Nested Schema for `features.metrics_exporter.cloudwatch`
-
-Read-Only:
-
-- `enabled` (Boolean)
-- `namespace` (String)
-
-
-<a id="nestedatt--features--metrics_exporter--kafka"></a>
-### Nested Schema for `features.metrics_exporter.kafka`
-
-Read-Only:
-
-- `bootstrap_servers` (String)
-- `collection_period` (Number)
-- `enabled` (Boolean)
-- `sasl_mechanism` (String)
-- `sasl_password` (String, Sensitive)
-- `sasl_username` (String)
-- `security_protocol` (String)
-- `topic` (String)
 
 
 <a id="nestedatt--features--metrics_exporter--prometheus"></a>
@@ -217,24 +145,12 @@ Read-Only:
 Read-Only:
 
 - `auth_type` (String)
-- `enabled` (Boolean)
 - `end_point` (String)
 - `labels` (Map of String)
 - `password` (String, Sensitive)
 - `prometheus_arn` (String)
 - `token` (String, Sensitive)
 - `username` (String)
-
-
-
-<a id="nestedatt--features--s3_failover"></a>
-### Nested Schema for `features.s3_failover`
-
-Read-Only:
-
-- `ebs_volume_size_gb` (Number)
-- `enabled` (Boolean)
-- `storage_type` (String)
 
 
 <a id="nestedatt--features--security"></a>

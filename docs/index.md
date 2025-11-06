@@ -95,9 +95,6 @@ resource "automq_kafka_instance" "example" {
   compute_specs = {
     reserved_aku = 3
     deploy_type  = "IAAS"
-    provider     = "aws"
-    region       = var.region
-    vpc          = var.vpc_id
     networks = [
       {
         zone    = var.az
@@ -125,7 +122,6 @@ resource "automq_kafka_instance" "example" {
     }
     metrics_exporter = {
       prometheus = {
-        enabled   = true
         end_point = "http://prometheus.example.com/api/v1/write"
       }
     }
