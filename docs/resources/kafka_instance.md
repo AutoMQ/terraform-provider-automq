@@ -99,20 +99,32 @@ resource "automq_kafka_instance" "example" {
 
 Required:
 
+- `networks` (Attributes List) To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones. (see [below for nested schema](#nestedatt--compute_specs--networks))
 - `reserved_aku` (Number) AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.
 
 Optional:
 
 - `bucket_profiles` (Attributes List, Deprecated) (Deprecated) Bucket profile bindings. Use `data_buckets` instead. (see [below for nested schema](#nestedatt--compute_specs--bucket_profiles))
 - `data_buckets` (Attributes List) Inline bucket configuration replacing legacy bucket profiles. (see [below for nested schema](#nestedatt--compute_specs--data_buckets))
-- `deploy_type` (String) Deployment platform for the instance. Supported values: `IAAS`, `KUBERNETES`.
+- `deploy_type` (String) Deployment platform for the instance. Supported values: `IAAS`, `K8S`.
 - `dns_zone` (String) DNS zone used when creating custom records.
 - `instance_role` (String)
 - `kubernetes_cluster_id` (String) Identifier for the target Kubernetes cluster when deploy_type is KUBERNETES.
 - `kubernetes_namespace` (String)
 - `kubernetes_node_groups` (Attributes List) Node groups (or node pools) are units for unified configuration management of physical nodes in Kubernetes. Different Kubernetes providers may use different terms for node groups. Select target node groups that must be created in advance and configured for either single-AZ or three-AZ deployment. The instance node type must meet the requirements specified in the documentation. If you select a single-AZ node group, the AutoMQ instance will be deployed in a single availability zone; if you select a three-AZ node group, the instance will be deployed across three availability zones. (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
 - `kubernetes_service_account` (String)
-- `networks` (Attributes List) To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones. (see [below for nested schema](#nestedatt--compute_specs--networks))
+
+<a id="nestedatt--compute_specs--networks"></a>
+### Nested Schema for `compute_specs.networks`
+
+Required:
+
+- `zone` (String) The availability zone ID of the cloud provider.
+
+Optional:
+
+- `subnets` (List of String) Specify the subnet under the corresponding availability zone for deploying the instance. Currently, only one subnet can be set for each availability zone.
+
 
 <a id="nestedatt--compute_specs--bucket_profiles"></a>
 ### Nested Schema for `compute_specs.bucket_profiles`
@@ -125,24 +137,17 @@ Required:
 <a id="nestedatt--compute_specs--data_buckets"></a>
 ### Nested Schema for `compute_specs.data_buckets`
 
-Required:
+Optional:
 
 - `bucket_name` (String) Object storage bucket name used for data.
+
+
 <a id="nestedatt--compute_specs--kubernetes_node_groups"></a>
 ### Nested Schema for `compute_specs.kubernetes_node_groups`
 
 Required:
 
 - `id` (String) Node group identifier
-
-
-<a id="nestedatt--compute_specs--networks"></a>
-### Nested Schema for `compute_specs.networks`
-
-Required:
-
-- `subnets` (List of String) Specify the subnet under the corresponding availability zone for deploying the instance. Currently, only one subnet can be set for each availability zone.
-- `zone` (String) The availability zone ID of the cloud provider.
 
 
 
@@ -158,7 +163,7 @@ Optional:
 
 - `instance_configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
 - `integrations` (Set of String, Deprecated) (Deprecated) Integration identifiers previously used for metrics/table topic bindings.
-- `metrics_exporter` (Attributes) Inline Prometheus metrics exporter configuration. (see [below for nested schema](#nestedatt--features--metrics_exporter))
+- `metrics_exporter` (Attributes) Configure Prometheus metrics scraping. (see [below for nested schema](#nestedatt--features--metrics_exporter))
 - `table_topic` (Attributes) Inline table topic (Iceberg/Hive) configuration replacing legacy integration references. (see [below for nested schema](#nestedatt--features--table_topic))
 
 <a id="nestedatt--features--security"></a>
@@ -208,9 +213,9 @@ Optional:
 - `auth_type` (String)
 - `end_point` (String)
 - `labels` (Map of String)
-- `password` (String, Sensitive)
+- `password` (String)
 - `prometheus_arn` (String)
-- `token` (String, Sensitive)
+- `token` (String)
 - `username` (String)
 
 
@@ -227,8 +232,8 @@ Optional:
 
 - `hive_auth_mode` (String)
 - `kerberos_principal` (String)
-- `keytab_file` (String, Sensitive)
-- `krb5conf_file` (String, Sensitive)
+- `keytab_file` (String)
+- `krb5conf_file` (String)
 - `metastore_uri` (String)
 - `user_principal` (String)
 

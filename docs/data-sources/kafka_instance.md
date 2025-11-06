@@ -126,7 +126,7 @@ Read-Only:
 
 - `instance_configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
 - `integrations` (Set of String) (Deprecated) Integration identifiers returned for compatibility.
-- `metrics_exporter` (Attributes) Metrics exporter configuration for Prometheus. (see [below for nested schema](#nestedatt--features--metrics_exporter))
+- `metrics_exporter` (Attributes) Metrics exporter configuration for Prometheus or Kafka sinks. (see [below for nested schema](#nestedatt--features--metrics_exporter))
 - `security` (Attributes) (see [below for nested schema](#nestedatt--features--security))
 - `table_topic` (Attributes) Table topic configuration (warehouse/catalog settings). (see [below for nested schema](#nestedatt--features--table_topic))
 - `wal_mode` (String) Write-Ahead Logging mode: EBSWAL (using EBS as write buffer) or S3WAL (using object storage as write buffer). Defaults to EBSWAL.
@@ -136,7 +136,22 @@ Read-Only:
 
 Read-Only:
 
+- `kafka` (Attributes) (see [below for nested schema](#nestedatt--features--metrics_exporter--kafka))
 - `prometheus` (Attributes) (see [below for nested schema](#nestedatt--features--metrics_exporter--prometheus))
+
+<a id="nestedatt--features--metrics_exporter--kafka"></a>
+### Nested Schema for `features.metrics_exporter.kafka`
+
+Read-Only:
+
+- `bootstrap_servers` (String)
+- `collection_period` (Number)
+- `enabled` (Boolean)
+- `sasl_mechanism` (String)
+- `sasl_password` (String, Sensitive)
+- `sasl_username` (String)
+- `security_protocol` (String)
+- `topic` (String)
 
 
 <a id="nestedatt--features--metrics_exporter--prometheus"></a>
@@ -151,6 +166,7 @@ Read-Only:
 - `prometheus_arn` (String)
 - `token` (String, Sensitive)
 - `username` (String)
+
 
 
 <a id="nestedatt--features--security"></a>
