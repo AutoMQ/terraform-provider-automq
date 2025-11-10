@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -88,6 +89,7 @@ func (r *KafkaLinkingResource) Schema(ctx context.Context, req resource.SchemaRe
 			"source_cluster": schema.SingleNestedAttribute{
 				MarkdownDescription: "Inline configuration for the source Kafka cluster.",
 				Required:            true,
+				PlanModifiers:       []planmodifier.Object{objectplanmodifier.RequiresReplace()},
 				Attributes: map[string]schema.Attribute{
 					"endpoint": schema.StringAttribute{
 						MarkdownDescription: "Bootstrap servers of the source Kafka cluster (host:port list).",
