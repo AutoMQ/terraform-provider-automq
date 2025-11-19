@@ -53,10 +53,6 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 				MarkdownDescription: "The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.",
 				Computed:            true,
 			},
-			"deploy_profile": schema.StringAttribute{
-				MarkdownDescription: "",
-				Computed:            true,
-			},
 			"version": schema.StringAttribute{
 				Computed:    true,
 				Description: "The software version of AutoMQ instance. By default, there is no need to set version; the latest version will be used. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.",
@@ -107,19 +103,6 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 							},
 						},
 					},
-					"bucket_profiles": schema.ListNestedAttribute{
-						Computed:           true,
-						Description:        "(Deprecated) Bucket profile bindings.",
-						DeprecationMessage: "bucket_profiles is deprecated. Consult data_buckets instead.",
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"id": schema.StringAttribute{
-									Computed:    true,
-									Description: "Bucket profile ID",
-								},
-							},
-						},
-					},
 					"data_buckets": schema.ListNestedAttribute{
 						Computed:    true,
 						Description: "Inline bucket configuration replacing legacy bucket profiles.",
@@ -142,11 +125,6 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 						ElementType:         types.StringType,
 						MarkdownDescription: "Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).",
 						Computed:            true,
-					},
-					"integrations": schema.SetAttribute{
-						Computed:    true,
-						ElementType: types.StringType,
-						Description: "(Deprecated) Integration identifiers returned for compatibility.",
 					},
 					"metrics_exporter": schema.SingleNestedAttribute{
 						Computed:            true,
@@ -212,6 +190,10 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 							"data_encryption_mode": schema.StringAttribute{
 								Computed:    true,
 								Description: "Data encryption mode: NONE (no encryption), CPMK (cloud-managed KMS), BYOK (custom KMS key)",
+							},
+							"tls_hostname_validation_enabled": schema.BoolAttribute{
+								Computed:    true,
+								Description: "Whether TLS hostname validation is enabled for broker certificates.",
 							},
 						},
 					},
@@ -335,12 +317,6 @@ func (r *KafkaInstanceDataSource) Read(ctx context.Context, req datasource.ReadR
 	}
 
 	instanceId := *out.InstanceId
-	// Get instance integrations
-	integrations, err := r.client.ListInstanceIntegrations(ctx, instanceId)
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to list integrations for Kafka instance %q, got error: %s", instanceId, err))
-		return
-	}
 	// Get instance endpoints
 	endpoints, err := r.client.GetInstanceEndpoints(ctx, instanceId)
 	if err != nil {
@@ -350,7 +326,6 @@ func (r *KafkaInstanceDataSource) Read(ctx context.Context, req datasource.ReadR
 	model := models.KafkaInstanceModel{}
 	// Flatten API response into Terraform state
 	resp.Diagnostics.Append(models.FlattenKafkaInstanceModel(out, &instance)...)
-	resp.Diagnostics.Append(models.FlattenKafkaInstanceModelWithIntegrations(integrations, &instance)...)
 	resp.Diagnostics.Append(models.FlattenKafkaInstanceModelWithEndpoints(endpoints, &instance)...)
 	if resp.Diagnostics.HasError() {
 		return

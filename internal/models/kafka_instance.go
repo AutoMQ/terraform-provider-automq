@@ -29,7 +29,6 @@ type KafkaInstanceResourceModel struct {
 	InstanceID     types.String       `tfsdk:"id"`
 	Name           types.String       `tfsdk:"name"`
 	Description    types.String       `tfsdk:"description"`
-	DeployProfile  types.String       `tfsdk:"deploy_profile"`
 	Version        types.String       `tfsdk:"version"`
 	ComputeSpecs   *ComputeSpecsModel `tfsdk:"compute_specs"`
 	Features       *FeaturesModel     `tfsdk:"features"`
@@ -45,7 +44,6 @@ type KafkaInstanceModel struct {
 	InstanceID     types.String          `tfsdk:"id"`
 	Name           types.String          `tfsdk:"name"`
 	Description    types.String          `tfsdk:"description"`
-	DeployProfile  types.String          `tfsdk:"deploy_profile"`
 	Version        types.String          `tfsdk:"version"`
 	ComputeSpecs   *ComputeSpecsModel    `tfsdk:"compute_specs"`
 	Features       *FeaturesSummaryModel `tfsdk:"features"`
@@ -69,17 +67,16 @@ type NetworkModel struct {
 }
 
 type ComputeSpecsModel struct {
-	ReservedAku           types.Int64            `tfsdk:"reserved_aku"`
-	Networks              []NetworkModel         `tfsdk:"networks"`
-	KubernetesNodeGroups  []NodeGroupModel       `tfsdk:"kubernetes_node_groups"`
-	BucketProfiles        []BucketProfileIDModel `tfsdk:"bucket_profiles"`
-	DeployType            types.String           `tfsdk:"deploy_type"`
-	DnsZone               types.String           `tfsdk:"dns_zone"`
-	KubernetesClusterID   types.String           `tfsdk:"kubernetes_cluster_id"`
-	KubernetesNamespace   types.String           `tfsdk:"kubernetes_namespace"`
-	KubernetesServiceAcct types.String           `tfsdk:"kubernetes_service_account"`
-	InstanceRole          types.String           `tfsdk:"instance_role"`
-	DataBuckets           types.List             `tfsdk:"data_buckets"`
+	ReservedAku           types.Int64      `tfsdk:"reserved_aku"`
+	Networks              []NetworkModel   `tfsdk:"networks"`
+	KubernetesNodeGroups  []NodeGroupModel `tfsdk:"kubernetes_node_groups"`
+	DeployType            types.String     `tfsdk:"deploy_type"`
+	DnsZone               types.String     `tfsdk:"dns_zone"`
+	KubernetesClusterID   types.String     `tfsdk:"kubernetes_cluster_id"`
+	KubernetesNamespace   types.String     `tfsdk:"kubernetes_namespace"`
+	KubernetesServiceAcct types.String     `tfsdk:"kubernetes_service_account"`
+	InstanceRole          types.String     `tfsdk:"instance_role"`
+	DataBuckets           types.List       `tfsdk:"data_buckets"`
 }
 
 type NodeGroupModel struct {
@@ -123,10 +120,19 @@ func coalesceStringAttr(apiValue *string, previous *types.String) types.String {
 	return types.StringNull()
 }
 
+func coalesceBoolAttr(apiValue *bool, previous *types.Bool) types.Bool {
+	if apiValue != nil {
+		return types.BoolValue(*apiValue)
+	}
+	if previous != nil && !previous.IsNull() && !previous.IsUnknown() {
+		return *previous
+	}
+	return types.BoolNull()
+}
+
 type FeaturesModel struct {
 	WalMode         types.String          `tfsdk:"wal_mode"`
 	InstanceConfigs types.Map             `tfsdk:"instance_configs"`
-	Integrations    types.Set             `tfsdk:"integrations"`
 	Security        *SecurityModel        `tfsdk:"security"`
 	MetricsExporter *MetricsExporterModel `tfsdk:"metrics_exporter"`
 	TableTopic      *TableTopicModel      `tfsdk:"table_topic"`
@@ -135,29 +141,26 @@ type FeaturesModel struct {
 type FeaturesSummaryModel struct {
 	WalMode         types.String          `tfsdk:"wal_mode"`
 	InstanceConfigs types.Map             `tfsdk:"instance_configs"`
-	Integrations    types.Set             `tfsdk:"integrations"`
 	Security        *SecuritySummaryModel `tfsdk:"security"`
 	MetricsExporter *MetricsExporterModel `tfsdk:"metrics_exporter"`
 	TableTopic      *TableTopicModel      `tfsdk:"table_topic"`
 }
 
-type BucketProfileIDModel struct {
-	ID types.String `tfsdk:"id"`
-}
-
 type SecurityModel struct {
-	AuthenticationMethods  types.Set    `tfsdk:"authentication_methods"`
-	TransitEncryptionModes types.Set    `tfsdk:"transit_encryption_modes"`
-	CertificateAuthority   types.String `tfsdk:"certificate_authority"`
-	CertificateChain       types.String `tfsdk:"certificate_chain"`
-	PrivateKey             types.String `tfsdk:"private_key"`
-	DataEncryptionMode     types.String `tfsdk:"data_encryption_mode"`
+	AuthenticationMethods        types.Set    `tfsdk:"authentication_methods"`
+	TransitEncryptionModes       types.Set    `tfsdk:"transit_encryption_modes"`
+	CertificateAuthority         types.String `tfsdk:"certificate_authority"`
+	CertificateChain             types.String `tfsdk:"certificate_chain"`
+	PrivateKey                   types.String `tfsdk:"private_key"`
+	DataEncryptionMode           types.String `tfsdk:"data_encryption_mode"`
+	TlsHostnameValidationEnabled types.Bool   `tfsdk:"tls_hostname_validation_enabled"`
 }
 
 type SecuritySummaryModel struct {
-	AuthenticationMethods  types.Set    `tfsdk:"authentication_methods"`
-	TransitEncryptionModes types.Set    `tfsdk:"transit_encryption_modes"`
-	DataEncryptionMode     types.String `tfsdk:"data_encryption_mode"`
+	AuthenticationMethods        types.Set    `tfsdk:"authentication_methods"`
+	TransitEncryptionModes       types.Set    `tfsdk:"transit_encryption_modes"`
+	DataEncryptionMode           types.String `tfsdk:"data_encryption_mode"`
+	TlsHostnameValidationEnabled types.Bool   `tfsdk:"tls_hostname_validation_enabled"`
 }
 
 type MetricsExporterModel struct {
@@ -195,9 +198,6 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 	// Basic fields
 	request.Name = instance.Name.ValueString()
 	request.Description = instance.Description.ValueString()
-	if !instance.DeployProfile.IsNull() && !instance.DeployProfile.IsUnknown() {
-		request.DeployProfile = instance.DeployProfile.ValueString()
-	}
 	request.Version = instance.Version.ValueString()
 
 	// Validate required fields
@@ -272,18 +272,6 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 			}
 			request.Spec.Networks = networks
 		}
-		// Bucket Profiles
-		if len(instance.ComputeSpecs.BucketProfiles) > 0 {
-			bucketProfiles := make([]client.BucketProfileBindParam, 0, len(instance.ComputeSpecs.BucketProfiles))
-			for _, ng := range instance.ComputeSpecs.BucketProfiles {
-				id := ng.ID.ValueString()
-				bucketProfiles = append(bucketProfiles, client.BucketProfileBindParam{
-					Id: &id,
-				})
-			}
-			request.Spec.BucketProfiles = bucketProfiles
-		}
-
 		if !instance.ComputeSpecs.DataBuckets.IsNull() && !instance.ComputeSpecs.DataBuckets.IsUnknown() {
 			dataBucketModels, dataBucketDiags := DataBucketListToModels(context.TODO(), instance.ComputeSpecs.DataBuckets)
 			if dataBucketDiags.HasError() {
@@ -368,6 +356,14 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 				}
 				request.Features.Security.PrivateKey = &privateKey
 			}
+
+			if !instance.Features.Security.TlsHostnameValidationEnabled.IsNull() && !instance.Features.Security.TlsHostnameValidationEnabled.IsUnknown() {
+				enabled := instance.Features.Security.TlsHostnameValidationEnabled.ValueBool()
+				if request.Features.Security == nil {
+					request.Features.Security = &client.InstanceSecurityParam{}
+				}
+				request.Features.Security.TlsHostnameValidationEnabled = &enabled
+			}
 		}
 
 		// Metrics exporter
@@ -407,7 +403,15 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 					if len(configs) > 0 {
 						labelSlice := make([]client.MetricsLabelParam, len(configs))
 						for i, cfg := range configs {
-							labelSlice[i] = client.MetricsLabelParam{Name: cfg.Key, Value: cfg.Value}
+							name := ""
+							if cfg.Key != nil {
+								name = *cfg.Key
+							}
+							value := ""
+							if cfg.Value != nil {
+								value = *cfg.Value
+							}
+							labelSlice[i] = client.MetricsLabelParam{Name: name, Value: value}
 						}
 						prom.Labels = labelSlice
 					}
@@ -460,19 +464,6 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 			request.Features.TableTopic = topic
 		}
 
-		// Integrations
-		if !instance.Features.Integrations.IsNull() && len(instance.Features.Integrations.Elements()) > 0 {
-			ids := ExpandSetValueList(instance.Features.Integrations)
-			integrations := make([]client.IntegrationBindParam, 0, len(ids))
-			for _, id := range ids {
-				integrationID := id
-				integrations = append(integrations, client.IntegrationBindParam{
-					Id: &integrationID,
-				})
-			}
-			request.Features.Integrations = integrations
-		}
-
 		// Instance Configs
 		if !instance.Features.InstanceConfigs.IsNull() {
 			instanceConfigs := ExpandStringValueMap(instance.Features.InstanceConfigs)
@@ -493,22 +484,21 @@ func ConvertKafkaInstanceModel(resource *KafkaInstanceResourceModel, model *Kafk
 	model.InstanceID = resource.InstanceID
 	model.Name = resource.Name
 	model.Description = resource.Description
-	model.DeployProfile = resource.DeployProfile
 	model.Version = resource.Version
 	model.ComputeSpecs = resource.ComputeSpecs
 	if resource.Features != nil {
 		features := &FeaturesSummaryModel{
 			WalMode:         resource.Features.WalMode,
 			InstanceConfigs: resource.Features.InstanceConfigs,
-			Integrations:    resource.Features.Integrations,
 			MetricsExporter: resource.Features.MetricsExporter,
 			TableTopic:      resource.Features.TableTopic,
 		}
 		if resource.Features.Security != nil {
 			features.Security = &SecuritySummaryModel{
-				AuthenticationMethods:  resource.Features.Security.AuthenticationMethods,
-				TransitEncryptionModes: resource.Features.Security.TransitEncryptionModes,
-				DataEncryptionMode:     resource.Features.Security.DataEncryptionMode,
+				AuthenticationMethods:        resource.Features.Security.AuthenticationMethods,
+				TransitEncryptionModes:       resource.Features.Security.TransitEncryptionModes,
+				DataEncryptionMode:           resource.Features.Security.DataEncryptionMode,
+				TlsHostnameValidationEnabled: resource.Features.Security.TlsHostnameValidationEnabled,
 			}
 		}
 		model.Features = features
@@ -550,9 +540,6 @@ func FlattenKafkaInstanceBasicModel(instance *client.InstanceSummaryVO, resource
 	}
 	if instance.Description != nil {
 		resource.Description = types.StringValue(*instance.Description)
-	}
-	if instance.DeployProfile != nil {
-		resource.DeployProfile = types.StringValue(*instance.DeployProfile)
 	}
 	if instance.Version != nil {
 		resource.Version = types.StringValue(*instance.Version)
@@ -601,9 +588,6 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 	if instance.Description != nil {
 		resource.Description = types.StringValue(*instance.Description)
 	}
-	if instance.DeployProfile != nil {
-		resource.DeployProfile = types.StringValue(*instance.DeployProfile)
-	}
 	if instance.Version != nil {
 		resource.Version = types.StringValue(*instance.Version)
 	}
@@ -623,7 +607,6 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 				ReservedAku:           types.Int64Null(),
 				Networks:              []NetworkModel{},
 				KubernetesNodeGroups:  []NodeGroupModel{},
-				BucketProfiles:        []BucketProfileIDModel{},
 				DataBuckets:           types.ListNull(DataBucketObjectType),
 				DeployType:            types.StringNull(),
 				DnsZone:               types.StringNull(),
@@ -674,19 +657,6 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 			} else {
 				resource.ComputeSpecs.Networks = networks
 			}
-		}
-
-		// Bucket Profiles
-		if instance.Spec.BucketProfiles != nil {
-			bucketProfiles := make([]BucketProfileIDModel, 0, len(instance.Spec.BucketProfiles))
-			for _, bp := range instance.Spec.BucketProfiles {
-				if bp.Id != nil {
-					bucketProfiles = append(bucketProfiles, BucketProfileIDModel{
-						ID: types.StringValue(*bp.Id),
-					})
-				}
-			}
-			resource.ComputeSpecs.BucketProfiles = bucketProfiles
 		}
 
 		var previousDataBuckets []DataBucketModel
@@ -759,6 +729,14 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 			if instance.Features.Security.DataEncryptionMode != nil {
 				resource.Features.Security.DataEncryptionMode = types.StringValue(*instance.Features.Security.DataEncryptionMode)
 			}
+			var previousTls *types.Bool
+			if previousSecurity != nil {
+				previousTls = &previousSecurity.TlsHostnameValidationEnabled
+			}
+			resource.Features.Security.TlsHostnameValidationEnabled = coalesceBoolAttr(
+				instance.Features.Security.TlsHostnameValidationEnabled,
+				previousTls,
+			)
 
 			// Authentication Methods
 			if instance.Features.Security.AuthenticationMethods != nil {
@@ -962,36 +940,6 @@ func isPrometheusVOEmpty(vo *client.InstancePrometheusExporterVO) bool {
 		return false
 	}
 	return len(vo.Labels) == 0
-}
-
-// FlattenKafkaInstanceModelWithIntegrations adds integration information to the KafkaInstanceResourceModel.
-func FlattenKafkaInstanceModelWithIntegrations(integrations []client.IntegrationVO, resource *KafkaInstanceResourceModel) diag.Diagnostics {
-	var diags diag.Diagnostics
-
-	if resource.Features == nil {
-		resource.Features = &FeaturesModel{}
-	}
-
-	if len(integrations) == 0 {
-		resource.Features.Integrations = types.SetNull(types.StringType)
-		return diags
-	}
-
-	integrationIds := make([]attr.Value, 0, len(integrations))
-	for _, integration := range integrations {
-		if integration.Code == "" {
-			continue
-		}
-		integrationIds = append(integrationIds, types.StringValue(integration.Code))
-	}
-
-	if len(integrationIds) == 0 {
-		resource.Features.Integrations = types.SetNull(types.StringType)
-		return diags
-	}
-
-	resource.Features.Integrations = types.SetValueMust(types.StringType, integrationIds)
-	return diags
 }
 
 // FlattenKafkaInstanceModelWithEndpoints adds endpoint information to the KafkaInstanceResourceModel.

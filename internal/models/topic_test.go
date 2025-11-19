@@ -37,8 +37,8 @@ func TestExpandKafkaTopicResource(t *testing.T) {
 				Partition:       3,
 				CompactStrategy: "COMPACT",
 				Configs: []client.ConfigItemParam{
-					{Key: "cleanup.policy", Value: "compact"},
-					{Key: "delete.retention.ms", Value: "86400000"},
+					{Key: testStringPtr("cleanup.policy"), Value: testStringPtr("compact")},
+					{Key: testStringPtr("delete.retention.ms"), Value: testStringPtr("86400000")},
 				},
 			},
 		},
@@ -55,7 +55,7 @@ func TestExpandKafkaTopicResource(t *testing.T) {
 				Partition:       1,
 				CompactStrategy: "DELETE",
 				Configs: []client.ConfigItemParam{
-					{Key: "retention.ms", Value: "3600000"},
+					{Key: testStringPtr("retention.ms"), Value: testStringPtr("3600000")},
 				},
 			},
 		},

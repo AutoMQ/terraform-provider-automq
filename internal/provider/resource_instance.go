@@ -20,6 +20,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -57,7 +59,6 @@ type kafkaInstanceAPI interface {
 	GetKafkaInstanceByName(ctx context.Context, name string) (*client.InstanceVO, error)
 	DeleteKafkaInstance(ctx context.Context, instanceId string) error
 	UpdateKafkaInstance(ctx context.Context, instanceId string, param client.InstanceUpdateParam) error
-	ListInstanceIntegrations(ctx context.Context, instanceId string) ([]client.IntegrationVO, error)
 	GetInstanceEndpoints(ctx context.Context, instanceId string) ([]client.InstanceAccessInfoVO, error)
 	GetInstanceConfigs(ctx context.Context, instanceId string) ([]client.ConfigItemParam, error)
 }
@@ -84,10 +85,6 @@ func (a defaultKafkaInstanceAPI) DeleteKafkaInstance(ctx context.Context, instan
 
 func (a defaultKafkaInstanceAPI) UpdateKafkaInstance(ctx context.Context, instanceId string, param client.InstanceUpdateParam) error {
 	return a.client.UpdateKafkaInstance(ctx, instanceId, param)
-}
-
-func (a defaultKafkaInstanceAPI) ListInstanceIntegrations(ctx context.Context, instanceId string) ([]client.IntegrationVO, error) {
-	return a.client.ListInstanceIntegrations(ctx, instanceId)
 }
 
 func (a defaultKafkaInstanceAPI) GetInstanceEndpoints(ctx context.Context, instanceId string) ([]client.InstanceAccessInfoVO, error) {
@@ -132,15 +129,6 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 			"description": schema.StringAttribute{
 				MarkdownDescription: "The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.",
 				Optional:            true,
-			},
-			"deploy_profile": schema.StringAttribute{
-				MarkdownDescription: "(Deprecated) Deploy profile defining cloud resource configuration including VPC, Kubernetes, storage and IAM roles. Inline compute_specs should be used instead.",
-				Optional:            true,
-				Computed:            true,
-				DeprecationMessage:  "deploy_profile is deprecated. Use compute_specs.* fields to describe deployments.",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"version": schema.StringAttribute{
 				Required:    true,
@@ -215,24 +203,6 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						},
 						PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplace()},
 					},
-					"bucket_profiles": schema.ListNestedAttribute{
-						Optional:           true,
-						Description:        "(Deprecated) Bucket profile bindings. Use `data_buckets` instead.",
-						DeprecationMessage: "bucket_profiles is deprecated. Please migrate to data_buckets.",
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"id": schema.StringAttribute{
-									Required:    true,
-									Description: "Bucket profile ID",
-								},
-							},
-						},
-						Validators: []validator.List{
-							listvalidator.SizeAtLeast(1),
-							listvalidator.SizeAtMost(1),
-						},
-						PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplace()},
-					},
 					"data_buckets": schema.ListNestedAttribute{
 						Optional:    true,
 						Computed:    true,
@@ -302,12 +272,6 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						MarkdownDescription: "Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).",
 						Optional:            true,
 					},
-					"integrations": schema.SetAttribute{
-						Optional:           true,
-						ElementType:        types.StringType,
-						Description:        "(Deprecated) Integration identifiers previously used for metrics/table topic bindings.",
-						DeprecationMessage: "integrations is deprecated. Configure metrics_exporter or table_topic blocks instead.",
-					},
 					"security": schema.SingleNestedAttribute{
 						Required: true,
 						Attributes: map[string]schema.Attribute{
@@ -354,6 +318,16 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 								PlanModifiers: []planmodifier.String{
 									stringplanmodifier.UseStateForUnknown(),
 									stringplanmodifier.RequiresReplace(),
+								},
+							},
+							"tls_hostname_validation_enabled": schema.BoolAttribute{
+								Optional:            true,
+								Computed:            true,
+								MarkdownDescription: "Enable TLS hostname validation when AutoMQ brokers terminate TLS. Defaults to true. Changing this setting requires recreating the instance.",
+								Default:             booldefault.StaticBool(true),
+								PlanModifiers: []planmodifier.Bool{
+									boolplanmodifier.UseStateForUnknown(),
+									boolplanmodifier.RequiresReplace(),
 								},
 							},
 							"certificate_authority": schema.StringAttribute{
@@ -604,7 +578,6 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 	logFields := map[string]any{
 		"environment_id": instance.EnvironmentID.ValueString(),
 		"name":           instance.Name.ValueString(),
-		"deploy_profile": instance.DeployProfile.ValueString(),
 	}
 	if instance.ComputeSpecs != nil {
 		logFields["reserved_aku"] = instance.ComputeSpecs.ReservedAku.ValueInt64()
@@ -670,16 +643,6 @@ func (r *KafkaInstanceResource) Read(ctx context.Context, req resource.ReadReque
 	}
 
 	if instance.State != nil && *instance.State == models.StateRunning {
-		integrations, err := r.api.ListInstanceIntegrations(ctx, instanceId)
-		if err != nil {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to list integrations for Kafka instance %q, got error: %s", state.InstanceID.ValueString(), err))
-			return
-		}
-		resp.Diagnostics.Append(models.FlattenKafkaInstanceModelWithIntegrations(integrations, &state)...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
 		endpoints, err := r.api.GetInstanceEndpoints(ctx, instanceId)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get endpoints for Kafka instance %q, got error: %s", state.InstanceID.ValueString(), err))
@@ -968,10 +931,8 @@ func (r *KafkaInstanceResource) ImportState(ctx context.Context, req resource.Im
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), instanceId)...)
 
 	config := types.MapValueMust(types.StringType, map[string]attr.Value{})
-	integration := types.SetValueMust(types.StringType, []attr.Value{})
 	features := models.FeaturesModel{
 		InstanceConfigs: config,
-		Integrations:    integration,
 	}
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("features"), features)...)
 }
@@ -988,11 +949,6 @@ func ReadKafkaInstance(ctx context.Context, r *KafkaInstanceResource, instanceId
 		return diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Kafka instance %q not found", plan.InstanceID.ValueString()))}
 	}
 
-	integrations, err := r.api.ListInstanceIntegrations(ctx, instanceId)
-	if err != nil {
-		return diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to list integrations for Kafka instance %q, got error: %s", plan.InstanceID.ValueString(), err))}
-	}
-
 	endpoints, err := r.api.GetInstanceEndpoints(ctx, instanceId)
 	if err != nil {
 		return diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get endpoints for Kafka instance %q, got error: %s", plan.InstanceID.ValueString(), err))}
@@ -1000,7 +956,6 @@ func ReadKafkaInstance(ctx context.Context, r *KafkaInstanceResource, instanceId
 
 	diags := diag.Diagnostics{}
 	diags.Append(models.FlattenKafkaInstanceModel(instance, plan)...)
-	diags.Append(models.FlattenKafkaInstanceModelWithIntegrations(integrations, plan)...)
 	diags.Append(models.FlattenKafkaInstanceModelWithEndpoints(endpoints, plan)...)
 	return diags
 }
@@ -1164,7 +1119,15 @@ func buildPrometheusExporterParam(model *models.PrometheusExporterModel) (*clien
 		if len(labels) > 0 {
 			promLabels := make([]client.MetricsLabelParam, len(labels))
 			for i, label := range labels {
-				promLabels[i] = client.MetricsLabelParam{Name: label.Key, Value: label.Value}
+				name := ""
+				if label.Key != nil {
+					name = *label.Key
+				}
+				value := ""
+				if label.Value != nil {
+					value = *label.Value
+				}
+				promLabels[i] = client.MetricsLabelParam{Name: name, Value: value}
 			}
 			prom.Labels = promLabels
 		}

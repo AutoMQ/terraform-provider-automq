@@ -82,7 +82,6 @@ resource "automq_kafka_instance" "example" {
 
 ### Optional
 
-- `deploy_profile` (String, Deprecated) (Deprecated) Deploy profile defining cloud resource configuration including VPC, Kubernetes, storage and IAM roles. Inline compute_specs should be used instead.
 - `description` (String) The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 
@@ -104,7 +103,6 @@ Required:
 
 Optional:
 
-- `bucket_profiles` (Attributes List, Deprecated) (Deprecated) Bucket profile bindings. Use `data_buckets` instead. (see [below for nested schema](#nestedatt--compute_specs--bucket_profiles))
 - `data_buckets` (Attributes List) Inline bucket configuration replacing legacy bucket profiles. (see [below for nested schema](#nestedatt--compute_specs--data_buckets))
 - `deploy_type` (String) Deployment platform for the instance. Supported values: `IAAS`, `K8S`.
 - `dns_zone` (String) DNS zone used when creating custom records.
@@ -124,14 +122,6 @@ Required:
 Optional:
 
 - `subnets` (List of String) Specify the subnet under the corresponding availability zone for deploying the instance. Currently, only one subnet can be set for each availability zone.
-
-
-<a id="nestedatt--compute_specs--bucket_profiles"></a>
-### Nested Schema for `compute_specs.bucket_profiles`
-
-Required:
-
-- `id` (String) Bucket profile ID
 
 
 <a id="nestedatt--compute_specs--data_buckets"></a>
@@ -162,7 +152,6 @@ Required:
 Optional:
 
 - `instance_configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
-- `integrations` (Set of String, Deprecated) (Deprecated) Integration identifiers previously used for metrics/table topic bindings.
 - `metrics_exporter` (Attributes) Configure Prometheus metrics scraping. (see [below for nested schema](#nestedatt--features--metrics_exporter))
 - `table_topic` (Attributes) Inline table topic (Iceberg/Hive) configuration replacing legacy integration references. (see [below for nested schema](#nestedatt--features--table_topic))
 
@@ -195,6 +184,7 @@ Optional:
 	* `CPMK` - Cloud Provider Managed Key encryption using cloud provider's KMS service
 
 Changes to encryption mode require instance replacement.
+- `tls_hostname_validation_enabled` (Boolean) Whether TLS hostname validation is enforced for broker certificates. Defaults to `true`. Changing this value forces a new resource.
 - `private_key` (String) The private key in PEM format corresponding to the server certificate. AutoMQ will deploy the instance with this key. Required when `mtls` authentication method is enabled.
 
 

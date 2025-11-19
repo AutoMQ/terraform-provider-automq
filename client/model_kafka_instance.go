@@ -3,16 +3,15 @@ package client
 import "time"
 
 type InstanceCreateParam struct {
-	Name          string                 `json:"name"`
-	Description   string                 `json:"description,omitempty"`
-	DeployProfile string                 `json:"deployProfile,omitempty"`
-	Version       string                 `json:"version"`
-	Spec          SpecificationParam     `json:"spec"`
-	Features      *InstanceFeatureParam  `json:"features,omitempty"`
-	Tags          []TagParam             `json:"tags,omitempty"`
-	ClusterId     string                 `json:"clusterId,omitempty"`
-	EndPoint      *InstanceEndpointParam `json:"endPoint,omitempty"`
-	Accesses      []AccessCreateParam    `json:"accesses,omitempty"`
+	Name        string                 `json:"name"`
+	Description string                 `json:"description,omitempty"`
+	Version     string                 `json:"version"`
+	Spec        SpecificationParam     `json:"spec"`
+	Features    *InstanceFeatureParam  `json:"features,omitempty"`
+	Tags        []TagParam             `json:"tags,omitempty"`
+	ClusterId   string                 `json:"clusterId,omitempty"`
+	EndPoint    *InstanceEndpointParam `json:"endPoint,omitempty"`
+	Accesses    []AccessCreateParam    `json:"accesses,omitempty"`
 }
 
 type SpecificationParam struct {
@@ -21,7 +20,6 @@ type SpecificationParam struct {
 	Networks                 []InstanceNetworkParam     `json:"networks,omitempty"`
 	KubernetesNodeGroups     []KubernetesNodeGroupParam `json:"kubernetesNodeGroups,omitempty"`
 	SecurityGroup            *string                    `json:"securityGroup,omitempty"`
-	BucketProfiles           []BucketProfileBindParam   `json:"bucketProfiles,omitempty"`
 	Template                 *string                    `json:"template,omitempty"`
 	FileSystem               *FileSystemParam           `json:"fileSystemForFsWal,omitempty"`
 	DeployType               *string                    `json:"deployType,omitempty"`
@@ -37,10 +35,6 @@ type SpecificationParam struct {
 	DataBuckets              []BucketProfileParam       `json:"dataBuckets,omitempty"`
 }
 
-type BucketProfileBindParam struct {
-	Id *string `json:"id,omitempty"`
-}
-
 type BucketProfileParam struct {
 	BucketName string  `json:"bucketName"`
 	Provider   *string `json:"provider,omitempty"`
@@ -48,6 +42,18 @@ type BucketProfileParam struct {
 	Scope      *string `json:"scope,omitempty"`
 	Credential *string `json:"credential,omitempty"`
 	Endpoint   *string `json:"endpoint,omitempty"`
+}
+
+type BucketProfileVO struct {
+	Id          *string    `json:"id,omitempty"`
+	BucketName  *string    `json:"bucketName,omitempty"`
+	GmtCreate   *time.Time `json:"gmtCreate,omitempty"`
+	GmtModified *time.Time `json:"gmtModified,omitempty"`
+	Provider    *string    `json:"provider,omitempty"`
+	Region      *string    `json:"region,omitempty"`
+	Scope       *string    `json:"scope,omitempty"`
+	Credential  *string    `json:"credential,omitempty"`
+	Endpoint    *string    `json:"endpoint,omitempty"`
 }
 
 type FileSystemParam struct {
@@ -77,18 +83,18 @@ type InstanceFeatureParam struct {
 	S3Failover      *InstanceFailoverParam        `json:"s3Failover,omitempty"`
 	MetricsExporter *InstanceMetricsExporterParam `json:"metricsExporter,omitempty"`
 	TableTopic      *TableTopicParam              `json:"tableTopic,omitempty"`
-	Integrations    []IntegrationBindParam        `json:"integrations,omitempty"` // Deprecated: kept for backward compatibility
 	InboundRules    []InboundRuleParam            `json:"inboundRules,omitempty"`
 	ExtendListeners []InstanceListenerParam       `json:"extendListeners,omitempty"`
 }
 
 type InstanceSecurityParam struct {
-	AuthenticationMethods  []string `json:"authenticationMethods,omitempty"`
-	TransitEncryptionModes []string `json:"transitEncryptionModes,omitempty"`
-	CertificateAuthority   *string  `json:"certificateAuthority,omitempty"`
-	CertificateChain       *string  `json:"certificateChain,omitempty"`
-	PrivateKey             *string  `json:"privateKey,omitempty"`
-	DataEncryptionMode     *string  `json:"dataEncryptionMode,omitempty"`
+	AuthenticationMethods        []string `json:"authenticationMethods,omitempty"`
+	TransitEncryptionModes       []string `json:"transitEncryptionModes,omitempty"`
+	CertificateAuthority         *string  `json:"certificateAuthority,omitempty"`
+	CertificateChain             *string  `json:"certificateChain,omitempty"`
+	PrivateKey                   *string  `json:"privateKey,omitempty"`
+	DataEncryptionMode           *string  `json:"dataEncryptionMode,omitempty"`
+	TlsHostnameValidationEnabled *bool    `json:"tlsHostnameValidationEnabled,omitempty"`
 }
 
 type InstanceFailoverParam struct {
@@ -144,10 +150,6 @@ type InstanceListenerParam struct {
 	ListenerName     string  `json:"listenerName"`
 	SecurityProtocol *string `json:"securityProtocol,omitempty"`
 	Port             *int32  `json:"port,omitempty"`
-}
-
-type IntegrationBindParam struct {
-	Id *string `json:"id,omitempty"`
 }
 
 type TagParam struct {
@@ -269,9 +271,10 @@ type InstanceFeatureVO struct {
 }
 
 type InstanceSecurityConfigVO struct {
-	AuthenticationMethods  []string `json:"authenticationMethods,omitempty"`
-	TransitEncryptionModes []string `json:"transitEncryptionModes,omitempty"`
-	DataEncryptionMode     *string  `json:"dataEncryptionMode,omitempty"`
+	AuthenticationMethods        []string `json:"authenticationMethods,omitempty"`
+	TransitEncryptionModes       []string `json:"transitEncryptionModes,omitempty"`
+	DataEncryptionMode           *string  `json:"dataEncryptionMode,omitempty"`
+	TlsHostnameValidationEnabled *bool    `json:"tlsHostnameValidationEnabled,omitempty"`
 }
 
 type InstanceFailoverVO struct {
