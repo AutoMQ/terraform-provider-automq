@@ -359,7 +359,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 											stringvalidator.OneOf(allowedPrometheusAuthTypes...),
 										},
 									},
-									"endpoint":       schema.StringAttribute{Optional: true},
+									"endpoint":       schema.StringAttribute{Required: true},
 									"prometheus_arn": schema.StringAttribute{Optional: true},
 									"username":       schema.StringAttribute{Optional: true},
 									"password":       schema.StringAttribute{Optional: true},
@@ -551,6 +551,15 @@ func validateKafkaInstanceConfiguration(ctx context.Context, plan *models.KafkaI
 					fmt.Sprintf("compute_specs.data_buckets[%d].bucket_name must be provided when data_buckets is configured.", i),
 				)
 			}
+		}
+	}
+
+	if plan.Features != nil && plan.Features.MetricsExporter != nil {
+		if plan.Features.MetricsExporter.Prometheus == nil || !models.PrometheusExporterHasConfig(plan.Features.MetricsExporter.Prometheus) {
+			diagnostics.AddError(
+				"Invalid Configuration",
+				"features.metrics_exporter must include a prometheus block with required attributes. Remove the metrics_exporter block entirely to disable metrics export.",
+			)
 		}
 	}
 
@@ -997,19 +1006,9 @@ func metricsExporterChanged(plan, state *models.MetricsExporterModel) bool {
 		return state != nil
 	}
 	if state == nil {
-		return hasMetricsExporterConfig(plan)
+		return models.MetricsExporterHasConfig(plan)
 	}
 	if !prometheusExporterEqual(plan.Prometheus, state.Prometheus) {
-		return true
-	}
-	return false
-}
-
-func hasMetricsExporterConfig(model *models.MetricsExporterModel) bool {
-	if model == nil {
-		return false
-	}
-	if model.Prometheus != nil && prometheusExporterHasConfig(model.Prometheus) {
 		return true
 	}
 	return false
@@ -1043,34 +1042,6 @@ func prometheusExporterEqual(plan, state *models.PrometheusExporterModel) bool {
 	return true
 }
 
-func prometheusExporterHasConfig(model *models.PrometheusExporterModel) bool {
-	if model == nil {
-		return false
-	}
-	if !model.AuthType.IsNull() && !model.AuthType.IsUnknown() {
-		return true
-	}
-	if !model.EndPoint.IsNull() && !model.EndPoint.IsUnknown() {
-		return true
-	}
-	if !model.PrometheusArn.IsNull() && !model.PrometheusArn.IsUnknown() {
-		return true
-	}
-	if !model.Username.IsNull() && !model.Username.IsUnknown() {
-		return true
-	}
-	if !model.Password.IsNull() && !model.Password.IsUnknown() {
-		return true
-	}
-	if !model.Token.IsNull() && !model.Token.IsUnknown() {
-		return true
-	}
-	if !model.Labels.IsNull() && !model.Labels.IsUnknown() && len(model.Labels.Elements()) > 0 {
-		return true
-	}
-	return false
-}
-
 func buildMetricsExporterParam(model *models.MetricsExporterModel) (*client.InstanceMetricsExporterParam, bool) {
 	if model == nil {
 		return nil, false
@@ -1094,7 +1065,7 @@ func buildPrometheusExporterParam(model *models.PrometheusExporterModel) (*clien
 	if model == nil {
 		return nil, false
 	}
-	if !prometheusExporterHasConfig(model) {
+	if !models.PrometheusExporterHasConfig(model) {
 		return nil, false
 	}
 	prom := &client.InstancePrometheusExporterParam{}

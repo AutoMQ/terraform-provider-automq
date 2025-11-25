@@ -177,6 +177,25 @@ type PrometheusExporterModel struct {
 	Labels        types.Map    `tfsdk:"labels"`
 }
 
+// MetricsExporterHasConfig reports whether any nested exporter attributes are
+// explicitly configured (non-null and known).
+func MetricsExporterHasConfig(model *MetricsExporterModel) bool {
+	if model == nil {
+		return false
+	}
+	return PrometheusExporterHasConfig(model.Prometheus)
+}
+
+// PrometheusExporterHasConfig inspects the nested Prometheus block for any user
+// supplied values. It mirrors the provider-side logic so both expansion and
+// flattening share the same definition of an \"empty\" block.
+func PrometheusExporterHasConfig(model *PrometheusExporterModel) bool {
+	if model == nil {
+		return false
+	}
+	return !model.AuthType.IsNull()
+}
+
 type TableTopicModel struct {
 	Warehouse         types.String `tfsdk:"warehouse"`
 	CatalogType       types.String `tfsdk:"catalog_type"`

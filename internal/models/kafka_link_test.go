@@ -9,7 +9,7 @@ import (
 )
 
 func TestFlattenKafkaLinkPreservesSensitiveFields(t *testing.T) {
-	prior := &KafkaLinkingResourceModel{
+	prior := &KafkaLinkResourceModel{
 		EnvironmentID: types.StringValue("env-123"),
 		SourceCluster: &KafkaLinkSourceClusterModel{
 			Endpoint:                      types.StringValue("old-endpoint"),
@@ -34,7 +34,7 @@ func TestFlattenKafkaLinkPreservesSensitiveFields(t *testing.T) {
 		ErrorMessage: ptr(""),
 	}
 
-	var state KafkaLinkingResourceModel
+	var state KafkaLinkResourceModel
 	diags := FlattenKafkaLink(link, &state, prior)
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diags)

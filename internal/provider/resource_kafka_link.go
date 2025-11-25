@@ -23,23 +23,23 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-var _ resource.Resource = &KafkaLinkingResource{}
-var _ resource.ResourceWithImportState = &KafkaLinkingResource{}
+var _ resource.Resource = &KafkaLinkResource{}
+var _ resource.ResourceWithImportState = &KafkaLinkResource{}
 
-func NewKafkaLinkingResource() resource.Resource {
-	return &KafkaLinkingResource{}
+func NewKafkaLinkResource() resource.Resource {
+	return &KafkaLinkResource{}
 }
 
-// KafkaLinkingResource implements automq_kafka_linking.
-type KafkaLinkingResource struct {
+// KafkaLinkResource implements automq_kafka_link.
+type KafkaLinkResource struct {
 	client *client.Client
 }
 
-func (r *KafkaLinkingResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_kafka_linking"
+func (r *KafkaLinkResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_kafka_link"
 }
 
-func (r *KafkaLinkingResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *KafkaLinkResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	startOffsetRegex := regexp.MustCompile(`^(latest|earliest|[0-9]+)$`)
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manage Kafka links for mirroring topics and consumer groups between AutoMQ instances and external Kafka clusters.",
@@ -144,7 +144,7 @@ func (r *KafkaLinkingResource) Schema(ctx context.Context, req resource.SchemaRe
 	}
 }
 
-func (r *KafkaLinkingResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *KafkaLinkResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -156,8 +156,8 @@ func (r *KafkaLinkingResource) Configure(ctx context.Context, req resource.Confi
 	r.client = client
 }
 
-func (r *KafkaLinkingResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan models.KafkaLinkingResourceModel
+func (r *KafkaLinkResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var plan models.KafkaLinkResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -186,8 +186,8 @@ func (r *KafkaLinkingResource) Create(ctx context.Context, req resource.CreateRe
 	tflog.Trace(ctx, "created kafka link resource", map[string]any{"link_id": plan.LinkID.ValueString()})
 }
 
-func (r *KafkaLinkingResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state models.KafkaLinkingResourceModel
+func (r *KafkaLinkResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var state models.KafkaLinkResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -213,12 +213,12 @@ func (r *KafkaLinkingResource) Read(ctx context.Context, req resource.ReadReques
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-func (r *KafkaLinkingResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddError("Update Not Supported", "automq_kafka_linking does not support in-place updates. Please recreate the resource after making configuration changes.")
+func (r *KafkaLinkResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	resp.Diagnostics.AddError("Update Not Supported", "automq_kafka_link does not support in-place updates. Please recreate the resource after making configuration changes.")
 }
 
-func (r *KafkaLinkingResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var state models.KafkaLinkingResourceModel
+func (r *KafkaLinkResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var state models.KafkaLinkResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -235,7 +235,7 @@ func (r *KafkaLinkingResource) Delete(ctx context.Context, req resource.DeleteRe
 	}
 }
 
-func (r *KafkaLinkingResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *KafkaLinkResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	parts := strings.Split(req.ID, "@")
 	if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
 		resp.Diagnostics.Append(diag.NewErrorDiagnostic("Invalid Import ID", fmt.Sprintf("Expected <environment_id>@<instance_id>@<link_id>, got %q", req.ID)))

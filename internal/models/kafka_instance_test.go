@@ -352,6 +352,45 @@ func TestFlattenKafkaInstanceModelWithEndpoints(t *testing.T) {
 	}
 }
 
+func TestFlattenKafkaInstanceModel_RemovesMetricsExporterWhenAPIEmitsNone(t *testing.T) {
+	tests := []struct {
+		name     string
+		exporter *client.InstanceMetricsExporterVO
+	}{
+		{name: "nil metrics exporter", exporter: nil},
+		{name: "empty metrics exporter", exporter: &client.InstanceMetricsExporterVO{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resource := &KafkaInstanceResourceModel{
+				Features: &FeaturesModel{
+					MetricsExporter: &MetricsExporterModel{
+						Prometheus: &PrometheusExporterModel{
+							AuthType: types.StringValue("noauth"),
+							EndPoint: types.StringValue("https://previous.example.com"),
+						},
+					},
+				},
+			}
+			instance := &client.InstanceVO{
+				InstanceId: strPtr("test-instance"),
+				Features: &client.InstanceFeatureVO{
+					WalMode:         strPtr("EBSWAL"),
+					MetricsExporter: tt.exporter,
+				},
+			}
+
+			diags := FlattenKafkaInstanceModel(instance, resource)
+			assert.False(t, diags.HasError())
+			if resource.Features == nil {
+				t.Fatalf("features unexpectedly nil")
+			}
+			assert.Nil(t, resource.Features.MetricsExporter)
+		})
+	}
+}
+
 // Helper functions
 func strPtr(s string) *string {
 	return &s

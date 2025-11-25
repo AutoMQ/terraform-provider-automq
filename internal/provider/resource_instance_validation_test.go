@@ -115,6 +115,36 @@ func TestValidateKafkaInstanceConfiguration_DataBucketsMissingName(t *testing.T)
 	}
 }
 
+func TestMetricsExporterAuthTypeSchema(t *testing.T) {
+	s := getKafkaInstanceResourceSchema(t)
+	featuresAttrRaw, ok := s.Attributes["features"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("features attribute has unexpected type %T", s.Attributes["features"])
+	}
+	featuresAttr := featuresAttrRaw
+	metricsAttrRaw, ok := featuresAttr.Attributes["metrics_exporter"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("metrics_exporter attribute has unexpected type %T", featuresAttr.Attributes["metrics_exporter"])
+	}
+	metricsAttr := metricsAttrRaw
+	prometheusAttrRaw, ok := metricsAttr.Attributes["prometheus"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("prometheus attribute has unexpected type %T", metricsAttr.Attributes["prometheus"])
+	}
+	prometheusAttr := prometheusAttrRaw
+	authAttrRaw, ok := prometheusAttr.Attributes["auth_type"].(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("auth_type attribute has unexpected type %T", prometheusAttr.Attributes["auth_type"])
+	}
+	authAttr := authAttrRaw
+	if !authAttr.Required {
+		t.Fatalf("auth_type should be required")
+	}
+	if len(authAttr.Validators) == 0 {
+		t.Fatalf("auth_type validators missing")
+	}
+}
+
 func TestWalModeValidatorRejectsUnsupportedValue(t *testing.T) {
 	s := getKafkaInstanceResourceSchema(t)
 	featuresAttrRaw, ok := s.Attributes["features"].(schema.SingleNestedAttribute)
