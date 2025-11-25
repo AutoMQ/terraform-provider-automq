@@ -169,7 +169,7 @@ type MetricsExporterModel struct {
 
 type PrometheusExporterModel struct {
 	AuthType      types.String `tfsdk:"auth_type"`
-	EndPoint      types.String `tfsdk:"end_point"`
+	EndPoint      types.String `tfsdk:"endpoint"`
 	PrometheusArn types.String `tfsdk:"prometheus_arn"`
 	Username      types.String `tfsdk:"username"`
 	Password      types.String `tfsdk:"password"`
@@ -775,8 +775,6 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 			metrics, metricsDiags := flattenMetricsExporterVO(instance.Features.MetricsExporter, previousMetrics)
 			diags.Append(metricsDiags...)
 			resource.Features.MetricsExporter = metrics
-		} else if previousMetrics != nil {
-			resource.Features.MetricsExporter = previousMetrics
 		} else {
 			resource.Features.MetricsExporter = nil
 		}

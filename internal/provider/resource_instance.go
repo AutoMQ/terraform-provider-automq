@@ -67,6 +67,8 @@ type defaultKafkaInstanceAPI struct {
 	client *client.Client
 }
 
+var allowedPrometheusAuthTypes = []string{"noauth", "basic", "bearer", "sigv4"}
+
 func (a defaultKafkaInstanceAPI) CreateKafkaInstance(ctx context.Context, param client.InstanceCreateParam) (*client.InstanceSummaryVO, error) {
 	return a.client.CreateKafkaInstance(ctx, param)
 }
@@ -351,8 +353,13 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							"prometheus": schema.SingleNestedAttribute{
 								Optional: true,
 								Attributes: map[string]schema.Attribute{
-									"auth_type":      schema.StringAttribute{Optional: true},
-									"end_point":      schema.StringAttribute{Optional: true},
+									"auth_type": schema.StringAttribute{
+										Required: true,
+										Validators: []validator.String{
+											stringvalidator.OneOf(allowedPrometheusAuthTypes...),
+										},
+									},
+									"endpoint":       schema.StringAttribute{Optional: true},
 									"prometheus_arn": schema.StringAttribute{Optional: true},
 									"username":       schema.StringAttribute{Optional: true},
 									"password":       schema.StringAttribute{Optional: true},
@@ -789,9 +796,8 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 				shouldWait = true
 			} else if stateMetrics != nil {
 				enabled := false
-				features.MetricsExporter = &client.InstanceMetricsExporterParam{
-					Prometheus: &client.InstancePrometheusExporterParam{Enabled: &enabled},
-				}
+				prom := &client.InstancePrometheusExporterParam{Enabled: &enabled}
+				features.MetricsExporter = &client.InstanceMetricsExporterParam{Prometheus: prom}
 				hasUpdate = true
 				shouldWait = true
 			}
@@ -906,10 +912,14 @@ func (r *KafkaInstanceResource) Delete(ctx context.Context, req resource.DeleteR
 	}
 
 	deleteTimeout := r.DeleteTimeout(ctx, state.Timeouts)
+	tflog.Info(ctx, "waiting for Kafka instance to be deleted", map[string]any{"instance_id": instanceId, "timeout": deleteTimeout.String()})
+	// Wait until control plane reports NotFound so acceptance tests don't leave dangling clusters.
 	if err := framework.WaitForKafkaClusterToDeleted(ctx, r.client, instanceId, deleteTimeout); err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error waiting for Kafka Cluster %q to provision: %s", instanceId, err))
 		return
 	}
+	tflog.Info(ctx, "Kafka instance deletion completed", map[string]any{"instance_id": instanceId})
+	resp.State.RemoveResource(ctx)
 }
 
 func (r *KafkaInstanceResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

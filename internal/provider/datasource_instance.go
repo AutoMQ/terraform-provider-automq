@@ -134,7 +134,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 								Computed: true,
 								Attributes: map[string]schema.Attribute{
 									"auth_type":      schema.StringAttribute{Computed: true},
-									"end_point":      schema.StringAttribute{Computed: true},
+									"endpoint":       schema.StringAttribute{Computed: true},
 									"prometheus_arn": schema.StringAttribute{Computed: true},
 									"username":       schema.StringAttribute{Computed: true},
 									"password":       schema.StringAttribute{Computed: true, Sensitive: true},

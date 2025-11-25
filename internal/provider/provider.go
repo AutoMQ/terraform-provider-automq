@@ -212,7 +212,7 @@ func (p *AutoMQProvider) Resources(ctx context.Context) []func() resource.Resour
 		NewKafkaTopicResource,
 		NewKafkaUserResource,
 		NewKafkaAclResource,
-		NewKafkaLinkingResource,
+		NewKafkaLinkResource,
 		NewKafkaMirrorTopicResource,
 		NewKafkaMirrorGroupResource,
 	}

@@ -9,8 +9,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// KafkaLinkingResourceModel represents the Terraform state for automq_kafka_linking.
-type KafkaLinkingResourceModel struct {
+// KafkaLinkResourceModel represents the Terraform state for automq_kafka_link.
+type KafkaLinkResourceModel struct {
 	EnvironmentID   types.String                 `tfsdk:"environment_id"`
 	InstanceID      types.String                 `tfsdk:"instance_id"`
 	LinkID          types.String                 `tfsdk:"link_id"`
@@ -59,7 +59,7 @@ type KafkaMirrorGroupResourceModel struct {
 }
 
 // ExpandKafkaLinkCreateParam builds API payload from Terraform model.
-func ExpandKafkaLinkCreateParam(model *KafkaLinkingResourceModel) (client.KafkaLinkCreateParam, diag.Diagnostics) {
+func ExpandKafkaLinkCreateParam(model *KafkaLinkResourceModel) (client.KafkaLinkCreateParam, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	param := client.KafkaLinkCreateParam{
 		LinkID:          model.LinkID.ValueString(),
@@ -131,7 +131,7 @@ func expandKafkaLinkSourceCluster(model *KafkaLinkSourceClusterModel) client.Kaf
 }
 
 // FlattenKafkaLink populates Terraform state from API response, preserving sensitive values when absent.
-func FlattenKafkaLink(link *client.KafkaLinkVO, state *KafkaLinkingResourceModel, prior *KafkaLinkingResourceModel) diag.Diagnostics {
+func FlattenKafkaLink(link *client.KafkaLinkVO, state *KafkaLinkResourceModel, prior *KafkaLinkResourceModel) diag.Diagnostics {
 	var diags diag.Diagnostics
 	if link == nil {
 		return diags
@@ -185,7 +185,7 @@ func FlattenKafkaLink(link *client.KafkaLinkVO, state *KafkaLinkingResourceModel
 	return diags
 }
 
-func flattenKafkaLinkSourceCluster(link *client.KafkaLinkVO, prior *KafkaLinkingResourceModel) *KafkaLinkSourceClusterModel {
+func flattenKafkaLinkSourceCluster(link *client.KafkaLinkVO, prior *KafkaLinkResourceModel) *KafkaLinkSourceClusterModel {
 	var previous *KafkaLinkSourceClusterModel
 	if prior != nil {
 		previous = prior.SourceCluster
