@@ -18,8 +18,6 @@ resource "automq_kafka_instance" "example" {
     data_buckets = [
       {
         bucket_name = "automq-data-bucket"
-        provider    = "aws"
-        region      = "us-east-1"
       }
     ]
   }
@@ -33,7 +31,8 @@ resource "automq_kafka_instance" "example" {
 
     metrics_exporter = {
       prometheus = {
-        end_point = "http://prometheus.example.com/api/v1/write"
+        auth_type = "noauth"
+        endpoint  = "http://prometheus.example.com/api/v1/write"
         labels = {
           "env" = "test"
         }
@@ -46,4 +45,8 @@ resource "automq_kafka_instance" "example" {
       metastore_uri = "thrift://hive-metastore.example.com:9083"
     }
   }
+}
+
+variable "automq_environment_id" {
+  type = string
 }

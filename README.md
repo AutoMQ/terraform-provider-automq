@@ -1,9 +1,45 @@
 # Terraform Provider AutoMQ
 
+Manage AutoMQ BYOC environments and Kafka resources (instances, topics, users, ACLs, mirroring) with Terraform. 
+
 ## Requirements
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
 - [Go](https://golang.org/doc/install) >= 1.21
+
+## Getting Started
+
+1. Install the provider plugin via the Terraform Registry (`automq/automq`).
+2. Collect your AutoMQ BYOC endpoint plus Service Account Access Key credentials from the AutoMQ console.
+3. Configure the provider:
+
+```terraform
+terraform {
+  required_providers {
+    automq = {
+      source  = "automq/automq"
+      version = "~> 0.1"
+    }
+  }
+}
+
+provider "automq" {
+  automq_byoc_endpoint      = var.automq_byoc_endpoint
+  automq_byoc_access_key_id = var.automq_byoc_access_key_id
+  automq_byoc_secret_key    = var.automq_byoc_secret_key
+}
+```
+
+> Tip: set `AUTOMQ_BYOC_ENDPOINT`, `AUTOMQ_BYOC_ACCESS_KEY_ID`, and `AUTOMQ_BYOC_SECRET_KEY` environment variables to avoid hard-coding credentials.
+
+## Examples
+
+Reusable configuration samples live under `examples/`. Highlights:
+- `examples/provider` – minimal provider configuration.
+- `examples/quick-start/aws` – end-to-end instance provisioning, with TLS automation for BYOC on AWS.
+- `examples/resources/*` – focused snippets that align with each resource schema (instance, link, mirror group/topic, ACL, etc.).
+
+Use these as references or copy them into your own configuration, updating IDs/secrets as needed.
 
 ## Building The Provider
 

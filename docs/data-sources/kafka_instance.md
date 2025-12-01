@@ -149,7 +149,7 @@ Read-Only:
 Read-Only:
 
 - `auth_type` (String)
-- `end_point` (String)
+- `endpoint` (String)
 - `labels` (Map of String)
 - `password` (String, Sensitive)
 - `prometheus_arn` (String)
@@ -165,8 +165,8 @@ Read-Only:
 
 - `authentication_methods` (Set of String) Authentication methods: anonymous (anonymous access), sasl (SASL user auth), mtls (TLS cert auth). Defaults to anonymous.
 - `data_encryption_mode` (String) Data encryption mode: NONE (no encryption), CPMK (cloud-managed KMS), BYOK (custom KMS key)
+- `tls_hostname_validation_enabled` (Boolean) Whether TLS hostname validation is enabled for broker certificates.
 - `transit_encryption_modes` (Set of String) Transit encryption modes: plaintext (unencrypted) or tls (TLS encrypted). Defaults to plaintext.
-- `tls_hostname_validation_enabled` (Boolean) Indicates whether TLS hostname validation is enabled for broker certificates.
 
 
 <a id="nestedatt--features--table_topic"></a>

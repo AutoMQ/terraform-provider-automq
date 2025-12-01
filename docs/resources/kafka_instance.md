@@ -38,8 +38,6 @@ resource "automq_kafka_instance" "example" {
     data_buckets = [
       {
         bucket_name = "automq-data-bucket"
-        provider    = "aws"
-        region      = "us-east-1"
       }
     ]
   }
@@ -53,7 +51,8 @@ resource "automq_kafka_instance" "example" {
 
     metrics_exporter = {
       prometheus = {
-        end_point = "http://prometheus.example.com/api/v1/write"
+        auth_type = "noauth"
+        endpoint  = "http://prometheus.example.com/api/v1/write"
         labels = {
           "env" = "test"
         }
@@ -66,6 +65,10 @@ resource "automq_kafka_instance" "example" {
       metastore_uri = "thrift://hive-metastore.example.com:9083"
     }
   }
+}
+
+variable "automq_environment_id" {
+  type = string
 }
 ```
 
@@ -184,8 +187,8 @@ Optional:
 	* `CPMK` - Cloud Provider Managed Key encryption using cloud provider's KMS service
 
 Changes to encryption mode require instance replacement.
-- `tls_hostname_validation_enabled` (Boolean) Whether TLS hostname validation is enforced for broker certificates. Defaults to `true`. Changing this value forces a new resource.
 - `private_key` (String) The private key in PEM format corresponding to the server certificate. AutoMQ will deploy the instance with this key. Required when `mtls` authentication method is enabled.
+- `tls_hostname_validation_enabled` (Boolean) Enable TLS hostname validation when AutoMQ brokers terminate TLS. Defaults to true. Changing this setting requires recreating the instance.
 
 
 <a id="nestedatt--features--metrics_exporter"></a>
@@ -198,10 +201,13 @@ Optional:
 <a id="nestedatt--features--metrics_exporter--prometheus"></a>
 ### Nested Schema for `features.metrics_exporter.prometheus`
 
-Optional:
+Required:
 
 - `auth_type` (String)
-- `end_point` (String)
+- `endpoint` (String)
+
+Optional:
+
 - `labels` (Map of String)
 - `password` (String)
 - `prometheus_arn` (String)
