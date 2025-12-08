@@ -7,6 +7,8 @@ description: |-
 # AutoMQ Provider
 ![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)
 
+-> **Note** This version of the provider is compatible **only** with AutoMQ Control Plane versions 8.0 and later. It introduces **breaking changes** compared to version v0.2.3 and earlier. We apologize for any inconvenience this may cause. If your environment is running a version older than 8.0, please do not use this version. If you have upgraded your Control Plane to version 8.0 or later, you must update the Provider, adjust your Terraform configuration to match the new Schema, and re-import your resources.
+
 ## Prerequisites
 
 The AutoMQ environment represents a namespace, with each environment containing a complete set of AutoMQ control plane and data plane. All control and data planes of the AutoMQ BYOC environment are deployed within the user's VPC to ensure data privacy and security.
