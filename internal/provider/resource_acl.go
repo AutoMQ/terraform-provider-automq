@@ -41,7 +41,7 @@ func (r *KafkaAclResource) Schema(ctx context.Context, req resource.SchemaReques
 			"\n" +
 			"Using the `automq_kafka_acl` resource type, you can create and manage Kafka ACL rules.\n" +
 			"\n" +
-			"> **Note**: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.",
+			"> **Note**: This provider version is only compatible with AutoMQ control plane versions 8.0 and later.",
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
