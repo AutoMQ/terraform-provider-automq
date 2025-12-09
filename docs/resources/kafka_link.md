@@ -89,12 +89,12 @@ Required:
 
 Optional:
 
-- `disable_endpoint_identification` (Boolean) Disable TLS endpoint identification when required by the source cluster.
+- `disable_endpoint_identification` (Boolean) Disable TLS endpoint identification when required by the source cluster. Defaults to `false`.
 - `keystore_certificate_chain` (String, Sensitive) PEM encoded client certificate chain for mTLS connections.
 - `keystore_key` (String, Sensitive) PEM encoded private key for mTLS connections.
 - `password` (String, Sensitive) SASL password for the source cluster.
 - `sasl_mechanism` (String) SASL mechanism when SASL is enabled (e.g. `PLAIN`, `SCRAM_SHA_512`).
-- `security_protocol` (String) Security protocol to use when connecting to the source cluster (e.g. `PLAINTEXT`, `SSL`, `SASL_SSL`).
+- `security_protocol` (String) Security protocol to use when connecting to the source cluster (e.g. `PLAINTEXT`, `SSL`, `SASL_SSL`, `SASL_PLAINTEXT`).
 - `truststore_certificates` (String, Sensitive) PEM encoded CA certificates for TLS connections.
 - `user` (String) SASL username when authentication is enabled.
 

@@ -7,7 +7,7 @@ description: |-
 # AutoMQ Provider
 ![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)
 
--> **Note** This version of the provider is compatible **only** with AutoMQ Control Plane versions 8.0 and later. It introduces **breaking changes** compared to version v0.2.3 and earlier. We apologize for any inconvenience this may cause. If your environment is running a version older than 8.0, please do not use this version. If you have upgraded your Control Plane to version 8.0 or later, you must update the Provider, adjust your Terraform configuration to match the new Schema, and re-import your resources.
+> **Note** This provider release currently targets AutoMQ Control Plane **8.0 or later on AWS** only. It introduces **breaking changes** compared to version v0.2.3 and earlier. If your control plane runs on other clouds or on a version older than 8.0, do not use this build. After upgrading the AWS control plane to 8.0+, update the provider, align your Terraform configuration to the new schema, and re-import managed resources.
 
 ## Prerequisites
 
@@ -16,7 +16,7 @@ The AutoMQ environment represents a namespace, with each environment containing 
 The AutoMQ Provider is used to manage an already installed AutoMQ environment. Therefore, before using the AutoMQ Provider, you need to complete the environment installation and obtain the access point and initial account information.
 
 Refer to the following for specific operations:
-- Install the AutoMQ environment by following the [documentation](https://registry.terraform.io/modules/AutoMQ/automq-byoc-environment/aws/latest).
+- Install the AutoMQ environment by following the [documentation](https://registry.terraform.io/providers/AutoMQ/automq/latest/docs).
 - Create a ServiceAccount and obtain an AccessKey: After the environment is installed, users need to access the AutoMQ environment console through web browser, create a Service Account, and use the Access Key of the Service Account. Please refer to [document](https://docs.automq.com/automq-cloud/manage-identities-and-access/service-accounts).
 
 
