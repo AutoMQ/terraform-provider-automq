@@ -4,7 +4,7 @@ page_title: "automq_kafka_acl Resource - automq"
 subcategory: ""
 description: |-
   Using the automq_kafka_acl resource type, you can create and manage Kafka ACL rules.
-  Note: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
+  Note: This provider version is only compatible with AutoMQ control plane versions 8.0 and later.
 ---
 
 # automq_kafka_acl (Resource)
