@@ -7,7 +7,7 @@ description: |-
   Note: This provider version is only compatible with AutoMQ control plane versions 8.0 and later.
 ---
 
-# automq_kafka_instance (Resource)
+# automq_kafka_instance
 
 ![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)
 
@@ -254,3 +254,16 @@ Read-Only:
 - `mechanisms` (String) The supported mechanisms of endpoint. Currently support `PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512`.
 - `network_type` (String) The network type of endpoint. Currently support `VPC` and `INTERNET`. `VPC` type is generally used for internal network access, while `INTERNET` type is used for accessing the AutoMQ cluster from the internet.
 - `protocol` (String) The protocol of endpoint. Currently support `PLAINTEXT` and `SASL_PLAINTEXT`.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# Import format: <environment_id>@<instance_id>
+# environment_id - AutoMQ BYOC environment identifier (for example, env-abc123)
+# instance_id    - Kafka instance ID returned by AutoMQ (for example, kf-xyz789)
+terraform import automq_kafka_instance.example env-abc123@kf-xyz789
+```
+
+After the import completes, run `terraform plan` to review any drift in optional arguments.

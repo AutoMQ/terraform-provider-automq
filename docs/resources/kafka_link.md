@@ -6,7 +6,7 @@ description: |-
   Manage Kafka links for mirroring topics and consumer groups between AutoMQ instances and external Kafka clusters.
 ---
 
-# automq_kafka_link (Resource)
+# automq_kafka_link
 
 Manage Kafka links for mirroring topics and consumer groups between AutoMQ instances and external Kafka clusters.
 
@@ -97,3 +97,16 @@ Optional:
 - `security_protocol` (String) Security protocol to use when connecting to the source cluster (e.g. `PLAINTEXT`, `SSL`, `SASL_SSL`).
 - `truststore_certificates` (String, Sensitive) PEM encoded CA certificates for TLS connections.
 - `user` (String) SASL username when authentication is enabled.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# Import format: <environment_id>@<instance_id>@<link_id>
+# instance_id - Kafka instance that owns the link (for example, kf-xyz789)
+# link_id     - Identifier provided when the link was created
+terraform import automq_kafka_link.example env-abc123@kf-xyz789@example-link
+```
+
+After the import completes, run `terraform plan` to review any drift in optional arguments.
