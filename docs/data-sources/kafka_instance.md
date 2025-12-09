@@ -4,7 +4,7 @@ page_title: "automq_kafka_instance Data Source - automq"
 subcategory: ""
 description: |-
   Using the automq_kafka_instance data source, you can manage kafka resoure within instance.
-  Note: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
+  Note: This provider version is only compatible with AutoMQ control plane versions 8.0 and later.
 ---
 
 # automq_kafka_instance (Data Source)
@@ -13,7 +13,7 @@ description: |-
 
 Using the `automq_kafka_instance` data source, you can manage kafka resoure within instance.
 
-> **Note**: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
+> **Note**: This provider version is only compatible with AutoMQ control plane versions 8.0 and later.
 
 ## Example Usage
 

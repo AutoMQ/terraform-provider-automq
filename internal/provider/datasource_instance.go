@@ -34,7 +34,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)\n\n" +
 			"Using the `automq_kafka_instance` data source, you can manage kafka resoure within instance.\n\n" +
-			"> **Note**: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.",
+			"> **Note**: This provider version is only compatible with AutoMQ control plane versions 8.0 and later.",
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{

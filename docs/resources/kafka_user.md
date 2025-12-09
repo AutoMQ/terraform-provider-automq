@@ -4,7 +4,7 @@ page_title: "automq_kafka_user Resource - automq"
 subcategory: ""
 description: |-
   Using the automq_kafka_user resource type, you can create and manage Kafka users for authentication.
-  Note: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
+  Note: This provider version is only compatible with AutoMQ control plane versions 8.0 and later.
 ---
 
 # automq_kafka_user (Resource)
@@ -13,7 +13,7 @@ description: |-
 
 Using the `automq_kafka_user` resource type, you can create and manage Kafka users for authentication.
 
-> **Note**: This provider version is only compatible with AutoMQ control plane versions 7.3.5 and later.
+> **Note**: This provider version is only compatible with AutoMQ control plane versions 8.0 and later.
 
 ## Example Usage
 
