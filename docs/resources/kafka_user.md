@@ -7,7 +7,7 @@ description: |-
   Note: This provider version is only compatible with AutoMQ control plane versions 8.0 and later.
 ---
 
-# automq_kafka_user (Resource)
+# automq_kafka_user
 
 ![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)
 
@@ -39,3 +39,15 @@ resource "automq_kafka_user" "example" {
 ### Read-Only
 
 - `id` (String) Kafka user identifier.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# Import format: <environment_id>@<kafka_instance_id>@<username>
+# Set the desired password in configuration because AutoMQ never returns credentials.
+terraform import automq_kafka_user.example env-abc123@kf-xyz789@service-user
+```
+
+After the import completes, run `terraform plan` to review any drift in optional arguments.

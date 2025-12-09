@@ -7,7 +7,7 @@ description: |-
   Note: This provider version is only compatible with AutoMQ control plane versions 8.0 and later.
 ---
 
-# automq_kafka_acl (Resource)
+# automq_kafka_acl
 
 ![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)
 
@@ -95,3 +95,7 @@ resource "automq_kafka_acl" "transaction" {
 ### Read-Only
 
 - `id` (String) The Kafka ACL Resource ID is returned upon successful creation of the ACL.
+
+## Import
+
+`terraform import` is not supported for this resource. Manage its lifecycle directly in configuration so Terraform remains the source of truth.

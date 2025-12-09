@@ -6,7 +6,7 @@ description: |-
   Manage mirrored topics within a Kafka link.
 ---
 
-# automq_kafka_mirror_topic (Resource)
+# automq_kafka_mirror_topic
 
 Manage mirrored topics within a Kafka link.
 
@@ -54,3 +54,15 @@ variable "link_id" {
 - `error_code` (String)
 - `mirror_topic_id` (String)
 - `mirror_topic_name` (String)
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+# Import format: <environment_id>@<instance_id>@<link_id>@<source_topic_name>
+# source_topic_name - Topic name in the source Kafka cluster being mirrored
+terraform import automq_kafka_mirror_topic.example env-abc123@kf-xyz789@link-sync@orders
+```
+
+After the import completes, run `terraform plan` to review any drift in optional arguments.
