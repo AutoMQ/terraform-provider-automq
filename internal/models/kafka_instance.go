@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"fmt"
+	"strings"
 	"terraform-provider-automq/client"
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
@@ -28,7 +29,6 @@ type KafkaInstanceResourceModel struct {
 	InstanceID     types.String       `tfsdk:"id"`
 	Name           types.String       `tfsdk:"name"`
 	Description    types.String       `tfsdk:"description"`
-	DeployProfile  types.String       `tfsdk:"deploy_profile"`
 	Version        types.String       `tfsdk:"version"`
 	ComputeSpecs   *ComputeSpecsModel `tfsdk:"compute_specs"`
 	Features       *FeaturesModel     `tfsdk:"features"`
@@ -44,7 +44,6 @@ type KafkaInstanceModel struct {
 	InstanceID     types.String          `tfsdk:"id"`
 	Name           types.String          `tfsdk:"name"`
 	Description    types.String          `tfsdk:"description"`
-	DeployProfile  types.String          `tfsdk:"deploy_profile"`
 	Version        types.String          `tfsdk:"version"`
 	ComputeSpecs   *ComputeSpecsModel    `tfsdk:"compute_specs"`
 	Features       *FeaturesSummaryModel `tfsdk:"features"`
@@ -68,47 +67,144 @@ type NetworkModel struct {
 }
 
 type ComputeSpecsModel struct {
-	ReservedAku          types.Int64            `tfsdk:"reserved_aku"`
-	Networks             []NetworkModel         `tfsdk:"networks"`
-	KubernetesNodeGroups []NodeGroupModel       `tfsdk:"kubernetes_node_groups"`
-	BucketProfiles       []BucketProfileIDModel `tfsdk:"bucket_profiles"`
+	ReservedAku           types.Int64      `tfsdk:"reserved_aku"`
+	Networks              []NetworkModel   `tfsdk:"networks"`
+	KubernetesNodeGroups  []NodeGroupModel `tfsdk:"kubernetes_node_groups"`
+	DeployType            types.String     `tfsdk:"deploy_type"`
+	DnsZone               types.String     `tfsdk:"dns_zone"`
+	KubernetesClusterID   types.String     `tfsdk:"kubernetes_cluster_id"`
+	KubernetesNamespace   types.String     `tfsdk:"kubernetes_namespace"`
+	KubernetesServiceAcct types.String     `tfsdk:"kubernetes_service_account"`
+	InstanceRole          types.String     `tfsdk:"instance_role"`
+	DataBuckets           types.List       `tfsdk:"data_buckets"`
 }
 
 type NodeGroupModel struct {
 	ID types.String `tfsdk:"id"`
 }
 
+type DataBucketModel struct {
+	BucketName types.String `tfsdk:"bucket_name"`
+}
+
+var DataBucketObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"bucket_name": types.StringType,
+	},
+}
+
+func DataBucketListToModels(ctx context.Context, list types.List) ([]DataBucketModel, diag.Diagnostics) {
+	if list.IsNull() || list.IsUnknown() {
+		return nil, nil
+	}
+	var buckets []DataBucketModel
+	diags := list.ElementsAs(ctx, &buckets, false)
+	return buckets, diags
+}
+
+func DataBucketModelsToList(ctx context.Context, buckets []DataBucketModel) (types.List, diag.Diagnostics) {
+	if len(buckets) == 0 {
+		return types.ListNull(DataBucketObjectType), nil
+	}
+	listValue, diags := types.ListValueFrom(ctx, DataBucketObjectType, buckets)
+	return listValue, diags
+}
+
+func coalesceStringAttr(apiValue *string, previous *types.String) types.String {
+	if apiValue != nil {
+		return types.StringValue(*apiValue)
+	}
+	if previous != nil && !previous.IsNull() && !previous.IsUnknown() {
+		return *previous
+	}
+	return types.StringNull()
+}
+
+func coalesceBoolAttr(apiValue *bool, previous *types.Bool) types.Bool {
+	if apiValue != nil {
+		return types.BoolValue(*apiValue)
+	}
+	if previous != nil && !previous.IsNull() && !previous.IsUnknown() {
+		return *previous
+	}
+	return types.BoolNull()
+}
+
 type FeaturesModel struct {
-	WalMode         types.String   `tfsdk:"wal_mode"`
-	InstanceConfigs types.Map      `tfsdk:"instance_configs"`
-	Integrations    types.Set      `tfsdk:"integrations"`
-	Security        *SecurityModel `tfsdk:"security"`
+	WalMode         types.String          `tfsdk:"wal_mode"`
+	InstanceConfigs types.Map             `tfsdk:"instance_configs"`
+	Security        *SecurityModel        `tfsdk:"security"`
+	MetricsExporter *MetricsExporterModel `tfsdk:"metrics_exporter"`
+	TableTopic      *TableTopicModel      `tfsdk:"table_topic"`
 }
 
 type FeaturesSummaryModel struct {
 	WalMode         types.String          `tfsdk:"wal_mode"`
 	InstanceConfigs types.Map             `tfsdk:"instance_configs"`
-	Integrations    types.Set             `tfsdk:"integrations"`
 	Security        *SecuritySummaryModel `tfsdk:"security"`
-}
-
-type BucketProfileIDModel struct {
-	ID types.String `tfsdk:"id"`
+	MetricsExporter *MetricsExporterModel `tfsdk:"metrics_exporter"`
+	TableTopic      *TableTopicModel      `tfsdk:"table_topic"`
 }
 
 type SecurityModel struct {
-	AuthenticationMethods  types.Set    `tfsdk:"authentication_methods"`
-	TransitEncryptionModes types.Set    `tfsdk:"transit_encryption_modes"`
-	CertificateAuthority   types.String `tfsdk:"certificate_authority"`
-	CertificateChain       types.String `tfsdk:"certificate_chain"`
-	PrivateKey             types.String `tfsdk:"private_key"`
-	DataEncryptionMode     types.String `tfsdk:"data_encryption_mode"`
+	AuthenticationMethods        types.Set    `tfsdk:"authentication_methods"`
+	TransitEncryptionModes       types.Set    `tfsdk:"transit_encryption_modes"`
+	CertificateAuthority         types.String `tfsdk:"certificate_authority"`
+	CertificateChain             types.String `tfsdk:"certificate_chain"`
+	PrivateKey                   types.String `tfsdk:"private_key"`
+	DataEncryptionMode           types.String `tfsdk:"data_encryption_mode"`
+	TlsHostnameValidationEnabled types.Bool   `tfsdk:"tls_hostname_validation_enabled"`
 }
 
 type SecuritySummaryModel struct {
-	AuthenticationMethods  types.Set    `tfsdk:"authentication_methods"`
-	TransitEncryptionModes types.Set    `tfsdk:"transit_encryption_modes"`
-	DataEncryptionMode     types.String `tfsdk:"data_encryption_mode"`
+	AuthenticationMethods        types.Set    `tfsdk:"authentication_methods"`
+	TransitEncryptionModes       types.Set    `tfsdk:"transit_encryption_modes"`
+	DataEncryptionMode           types.String `tfsdk:"data_encryption_mode"`
+	TlsHostnameValidationEnabled types.Bool   `tfsdk:"tls_hostname_validation_enabled"`
+}
+
+type MetricsExporterModel struct {
+	Prometheus *PrometheusExporterModel `tfsdk:"prometheus"`
+}
+
+type PrometheusExporterModel struct {
+	AuthType      types.String `tfsdk:"auth_type"`
+	EndPoint      types.String `tfsdk:"endpoint"`
+	PrometheusArn types.String `tfsdk:"prometheus_arn"`
+	Username      types.String `tfsdk:"username"`
+	Password      types.String `tfsdk:"password"`
+	Token         types.String `tfsdk:"token"`
+	Labels        types.Map    `tfsdk:"labels"`
+}
+
+// MetricsExporterHasConfig reports whether any nested exporter attributes are
+// explicitly configured (non-null and known).
+func MetricsExporterHasConfig(model *MetricsExporterModel) bool {
+	if model == nil {
+		return false
+	}
+	return PrometheusExporterHasConfig(model.Prometheus)
+}
+
+// PrometheusExporterHasConfig inspects the nested Prometheus block for any user
+// supplied values. It mirrors the provider-side logic so both expansion and
+// flattening share the same definition of an \"empty\" block.
+func PrometheusExporterHasConfig(model *PrometheusExporterModel) bool {
+	if model == nil {
+		return false
+	}
+	return !model.AuthType.IsNull()
+}
+
+type TableTopicModel struct {
+	Warehouse         types.String `tfsdk:"warehouse"`
+	CatalogType       types.String `tfsdk:"catalog_type"`
+	MetastoreURI      types.String `tfsdk:"metastore_uri"`
+	HiveAuthMode      types.String `tfsdk:"hive_auth_mode"`
+	KerberosPrincipal types.String `tfsdk:"kerberos_principal"`
+	UserPrincipal     types.String `tfsdk:"user_principal"`
+	KeytabFile        types.String `tfsdk:"keytab_file"`
+	Krb5ConfFile      types.String `tfsdk:"krb5conf_file"`
 }
 
 // ExpandKafkaInstanceResource converts a KafkaInstanceResourceModel to a client.InstanceCreateParam.
@@ -121,7 +217,6 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 	// Basic fields
 	request.Name = instance.Name.ValueString()
 	request.Description = instance.Description.ValueString()
-	request.DeployProfile = instance.DeployProfile.ValueString()
 	request.Version = instance.Version.ValueString()
 
 	// Validate required fields
@@ -141,6 +236,30 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 			NodeConfig:  &client.NodeConfigParam{},
 		}
 
+		if !instance.ComputeSpecs.DeployType.IsNull() && !instance.ComputeSpecs.DeployType.IsUnknown() {
+			deployType := instance.ComputeSpecs.DeployType.ValueString()
+			request.Spec.DeployType = &deployType
+		}
+		if !instance.ComputeSpecs.DnsZone.IsNull() && !instance.ComputeSpecs.DnsZone.IsUnknown() {
+			dns := instance.ComputeSpecs.DnsZone.ValueString()
+			request.Spec.DnsZone = &dns
+		}
+		if !instance.ComputeSpecs.KubernetesClusterID.IsNull() && !instance.ComputeSpecs.KubernetesClusterID.IsUnknown() {
+			clusterID := instance.ComputeSpecs.KubernetesClusterID.ValueString()
+			request.Spec.KubernetesClusterId = &clusterID
+		}
+		if !instance.ComputeSpecs.KubernetesNamespace.IsNull() && !instance.ComputeSpecs.KubernetesNamespace.IsUnknown() {
+			namespace := instance.ComputeSpecs.KubernetesNamespace.ValueString()
+			request.Spec.KubernetesNamespace = &namespace
+		}
+		if !instance.ComputeSpecs.KubernetesServiceAcct.IsNull() && !instance.ComputeSpecs.KubernetesServiceAcct.IsUnknown() {
+			serviceAccount := instance.ComputeSpecs.KubernetesServiceAcct.ValueString()
+			request.Spec.KubernetesServiceAccount = &serviceAccount
+		}
+		if !instance.ComputeSpecs.InstanceRole.IsNull() && !instance.ComputeSpecs.InstanceRole.IsUnknown() {
+			role := instance.ComputeSpecs.InstanceRole.ValueString()
+			request.Spec.InstanceRole = &role
+		}
 		// ignore Node Configs
 
 		// Networks
@@ -154,7 +273,8 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 				})
 			}
 			request.Spec.KubernetesNodeGroups = nodeGroups
-		} else if len(instance.ComputeSpecs.Networks) > 0 {
+		}
+		if len(instance.ComputeSpecs.Networks) > 0 {
 			networks := make([]client.InstanceNetworkParam, 0, len(instance.ComputeSpecs.Networks))
 			for _, network := range instance.ComputeSpecs.Networks {
 				subnet := ""
@@ -171,17 +291,24 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 			}
 			request.Spec.Networks = networks
 		}
-		// Bucket Profiles
-		if len(instance.ComputeSpecs.BucketProfiles) > 0 {
-			bucketProfiles := make([]client.BucketProfileBindParam, 0, len(instance.ComputeSpecs.BucketProfiles))
-			for _, ng := range instance.ComputeSpecs.BucketProfiles {
-				id := ng.ID.ValueString()
-				bucketProfiles = append(bucketProfiles, client.BucketProfileBindParam{
-					Id: &id,
-				})
+		if !instance.ComputeSpecs.DataBuckets.IsNull() && !instance.ComputeSpecs.DataBuckets.IsUnknown() {
+			dataBucketModels, dataBucketDiags := DataBucketListToModels(context.TODO(), instance.ComputeSpecs.DataBuckets)
+			if dataBucketDiags.HasError() {
+				return fmt.Errorf("failed to parse compute_specs.data_buckets: %v", dataBucketDiags.Errors())
 			}
-			request.Spec.BucketProfiles = bucketProfiles
+			dataBuckets := make([]client.BucketProfileParam, 0, len(dataBucketModels))
+			for _, bucket := range dataBucketModels {
+				if bucket.BucketName.IsNull() || bucket.BucketName.IsUnknown() {
+					return fmt.Errorf("compute_specs.data_buckets.bucket_name is required")
+				}
+				profile := client.BucketProfileParam{
+					BucketName: bucket.BucketName.ValueString(),
+				}
+				dataBuckets = append(dataBuckets, profile)
+			}
+			request.Spec.DataBuckets = dataBuckets
 		}
+
 	}
 
 	// Features
@@ -248,19 +375,112 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 				}
 				request.Features.Security.PrivateKey = &privateKey
 			}
+
+			if !instance.Features.Security.TlsHostnameValidationEnabled.IsNull() && !instance.Features.Security.TlsHostnameValidationEnabled.IsUnknown() {
+				enabled := instance.Features.Security.TlsHostnameValidationEnabled.ValueBool()
+				if request.Features.Security == nil {
+					request.Features.Security = &client.InstanceSecurityParam{}
+				}
+				request.Features.Security.TlsHostnameValidationEnabled = &enabled
+			}
 		}
 
-		// Integrations
-		if !instance.Features.Integrations.IsNull() && len(instance.Features.Integrations.Elements()) > 0 {
-			ids := ExpandSetValueList(instance.Features.Integrations)
-			integrations := make([]client.IntegrationBindParam, 0, len(ids))
-			for _, id := range ids {
-				integrationID := id
-				integrations = append(integrations, client.IntegrationBindParam{
-					Id: &integrationID,
-				})
+		// Metrics exporter
+		if instance.Features.MetricsExporter != nil {
+			exporter := client.InstanceMetricsExporterParam{}
+			hasConfig := false
+			if promConfig := instance.Features.MetricsExporter.Prometheus; promConfig != nil {
+				prom := &client.InstancePrometheusExporterParam{}
+				enabled := true
+				prom.Enabled = &enabled
+				if !promConfig.AuthType.IsNull() && !promConfig.AuthType.IsUnknown() {
+					auth := promConfig.AuthType.ValueString()
+					prom.AuthType = &auth
+				}
+				if !promConfig.EndPoint.IsNull() && !promConfig.EndPoint.IsUnknown() {
+					endpoint := promConfig.EndPoint.ValueString()
+					prom.EndPoint = &endpoint
+				}
+				if !promConfig.PrometheusArn.IsNull() && !promConfig.PrometheusArn.IsUnknown() {
+					arn := promConfig.PrometheusArn.ValueString()
+					prom.PrometheusArn = &arn
+				}
+				if !promConfig.Username.IsNull() && !promConfig.Username.IsUnknown() {
+					username := promConfig.Username.ValueString()
+					prom.Username = &username
+				}
+				if !promConfig.Password.IsNull() && !promConfig.Password.IsUnknown() {
+					password := promConfig.Password.ValueString()
+					prom.Password = &password
+				}
+				if !promConfig.Token.IsNull() && !promConfig.Token.IsUnknown() {
+					token := promConfig.Token.ValueString()
+					prom.Token = &token
+				}
+				if !promConfig.Labels.IsNull() && !promConfig.Labels.IsUnknown() {
+					configs := ExpandStringValueMap(promConfig.Labels)
+					if len(configs) > 0 {
+						labelSlice := make([]client.MetricsLabelParam, len(configs))
+						for i, cfg := range configs {
+							name := ""
+							if cfg.Key != nil {
+								name = *cfg.Key
+							}
+							value := ""
+							if cfg.Value != nil {
+								value = *cfg.Value
+							}
+							labelSlice[i] = client.MetricsLabelParam{Name: name, Value: value}
+						}
+						prom.Labels = labelSlice
+					}
+				}
+				exporter.Prometheus = prom
+				hasConfig = true
 			}
-			request.Features.Integrations = integrations
+			if hasConfig {
+				request.Features.MetricsExporter = &exporter
+			}
+		}
+
+		// Table topic
+		if instance.Features.TableTopic != nil {
+			topicModel := instance.Features.TableTopic
+			if topicModel.Warehouse.IsNull() || topicModel.Warehouse.IsUnknown() {
+				return fmt.Errorf("features.table_topic.warehouse is required when table_topic is set")
+			}
+			if topicModel.CatalogType.IsNull() || topicModel.CatalogType.IsUnknown() {
+				return fmt.Errorf("features.table_topic.catalog_type is required when table_topic is set")
+			}
+			topic := &client.TableTopicParam{
+				Warehouse:   topicModel.Warehouse.ValueString(),
+				CatalogType: topicModel.CatalogType.ValueString(),
+			}
+			if !topicModel.MetastoreURI.IsNull() && !topicModel.MetastoreURI.IsUnknown() {
+				uri := topicModel.MetastoreURI.ValueString()
+				topic.MetastoreUri = &uri
+			}
+			if !topicModel.HiveAuthMode.IsNull() && !topicModel.HiveAuthMode.IsUnknown() {
+				mode := topicModel.HiveAuthMode.ValueString()
+				topic.HiveAuthMode = &mode
+			}
+			if !topicModel.KerberosPrincipal.IsNull() && !topicModel.KerberosPrincipal.IsUnknown() {
+				principal := topicModel.KerberosPrincipal.ValueString()
+				topic.KerberosPrincipal = &principal
+			}
+			if !topicModel.UserPrincipal.IsNull() && !topicModel.UserPrincipal.IsUnknown() {
+				principal := topicModel.UserPrincipal.ValueString()
+				topic.UserPrincipal = &principal
+			}
+			if !topicModel.KeytabFile.IsNull() && !topicModel.KeytabFile.IsUnknown() {
+				keytab := topicModel.KeytabFile.ValueString()
+				topic.KeytabFile = &keytab
+			}
+			if !topicModel.Krb5ConfFile.IsNull() && !topicModel.Krb5ConfFile.IsUnknown() {
+				conf := topicModel.Krb5ConfFile.ValueString()
+				topic.Krb5ConfFile = &conf
+			}
+			request.Features.TableTopic = topic
 		}
 
 		// Instance Configs
@@ -283,18 +503,26 @@ func ConvertKafkaInstanceModel(resource *KafkaInstanceResourceModel, model *Kafk
 	model.InstanceID = resource.InstanceID
 	model.Name = resource.Name
 	model.Description = resource.Description
-	model.DeployProfile = resource.DeployProfile
 	model.Version = resource.Version
 	model.ComputeSpecs = resource.ComputeSpecs
-	model.Features = &FeaturesSummaryModel{
-		WalMode:         resource.Features.WalMode,
-		InstanceConfigs: resource.Features.InstanceConfigs,
-		Integrations:    resource.Features.Integrations,
-		Security: &SecuritySummaryModel{
-			AuthenticationMethods:  resource.Features.Security.AuthenticationMethods,
-			TransitEncryptionModes: resource.Features.Security.TransitEncryptionModes,
-			DataEncryptionMode:     resource.Features.Security.DataEncryptionMode,
-		},
+	if resource.Features != nil {
+		features := &FeaturesSummaryModel{
+			WalMode:         resource.Features.WalMode,
+			InstanceConfigs: resource.Features.InstanceConfigs,
+			MetricsExporter: resource.Features.MetricsExporter,
+			TableTopic:      resource.Features.TableTopic,
+		}
+		if resource.Features.Security != nil {
+			features.Security = &SecuritySummaryModel{
+				AuthenticationMethods:        resource.Features.Security.AuthenticationMethods,
+				TransitEncryptionModes:       resource.Features.Security.TransitEncryptionModes,
+				DataEncryptionMode:           resource.Features.Security.DataEncryptionMode,
+				TlsHostnameValidationEnabled: resource.Features.Security.TlsHostnameValidationEnabled,
+			}
+		}
+		model.Features = features
+	} else {
+		model.Features = nil
 	}
 	model.Endpoints = resource.Endpoints
 	model.CreatedAt = resource.CreatedAt
@@ -331,9 +559,6 @@ func FlattenKafkaInstanceBasicModel(instance *client.InstanceSummaryVO, resource
 	}
 	if instance.Description != nil {
 		resource.Description = types.StringValue(*instance.Description)
-	}
-	if instance.DeployProfile != nil {
-		resource.DeployProfile = types.StringValue(*instance.DeployProfile)
 	}
 	if instance.Version != nil {
 		resource.Version = types.StringValue(*instance.Version)
@@ -382,9 +607,6 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 	if instance.Description != nil {
 		resource.Description = types.StringValue(*instance.Description)
 	}
-	if instance.DeployProfile != nil {
-		resource.DeployProfile = types.StringValue(*instance.DeployProfile)
-	}
 	if instance.Version != nil {
 		resource.Version = types.StringValue(*instance.Version)
 	}
@@ -394,18 +616,45 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 
 	// Compute Specs
 	if instance.Spec != nil {
+		var previousSpecs *ComputeSpecsModel
+		if resource.ComputeSpecs != nil {
+			prevCopy := *resource.ComputeSpecs
+			previousSpecs = &prevCopy
+		}
 		if resource.ComputeSpecs == nil {
 			resource.ComputeSpecs = &ComputeSpecsModel{
-				ReservedAku:          types.Int64Null(),
-				Networks:             []NetworkModel{},
-				KubernetesNodeGroups: []NodeGroupModel{},
-				BucketProfiles:       []BucketProfileIDModel{},
+				ReservedAku:           types.Int64Null(),
+				Networks:              []NetworkModel{},
+				KubernetesNodeGroups:  []NodeGroupModel{},
+				DataBuckets:           types.ListNull(DataBucketObjectType),
+				DeployType:            types.StringNull(),
+				DnsZone:               types.StringNull(),
+				KubernetesClusterID:   types.StringNull(),
+				KubernetesNamespace:   types.StringNull(),
+				KubernetesServiceAcct: types.StringNull(),
+				InstanceRole:          types.StringNull(),
 			}
 		}
 		// Reserved AKU
 		if instance.Spec.ReservedAku != nil {
 			resource.ComputeSpecs.ReservedAku = types.Int64Value(int64(*instance.Spec.ReservedAku))
 		}
+		var prevDeploy, prevDnsZone *types.String
+		var prevClusterID, prevNamespace, prevServiceAccount, prevInstanceRole *types.String
+		if previousSpecs != nil {
+			prevDeploy = &previousSpecs.DeployType
+			prevDnsZone = &previousSpecs.DnsZone
+			prevClusterID = &previousSpecs.KubernetesClusterID
+			prevNamespace = &previousSpecs.KubernetesNamespace
+			prevServiceAccount = &previousSpecs.KubernetesServiceAcct
+			prevInstanceRole = &previousSpecs.InstanceRole
+		}
+		resource.ComputeSpecs.DeployType = coalesceStringAttr(instance.Spec.DeployType, prevDeploy)
+		resource.ComputeSpecs.DnsZone = coalesceStringAttr(instance.Spec.DnsZone, prevDnsZone)
+		resource.ComputeSpecs.KubernetesClusterID = coalesceStringAttr(instance.Spec.KubernetesClusterId, prevClusterID)
+		resource.ComputeSpecs.KubernetesNamespace = coalesceStringAttr(instance.Spec.KubernetesNamespace, prevNamespace)
+		resource.ComputeSpecs.KubernetesServiceAcct = coalesceStringAttr(instance.Spec.KubernetesServiceAccount, prevServiceAccount)
+		resource.ComputeSpecs.InstanceRole = coalesceStringAttr(instance.Spec.InstanceRole, prevInstanceRole)
 
 		// Kubernetes Node Groups
 		if instance.Spec.KubernetesNodeGroups != nil {
@@ -419,7 +668,8 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 			}
 			resource.ComputeSpecs.KubernetesNodeGroups = nodeGroups
 			// Networks
-		} else if instance.Spec.Networks != nil {
+		}
+		if instance.Spec.Networks != nil {
 			networks, networkDiags := flattenNetworks(instance.Spec.Networks)
 			if networkDiags.HasError() {
 				diags.Append(networkDiags...)
@@ -428,21 +678,50 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 			}
 		}
 
-		// Bucket Profiles
-		if instance.Spec.BucketProfiles != nil {
-			bucketProfiles := make([]BucketProfileIDModel, 0, len(instance.Spec.BucketProfiles))
-			for _, bp := range instance.Spec.BucketProfiles {
-				if bp.Id != nil {
-					bucketProfiles = append(bucketProfiles, BucketProfileIDModel{
-						ID: types.StringValue(*bp.Id),
-					})
-				}
+		var previousDataBuckets []DataBucketModel
+		if previousSpecs != nil {
+			prevBuckets, prevDiags := DataBucketListToModels(context.TODO(), previousSpecs.DataBuckets)
+			if prevDiags.HasError() {
+				diags.Append(prevDiags...)
 			}
-			resource.ComputeSpecs.BucketProfiles = bucketProfiles
+			previousDataBuckets = prevBuckets
 		}
+		if instance.Spec.DataBuckets != nil {
+			dataBuckets := make([]DataBucketModel, 0, len(instance.Spec.DataBuckets))
+			for idx, bucket := range instance.Spec.DataBuckets {
+				var base DataBucketModel
+				if idx < len(previousDataBuckets) {
+					base = previousDataBuckets[idx]
+				} else {
+					base = DataBucketModel{
+						BucketName: types.StringNull(),
+					}
+				}
+				if bucket.BucketName != nil {
+					base.BucketName = types.StringValue(*bucket.BucketName)
+				}
+				dataBuckets = append(dataBuckets, base)
+			}
+			listValue, listDiags := DataBucketModelsToList(context.TODO(), dataBuckets)
+			if listDiags.HasError() {
+				diags.Append(listDiags...)
+			} else {
+				resource.ComputeSpecs.DataBuckets = listValue
+			}
+		} else if previousSpecs != nil {
+			resource.ComputeSpecs.DataBuckets = previousSpecs.DataBuckets
+		} else {
+			resource.ComputeSpecs.DataBuckets = types.ListNull(DataBucketObjectType)
+		}
+
 	}
 
 	// Features
+	var previousFeatures *FeaturesModel
+	if resource.Features != nil {
+		prevCopy := *resource.Features
+		previousFeatures = &prevCopy
+	}
 	if instance.Features != nil {
 		if resource.Features == nil {
 			resource.Features = &FeaturesModel{}
@@ -455,13 +734,28 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 
 		// Security
 		if instance.Features.Security != nil {
-			if resource.Features.Security == nil {
+			var previousSecurity *SecurityModel
+			if previousFeatures != nil {
+				previousSecurity = previousFeatures.Security
+			}
+			if previousSecurity != nil {
+				clone := *previousSecurity
+				resource.Features.Security = &clone
+			} else {
 				resource.Features.Security = &SecurityModel{}
 			}
 
 			if instance.Features.Security.DataEncryptionMode != nil {
 				resource.Features.Security.DataEncryptionMode = types.StringValue(*instance.Features.Security.DataEncryptionMode)
 			}
+			var previousTls *types.Bool
+			if previousSecurity != nil {
+				previousTls = &previousSecurity.TlsHostnameValidationEnabled
+			}
+			resource.Features.Security.TlsHostnameValidationEnabled = coalesceBoolAttr(
+				instance.Features.Security.TlsHostnameValidationEnabled,
+				previousTls,
+			)
 
 			// Authentication Methods
 			if instance.Features.Security.AuthenticationMethods != nil {
@@ -490,6 +784,27 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 				}
 			}
 		}
+
+		// Metrics exporter
+		var previousMetrics *MetricsExporterModel
+		if previousFeatures != nil {
+			previousMetrics = previousFeatures.MetricsExporter
+		}
+		if instance.Features.MetricsExporter != nil && !isMetricsExporterVOEmpty(instance.Features.MetricsExporter) {
+			metrics, metricsDiags := flattenMetricsExporterVO(instance.Features.MetricsExporter, previousMetrics)
+			diags.Append(metricsDiags...)
+			resource.Features.MetricsExporter = metrics
+		} else {
+			resource.Features.MetricsExporter = nil
+		}
+
+		// Table topic
+		var previousTableTopic *TableTopicModel
+		if previousFeatures != nil {
+			previousTableTopic = previousFeatures.TableTopic
+		}
+		resource.Features.TableTopic = flattenTableTopicVO(instance.Features.TableTopic, previousTableTopic)
+
 	}
 
 	// Timestamps
@@ -503,31 +818,145 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 	return diags
 }
 
-// FlattenKafkaInstanceModelWithIntegrations adds integration information to the KafkaInstanceResourceModel.
-func FlattenKafkaInstanceModelWithIntegrations(integrations []client.IntegrationVO, resource *KafkaInstanceResourceModel) diag.Diagnostics {
+func isMetricsExporterVOEmpty(vo *client.InstanceMetricsExporterVO) bool {
+	if vo == nil {
+		return true
+	}
+	if vo.Prometheus != nil && !isPrometheusVOEmpty(vo.Prometheus) {
+		return false
+	}
+	return true
+}
+
+func flattenMetricsExporterVO(vo *client.InstanceMetricsExporterVO, previous *MetricsExporterModel) (*MetricsExporterModel, diag.Diagnostics) {
 	var diags diag.Diagnostics
-
-	if integrations == nil {
-		return diag.Diagnostics{diag.NewErrorDiagnostic(
-			"Invalid Integrations",
-			"Cannot flatten nil integrations",
-		)}
+	if vo == nil || isMetricsExporterVOEmpty(vo) {
+		return nil, diags
 	}
 
-	if resource.Features == nil {
-		resource.Features = &FeaturesModel{}
+	metrics := MetricsExporterModel{}
+	if previous != nil {
+		metrics = *previous
 	}
-	// Handle integrations if present
-	if len(integrations) > 0 {
-		integrationIds := make([]attr.Value, 0, len(integrations))
-		for _, integration := range integrations {
-			integrationIds = append(integrationIds, types.StringValue(integration.Code))
+
+	var previousProm *PrometheusExporterModel
+	if previous != nil {
+		previousProm = previous.Prometheus
+	}
+
+	prom, promDiags := flattenPrometheusExporterVO(vo.Prometheus, previousProm)
+	diags.Append(promDiags...)
+	metrics.Prometheus = prom
+
+	if metrics.Prometheus == nil {
+		return nil, diags
+	}
+	return &metrics, diags
+}
+
+func flattenPrometheusExporterVO(vo *client.InstancePrometheusExporterVO, previous *PrometheusExporterModel) (*PrometheusExporterModel, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	if vo == nil || isPrometheusVOEmpty(vo) {
+		return nil, diags
+	}
+
+	prom := PrometheusExporterModel{
+		AuthType:      types.StringNull(),
+		EndPoint:      types.StringNull(),
+		PrometheusArn: types.StringNull(),
+		Username:      types.StringNull(),
+		Password:      types.StringNull(),
+		Token:         types.StringNull(),
+		Labels:        types.MapNull(types.StringType),
+	}
+	if previous != nil {
+		// Preserve any sensitive values (e.g. password/token) that are not returned by the API.
+		prom = *previous
+	}
+
+	prom.AuthType = retainString(cleanAPIString(vo.AuthType), prom.AuthType)
+	prom.EndPoint = retainString(cleanAPIString(vo.EndPoint), prom.EndPoint)
+	prom.PrometheusArn = retainString(cleanAPIString(vo.PrometheusArn), prom.PrometheusArn)
+	prom.Username = retainString(cleanAPIString(vo.Username), prom.Username)
+
+	if len(vo.Labels) > 0 {
+		labelMap := make(map[string]string, len(vo.Labels))
+		for _, label := range vo.Labels {
+			if label.Name != nil && label.Value != nil {
+				labelMap[*label.Name] = *label.Value
+			}
 		}
-		resource.Features.Integrations = types.SetValueMust(types.StringType, integrationIds)
-	} else if len(integrations) == 0 {
-		resource.Features.Integrations = types.SetNull(types.StringType)
+		if len(labelMap) > 0 {
+			labelsValue, mapDiags := types.MapValueFrom(context.Background(), types.StringType, labelMap)
+			diags.Append(mapDiags...)
+			if !mapDiags.HasError() {
+				prom.Labels = labelsValue
+			}
+		}
+	} else if previous == nil {
+		prom.Labels = types.MapNull(types.StringType)
 	}
-	return diags
+
+	return &prom, diags
+}
+
+func flattenTableTopicVO(vo *client.TableTopicVO, previous *TableTopicModel) *TableTopicModel {
+	if vo == nil || vo.CatalogType == nil {
+		return nil
+	}
+
+	topic := TableTopicModel{
+		Warehouse:         types.StringNull(),
+		CatalogType:       types.StringNull(),
+		MetastoreURI:      types.StringNull(),
+		HiveAuthMode:      types.StringNull(),
+		KerberosPrincipal: types.StringNull(),
+		UserPrincipal:     types.StringNull(),
+		KeytabFile:        types.StringNull(),
+		Krb5ConfFile:      types.StringNull(),
+	}
+	if previous != nil {
+		topic = *previous
+	}
+
+	topic.Warehouse = retainString(vo.Warehouse, topic.Warehouse)
+	topic.CatalogType = retainString(vo.CatalogType, topic.CatalogType)
+	topic.MetastoreURI = retainString(vo.MetastoreUri, topic.MetastoreURI)
+	topic.HiveAuthMode = retainString(vo.HiveAuthMode, topic.HiveAuthMode)
+	topic.KerberosPrincipal = retainString(vo.KerberosPrincipal, topic.KerberosPrincipal)
+	topic.UserPrincipal = retainString(vo.UserPrincipal, topic.UserPrincipal)
+	topic.KeytabFile = retainString(vo.KeytabFile, topic.KeytabFile)
+	topic.Krb5ConfFile = retainString(vo.Krb5ConfFile, topic.Krb5ConfFile)
+
+	return &topic
+}
+
+func retainString(api *string, previous types.String) types.String {
+	if api != nil {
+		return types.StringValue(*api)
+	}
+	return previous
+}
+
+func cleanAPIString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
+
+func isPrometheusVOEmpty(vo *client.InstancePrometheusExporterVO) bool {
+	if vo == nil {
+		return true
+	}
+	if vo.AuthType != nil || vo.EndPoint != nil || vo.Username != nil || vo.PrometheusArn != nil {
+		return false
+	}
+	return len(vo.Labels) == 0
 }
 
 // FlattenKafkaInstanceModelWithEndpoints adds endpoint information to the KafkaInstanceResourceModel.

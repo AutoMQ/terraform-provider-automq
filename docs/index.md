@@ -7,6 +7,8 @@ description: |-
 # AutoMQ Provider
 ![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)
 
+-> **Note** This version of the provider is compatible **only** with AutoMQ Control Plane versions 8.0 and later. It introduces **breaking changes** compared to version v0.2.3 and earlier. We apologize for any inconvenience this may cause. If your environment is running a version older than 8.0, please do not use this version. If you have upgraded your Control Plane to version 8.0 or later, you must update the Provider, adjust your Terraform configuration to match the new Schema, and re-import your resources.
+
 ## Prerequisites
 
 The AutoMQ environment represents a namespace, with each environment containing a complete set of AutoMQ control plane and data plane. All control and data planes of the AutoMQ BYOC environment are deployed within the user's VPC to ensure data privacy and security.
@@ -61,34 +63,10 @@ terraform {
     automq = {
       source = "automq/automq"
     }
-    aws = {
-      source = "hashicorp/aws"
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
     }
-  }
-}
-
-data "aws_subnets" "aws_subnets_example" {
-  provider = aws
-  filter {
-    name   = "vpc-id"
-    values = [var.vpc_id]
-  }
-  filter {
-    name   = "availability-zone"
-    values = [var.az]
-  }
-}
-
-
-resource "automq_integration" "prometheus_remote_write_example_1" {
-  environment_id = var.automq_environment_id
-  name           = "example-1"
-  type           = "prometheusRemoteWrite"
-  endpoint       = "http://example.com"
-  deploy_profile = "default"
-
-  prometheus_remote_write_config = {
-    auth_type = "noauth"
   }
 }
 
@@ -98,155 +76,90 @@ provider "automq" {
   automq_byoc_secret_key    = var.automq_byoc_secret_key
 }
 
-data "automq_deploy_profile" "test" {
-  environment_id = var.automq_environment_id
-  name           = "default"
+locals {
+  enable_tls = contains(var.security_transit_encryption_modes, "tls")
+  is_k8s     = var.deploy_type == "K8S"
 }
 
-data "automq_data_bucket_profiles" "test" {
-  environment_id = var.automq_environment_id
-  profile_name   = data.automq_deploy_profile.test.name
-}
-
-resource "automq_kafka_instance" "example" {
-  environment_id = var.automq_environment_id
-  name           = "automq-example-vm"
-  description    = "example"
-  version        = "1.4.1"
-  deploy_profile = data.automq_deploy_profile.test.name
+resource "automq_kafka_instance" "k8s" {
+  environment_id = var.environment_id
+  name           = var.instance_name
+  description    = var.description
+  version        = var.automq_version
 
   compute_specs = {
-    reserved_aku = 3
-    networks = [
-      {
-        zone    = var.az
-        subnets = [data.aws_subnets.aws_subnets_example.ids[0]]
-      }
-    ]
-    bucket_profiles = [
-      {
-        id = data.automq_data_bucket_profiles.test.data_buckets[0].id
-      }
-    ]
+    reserved_aku = var.reserved_aku
+    deploy_type  = var.deploy_type
+
+    networks                   = var.networks
+    dns_zone                   = var.dns_zone
+    data_buckets               = length(var.data_buckets) > 0 ? var.data_buckets : null
+    instance_role              = var.instance_role
+    kubernetes_cluster_id      = local.is_k8s ? var.kubernetes_cluster_id : null
+    kubernetes_node_groups     = local.is_k8s ? var.kubernetes_node_groups : null
+    kubernetes_namespace       = local.is_k8s ? var.kubernetes_namespace : null
+    kubernetes_service_account = local.is_k8s ? var.kubernetes_service_account : null
   }
 
   features = {
-    wal_mode = "EBSWAL"
+    wal_mode = var.wal_mode
+
+    instance_configs = var.instance_configs
+
+    metrics_exporter = var.metrics_exporter
+
+    table_topic = var.table_topic
+
     security = {
-      authentication_methods   = ["sasl"]
-      transit_encryption_modes = ["plaintext"]
+      authentication_methods   = var.security_authentication_methods
+      transit_encryption_modes = var.security_transit_encryption_modes
+      data_encryption_mode     = var.security_data_encryption_mode
+
+      certificate_authority = local.enable_tls ? tls_self_signed_cert.example[0].cert_pem : null
+      certificate_chain     = local.enable_tls ? tls_self_signed_cert.example[0].cert_pem : null
+      private_key           = local.enable_tls ? tls_private_key.example[0].private_key_pem : null
     }
-    instance_configs = {
-      "auto.create.topics.enable" = "false"
-      "log.retention.ms"          = "3600000"
-    }
-    integrations = [
-      automq_integration.prometheus_remote_write_example_1.id,
-    ]
   }
 }
 
-resource "automq_kafka_topic" "example" {
-  environment_id    = var.automq_environment_id
-  kafka_instance_id = automq_kafka_instance.example.id
-  name              = "topic-example"
-  partition         = 16
-  configs = {
-    "delete.retention.ms" = "86400"
-    "retention.ms"        = "3600000"
-    "max.message.bytes"   = "1024"
+
+resource "tls_private_key" "example" {
+  count     = local.enable_tls ? 1 : 0
+  algorithm = "RSA"
+  rsa_bits  = 2048
+}
+
+resource "tls_self_signed_cert" "example" {
+  count           = local.enable_tls ? 1 : 0
+  private_key_pem = tls_private_key.example[0].private_key_pem
+
+  subject {
+    common_name  = "automq.private"
+    organization = "AutoMQ"
   }
+
+  validity_period_hours = 8760
+
+  allowed_uses = [
+    "key_encipherment",
+    "digital_signature",
+    "server_auth",
+  ]
 }
 
-resource "automq_kafka_user" "example" {
-  environment_id    = var.automq_environment_id
-  kafka_instance_id = automq_kafka_instance.example.id
-  username          = "kafka_user-example"
-  password          = "user_password-example"
+output "instance_status" {
+  description = "Provisioning status of the AutoMQ Kafka instance"
+  value       = automq_kafka_instance.k8s.status
 }
 
-resource "automq_kafka_user" "example-1" {
-  environment_id    = var.automq_environment_id
-  kafka_instance_id = automq_kafka_instance.example.id
-  username          = "kafka_user-example-1"
-  password          = "user_password-example"
+output "instance_id" {
+  description = "Identifier of the AutoMQ Kafka instance"
+  value       = automq_kafka_instance.k8s.id
 }
 
-
-resource "automq_kafka_acl" "example-topic" {
-  environment_id    = var.automq_environment_id
-  kafka_instance_id = automq_kafka_instance.example.id
-
-  resource_type   = "TOPIC"
-  resource_name   = automq_kafka_topic.example.name
-  pattern_type    = "LITERAL"
-  principal       = "User:${automq_kafka_user.example.username}"
-  operation_group = "ALL"
-  permission      = "ALLOW"
-}
-
-resource "automq_kafka_acl" "example-group" {
-  environment_id    = var.automq_environment_id
-  kafka_instance_id = automq_kafka_instance.example.id
-
-  resource_type   = "GROUP"
-  resource_name   = "kafka_group-example"
-  pattern_type    = "LITERAL"
-  principal       = "User:${automq_kafka_user.example.username}"
-  operation_group = "ALL"
-  permission      = "ALLOW"
-}
-
-resource "automq_kafka_acl" "example-cluster" {
-  environment_id    = var.automq_environment_id
-  kafka_instance_id = automq_kafka_instance.example.id
-
-  resource_type   = "CLUSTER"
-  resource_name   = "kafka-cluster"
-  pattern_type    = "LITERAL"
-  principal       = "User:${automq_kafka_user.example-1.username}"
-  operation_group = "ALL"
-  permission      = "ALLOW"
-}
-
-resource "automq_kafka_acl" "example-transaction" {
-  environment_id    = var.automq_environment_id
-  kafka_instance_id = automq_kafka_instance.example.id
-
-  resource_type   = "TRANSACTIONAL_ID"
-  resource_name   = "kafka_transaction-example"
-  pattern_type    = "LITERAL"
-  principal       = "User:${automq_kafka_user.example-1.username}"
-  operation_group = "ALL"
-  permission      = "ALLOW"
-}
-
-variable "vpc_id" {
-  type = string
-}
-
-variable "region" {
-  type = string
-}
-
-variable "az" {
-  type = string
-}
-
-variable "automq_byoc_endpoint" {
-  type = string
-}
-
-variable "automq_byoc_access_key_id" {
-  type = string
-}
-
-variable "automq_byoc_secret_key" {
-  type = string
-}
-
-variable "automq_environment_id" {
-  type = string
+output "instance_endpoints" {
+  description = "Client connection endpoints"
+  value       = automq_kafka_instance.k8s.endpoints
 }
 ```
 
@@ -255,9 +168,9 @@ variable "automq_environment_id" {
 
 ### Optional
 
-- `automq_byoc_access_key_id` (String) Set the Access Key Id of Service Account. You can create and manage Access Keys by using the AutoMQ Cloud BYOC Console. Learn more about AutoMQ Cloud BYOC Console access [here](https://docs.automq.com/automq-cloud/manage-identities-and-access/service-accounts).
+- `automq_byoc_access_key_id` (String, Sensitive) Set the Access Key Id of Service Account. You can create and manage Access Keys by using the AutoMQ Cloud BYOC Console. Learn more about AutoMQ Cloud BYOC Console access [here](https://docs.automq.com/automq-cloud/manage-identities-and-access/service-accounts).
 - `automq_byoc_endpoint` (String) Set the AutoMQ BYOC environment endpoint. The endpoint looks like http://{hostname}:8080. You can get this endpoint when deploy environment complete.
-- `automq_byoc_secret_key` (String) Set the Secret Access Key of Service Account. You can create and manage Access Keys by using the AutoMQ Cloud BYOC Console. Learn more about AutoMQ Cloud BYOC Console access [here](https://docs.automq.com/automq-cloud/manage-identities-and-access/service-accounts).
+- `automq_byoc_secret_key` (String, Sensitive) Set the Secret Access Key of Service Account. You can create and manage Access Keys by using the AutoMQ Cloud BYOC Console. Learn more about AutoMQ Cloud BYOC Console access [here](https://docs.automq.com/automq-cloud/manage-identities-and-access/service-accounts).
 
 ## Helpful Links/Information
 

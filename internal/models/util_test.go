@@ -17,8 +17,8 @@ func TestExpandStringValueMap(t *testing.T) {
 	})
 
 	expected := []client.ConfigItemParam{
-		{Key: "key1", Value: "value1"},
-		{Key: "key2", Value: "value2"},
+		{Key: testStringPtr("key1"), Value: testStringPtr("value1")},
+		{Key: testStringPtr("key2"), Value: testStringPtr("value2")},
 	}
 
 	result := ExpandStringValueMap(planConfig)
@@ -28,8 +28,8 @@ func TestExpandStringValueMap(t *testing.T) {
 
 func TestFlattenStringValueMap(t *testing.T) {
 	configs := []client.ConfigItemParam{
-		{Key: "key1", Value: "value1"},
-		{Key: "key2", Value: "value2"},
+		{Key: testStringPtr("key1"), Value: testStringPtr("value1")},
+		{Key: testStringPtr("key2"), Value: testStringPtr("value2")},
 	}
 
 	expected := types.MapValueMust(types.StringType, map[string]attr.Value{
@@ -60,4 +60,8 @@ func TestMapsEqual(t *testing.T) {
 
 	assert.True(t, MapsEqual(map1, map2))
 	assert.False(t, MapsEqual(map1, map3))
+}
+
+func testStringPtr(s string) *string {
+	return &s
 }

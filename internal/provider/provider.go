@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 	"terraform-provider-automq/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -59,10 +60,12 @@ func (p *AutoMQProvider) Schema(ctx context.Context, req provider.SchemaRequest,
 			"automq_byoc_access_key_id": schema.StringAttribute{
 				MarkdownDescription: "Set the Access Key Id of Service Account. You can create and manage Access Keys by using the AutoMQ Cloud BYOC Console. Learn more about AutoMQ Cloud BYOC Console access [here](https://docs.automq.com/automq-cloud/manage-identities-and-access/service-accounts).",
 				Optional:            true,
+				Sensitive:           true,
 			},
 			"automq_byoc_secret_key": schema.StringAttribute{
 				MarkdownDescription: "Set the Secret Access Key of Service Account. You can create and manage Access Keys by using the AutoMQ Cloud BYOC Console. Learn more about AutoMQ Cloud BYOC Console access [here](https://docs.automq.com/automq-cloud/manage-identities-and-access/service-accounts).",
 				Optional:            true,
+				Sensitive:           true,
 			},
 			"automq_byoc_endpoint": schema.StringAttribute{
 				MarkdownDescription: "Set the AutoMQ BYOC environment endpoint. The endpoint looks like http://{hostname}:8080. You can get this endpoint when deploy environment complete.",
@@ -165,13 +168,12 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	}
 
 	ctx = tflog.SetField(ctx, "automq_env_byoc_host", byoc_endpoint)
-	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "automq_env_token")
 
 	tflog.Debug(ctx, "Creating AutoMQ client")
 
 	credential := client.AuthCredentials{
-		AccessKeyID:     data.BYOCAccessKey.ValueString(),
-		SecretAccessKey: data.BYOCSecretKey.ValueString(),
+		AccessKeyID:     byoc_access_key,
+		SecretAccessKey: byoc_secret_key,
 	}
 
 	parsedURL, err := url.Parse(byoc_endpoint)
@@ -182,7 +184,8 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 				"Please ensure the host is a valid URL and try again.",
 		)
 	}
-	baseURL := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
+	trimmedPath := strings.TrimRight(parsedURL.Path, "/")
+	baseURL := fmt.Sprintf("%s://%s%s", parsedURL.Scheme, parsedURL.Host, trimmedPath)
 
 	client, err := client.NewClient(ctx, baseURL, credential)
 	if err != nil {
@@ -209,15 +212,15 @@ func (p *AutoMQProvider) Resources(ctx context.Context) []func() resource.Resour
 		NewKafkaTopicResource,
 		NewKafkaUserResource,
 		NewKafkaAclResource,
-		NewIntegrationResource,
+		NewKafkaLinkResource,
+		NewKafkaMirrorTopicResource,
+		NewKafkaMirrorGroupResource,
 	}
 }
 
 func (p *AutoMQProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewKafkaInstanceDataSource,
-		NewDeployProfileDataSource,
-		NewDataBucketProfilesDataSource,
 	}
 }
 

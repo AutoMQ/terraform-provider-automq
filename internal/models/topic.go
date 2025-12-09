@@ -22,19 +22,19 @@ func ExpandKafkaTopicResource(topic KafkaTopicResourceModel, request *client.Top
 	request.Name = topic.Name.ValueString()
 	request.Partition = topic.Partition.ValueInt64()
 
-	request.Configs = make([]client.ConfigItemParam, len(topic.Configs.Elements()))
-	i := 0
+	request.Configs = make([]client.ConfigItemParam, 0, len(topic.Configs.Elements()))
 	for name, value := range topic.Configs.Elements() {
 		if config, ok := value.(types.String); ok {
-			request.Configs[i] = client.ConfigItemParam{
-				Key:   name,
-				Value: config.ValueString(),
-			}
+			key := name
+			val := config.ValueString()
+			request.Configs = append(request.Configs, client.ConfigItemParam{
+				Key:   &key,
+				Value: &val,
+			})
 			if name == "cleanup.policy" {
-				request.CompactStrategy = strings.ToUpper(config.ValueString())
+				request.CompactStrategy = strings.ToUpper(val)
 			}
 		}
-		i += 1
 	}
 	if request.CompactStrategy == "" {
 		request.CompactStrategy = "DELETE"

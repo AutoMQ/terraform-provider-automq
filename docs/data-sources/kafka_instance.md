@@ -48,7 +48,6 @@ output "example-id" {
 
 - `compute_specs` (Attributes) The compute specs of the instance (see [below for nested schema](#nestedatt--compute_specs))
 - `created_at` (String)
-- `deploy_profile` (String)
 - `description` (String) The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.
 - `endpoints` (Attributes List) The bootstrap endpoints of instance. AutoMQ supports multiple access protocols; therefore, the Endpoint is a list. (see [below for nested schema](#nestedatt--endpoints))
 - `features` (Attributes) (see [below for nested schema](#nestedatt--features))
@@ -61,17 +60,23 @@ output "example-id" {
 
 Read-Only:
 
-- `bucket_profiles` (Attributes List) Bucket profiles configuration (see [below for nested schema](#nestedatt--compute_specs--bucket_profiles))
+- `data_buckets` (Attributes List) Inline bucket configuration replacing legacy bucket profiles. (see [below for nested schema](#nestedatt--compute_specs--data_buckets))
+- `deploy_type` (String) Deployment platform for the instance.
+- `dns_zone` (String)
+- `instance_role` (String)
+- `kubernetes_cluster_id` (String)
+- `kubernetes_namespace` (String)
 - `kubernetes_node_groups` (Attributes List) Kubernetes node groups configuration (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
+- `kubernetes_service_account` (String)
 - `networks` (Attributes List) To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones. (see [below for nested schema](#nestedatt--compute_specs--networks))
 - `reserved_aku` (Number) AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.
 
-<a id="nestedatt--compute_specs--bucket_profiles"></a>
-### Nested Schema for `compute_specs.bucket_profiles`
+<a id="nestedatt--compute_specs--data_buckets"></a>
+### Nested Schema for `compute_specs.data_buckets`
 
 Read-Only:
 
-- `id` (String) Bucket profile ID
+- `bucket_name` (String)
 
 
 <a id="nestedatt--compute_specs--kubernetes_node_groups"></a>
@@ -107,15 +112,51 @@ Read-Only:
 <a id="nestedatt--features"></a>
 ### Nested Schema for `features`
 
-Optional:
-
-- `integrations` (Set of String) Integration identifiers
-
 Read-Only:
 
 - `instance_configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
+- `metrics_exporter` (Attributes) Metrics exporter configuration for Prometheus or Kafka sinks. (see [below for nested schema](#nestedatt--features--metrics_exporter))
 - `security` (Attributes) (see [below for nested schema](#nestedatt--features--security))
+- `table_topic` (Attributes) Table topic configuration (warehouse/catalog settings). (see [below for nested schema](#nestedatt--features--table_topic))
 - `wal_mode` (String) Write-Ahead Logging mode: EBSWAL (using EBS as write buffer) or S3WAL (using object storage as write buffer). Defaults to EBSWAL.
+
+<a id="nestedatt--features--metrics_exporter"></a>
+### Nested Schema for `features.metrics_exporter`
+
+Read-Only:
+
+- `kafka` (Attributes) (see [below for nested schema](#nestedatt--features--metrics_exporter--kafka))
+- `prometheus` (Attributes) (see [below for nested schema](#nestedatt--features--metrics_exporter--prometheus))
+
+<a id="nestedatt--features--metrics_exporter--kafka"></a>
+### Nested Schema for `features.metrics_exporter.kafka`
+
+Read-Only:
+
+- `bootstrap_servers` (String)
+- `collection_period` (Number)
+- `enabled` (Boolean)
+- `sasl_mechanism` (String)
+- `sasl_password` (String, Sensitive)
+- `sasl_username` (String)
+- `security_protocol` (String)
+- `topic` (String)
+
+
+<a id="nestedatt--features--metrics_exporter--prometheus"></a>
+### Nested Schema for `features.metrics_exporter.prometheus`
+
+Read-Only:
+
+- `auth_type` (String)
+- `endpoint` (String)
+- `labels` (Map of String)
+- `password` (String, Sensitive)
+- `prometheus_arn` (String)
+- `token` (String, Sensitive)
+- `username` (String)
+
+
 
 <a id="nestedatt--features--security"></a>
 ### Nested Schema for `features.security`
@@ -124,4 +165,20 @@ Read-Only:
 
 - `authentication_methods` (Set of String) Authentication methods: anonymous (anonymous access), sasl (SASL user auth), mtls (TLS cert auth). Defaults to anonymous.
 - `data_encryption_mode` (String) Data encryption mode: NONE (no encryption), CPMK (cloud-managed KMS), BYOK (custom KMS key)
+- `tls_hostname_validation_enabled` (Boolean) Whether TLS hostname validation is enabled for broker certificates.
 - `transit_encryption_modes` (Set of String) Transit encryption modes: plaintext (unencrypted) or tls (TLS encrypted). Defaults to plaintext.
+
+
+<a id="nestedatt--features--table_topic"></a>
+### Nested Schema for `features.table_topic`
+
+Read-Only:
+
+- `catalog_type` (String)
+- `hive_auth_mode` (String)
+- `kerberos_principal` (String)
+- `keytab_file` (String, Sensitive)
+- `krb5conf_file` (String, Sensitive)
+- `metastore_uri` (String)
+- `user_principal` (String)
+- `warehouse` (String)

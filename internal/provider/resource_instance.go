@@ -20,7 +20,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
@@ -37,7 +40,7 @@ var _ resource.ResourceWithImportState = &KafkaInstanceResource{}
 
 func NewKafkaInstanceResource() resource.Resource {
 	r := &KafkaInstanceResource{}
-	r.SetDefaultCreateTimeout(15 * time.Minute)
+	r.SetDefaultCreateTimeout(60 * time.Minute)
 	r.SetDefaultUpdateTimeout(90 * time.Minute)
 	r.SetDefaultDeleteTimeout(15 * time.Minute)
 	return r
@@ -46,7 +49,52 @@ func NewKafkaInstanceResource() resource.Resource {
 // KafkaInstanceResource defines the resource implementation.
 type KafkaInstanceResource struct {
 	client *client.Client
+	api    kafkaInstanceAPI
 	framework.WithTimeouts
+}
+
+type kafkaInstanceAPI interface {
+	CreateKafkaInstance(ctx context.Context, param client.InstanceCreateParam) (*client.InstanceSummaryVO, error)
+	GetKafkaInstance(ctx context.Context, instanceId string) (*client.InstanceVO, error)
+	GetKafkaInstanceByName(ctx context.Context, name string) (*client.InstanceVO, error)
+	DeleteKafkaInstance(ctx context.Context, instanceId string) error
+	UpdateKafkaInstance(ctx context.Context, instanceId string, param client.InstanceUpdateParam) error
+	GetInstanceEndpoints(ctx context.Context, instanceId string) ([]client.InstanceAccessInfoVO, error)
+	GetInstanceConfigs(ctx context.Context, instanceId string) ([]client.ConfigItemParam, error)
+}
+
+type defaultKafkaInstanceAPI struct {
+	client *client.Client
+}
+
+var allowedPrometheusAuthTypes = []string{"noauth", "basic", "bearer", "sigv4"}
+
+func (a defaultKafkaInstanceAPI) CreateKafkaInstance(ctx context.Context, param client.InstanceCreateParam) (*client.InstanceSummaryVO, error) {
+	return a.client.CreateKafkaInstance(ctx, param)
+}
+
+func (a defaultKafkaInstanceAPI) GetKafkaInstance(ctx context.Context, instanceId string) (*client.InstanceVO, error) {
+	return a.client.GetKafkaInstance(ctx, instanceId)
+}
+
+func (a defaultKafkaInstanceAPI) GetKafkaInstanceByName(ctx context.Context, name string) (*client.InstanceVO, error) {
+	return a.client.GetKafkaInstanceByName(ctx, name)
+}
+
+func (a defaultKafkaInstanceAPI) DeleteKafkaInstance(ctx context.Context, instanceId string) error {
+	return a.client.DeleteKafkaInstance(ctx, instanceId)
+}
+
+func (a defaultKafkaInstanceAPI) UpdateKafkaInstance(ctx context.Context, instanceId string, param client.InstanceUpdateParam) error {
+	return a.client.UpdateKafkaInstance(ctx, instanceId, param)
+}
+
+func (a defaultKafkaInstanceAPI) GetInstanceEndpoints(ctx context.Context, instanceId string) ([]client.InstanceAccessInfoVO, error) {
+	return a.client.GetInstanceEndpoints(ctx, instanceId)
+}
+
+func (a defaultKafkaInstanceAPI) GetInstanceConfigs(ctx context.Context, instanceId string) ([]client.ConfigItemParam, error) {
+	return a.client.GetInstanceConfigs(ctx, instanceId)
 }
 
 func (r *KafkaInstanceResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -84,10 +132,6 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				MarkdownDescription: "The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.",
 				Optional:            true,
 			},
-			"deploy_profile": schema.StringAttribute{
-				MarkdownDescription: "Deploy profile defining cloud resource configuration including VPC, Kubernetes, storage and IAM roles.",
-				Required:            true,
-			},
 			"version": schema.StringAttribute{
 				Required:    true,
 				Description: "The software version of AutoMQ instance. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.",
@@ -103,12 +147,30 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							int64validator.Between(3, 500),
 						},
 					},
+					"deploy_type": schema.StringAttribute{
+						Optional:            true,
+						Computed:            true,
+						MarkdownDescription: "Deployment platform for the instance. Supported values: `IAAS`, `K8S`.",
+						Validators: []validator.String{
+							stringvalidator.OneOf("IAAS", "K8S"),
+						},
+					},
+					"dns_zone": schema.StringAttribute{
+						Optional:            true,
+						Computed:            true,
+						MarkdownDescription: "DNS zone used when creating custom records.",
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+							stringplanmodifier.RequiresReplace(),
+						},
+					},
 					"networks": schema.ListNestedAttribute{
-						Optional:    true,
+						Required:    true,
 						Description: "To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones.",
 						Validators: []validator.List{
 							listvalidator.UniqueValues(),
-							listvalidator.SizeBetween(1, 3),
+							listvalidator.SizeAtMost(3),
+							listvalidator.SizeAtLeast(1),
 						},
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
@@ -118,12 +180,11 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 									PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 								},
 								"subnets": schema.ListAttribute{
-									Required:    true,
+									Optional:    true,
 									Description: "Specify the subnet under the corresponding availability zone for deploying the instance. Currently, only one subnet can be set for each availability zone.",
 									ElementType: types.StringType,
 									Validators: []validator.List{
 										listvalidator.UniqueValues(),
-										listvalidator.SizeAtLeast(1),
 										listvalidator.SizeAtMost(1),
 									},
 									PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplace()},
@@ -144,22 +205,55 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						},
 						PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplace()},
 					},
-					"bucket_profiles": schema.ListNestedAttribute{
-						Required:    true,
-						Description: "Bucket profiles configuration",
+					"data_buckets": schema.ListNestedAttribute{
+						Optional:    true,
+						Computed:    true,
+						Description: "Inline bucket configuration replacing legacy bucket profiles.",
+						CustomType:  types.ListType{ElemType: models.DataBucketObjectType},
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
-								"id": schema.StringAttribute{
-									Required:    true,
-									Description: "Bucket profile ID",
+								"bucket_name": schema.StringAttribute{
+									Optional:    true,
+									Computed:    true,
+									Description: "Object storage bucket name used for data.",
+									PlanModifiers: []planmodifier.String{
+										stringplanmodifier.UseStateForUnknown(),
+									},
 								},
 							},
 						},
 						Validators: []validator.List{
-							listvalidator.SizeAtLeast(1),
 							listvalidator.SizeAtMost(1),
 						},
-						PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplace()},
+						PlanModifiers: []planmodifier.List{
+							listplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"kubernetes_cluster_id": schema.StringAttribute{
+						Optional:            true,
+						MarkdownDescription: "Identifier for the target Kubernetes cluster when deploy_type is KUBERNETES.",
+					},
+					"kubernetes_namespace": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"kubernetes_service_account": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"instance_role": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+							stringplanmodifier.UseStateForUnknown(),
+						},
 					},
 				},
 			},
@@ -179,11 +273,6 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						ElementType:         types.StringType,
 						MarkdownDescription: "Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).",
 						Optional:            true,
-					},
-					"integrations": schema.SetAttribute{
-						Optional:    true,
-						ElementType: types.StringType,
-						Description: "Integration identifiers",
 					},
 					"security": schema.SingleNestedAttribute{
 						Required: true,
@@ -228,7 +317,20 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 								Validators: []validator.String{
 									stringvalidator.OneOf("NONE", "CPMK"),
 								},
-								PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.UseStateForUnknown(),
+									stringplanmodifier.RequiresReplace(),
+								},
+							},
+							"tls_hostname_validation_enabled": schema.BoolAttribute{
+								Optional:            true,
+								Computed:            true,
+								MarkdownDescription: "Enable TLS hostname validation when AutoMQ brokers terminate TLS. Defaults to true. Changing this setting requires recreating the instance.",
+								Default:             booldefault.StaticBool(true),
+								PlanModifiers: []planmodifier.Bool{
+									boolplanmodifier.UseStateForUnknown(),
+									boolplanmodifier.RequiresReplace(),
+								},
 							},
 							"certificate_authority": schema.StringAttribute{
 								Optional:            true,
@@ -242,6 +344,53 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 								Optional:            true,
 								MarkdownDescription: "The private key in PEM format corresponding to the server certificate. AutoMQ will deploy the instance with this key. Required when `mtls` authentication method is enabled.",
 							},
+						},
+					},
+					"metrics_exporter": schema.SingleNestedAttribute{
+						Optional:            true,
+						MarkdownDescription: "Configure Prometheus metrics scraping.",
+						Attributes: map[string]schema.Attribute{
+							"prometheus": schema.SingleNestedAttribute{
+								Optional: true,
+								Attributes: map[string]schema.Attribute{
+									"auth_type": schema.StringAttribute{
+										Required: true,
+										Validators: []validator.String{
+											stringvalidator.OneOf(allowedPrometheusAuthTypes...),
+										},
+									},
+									"endpoint":       schema.StringAttribute{Required: true},
+									"prometheus_arn": schema.StringAttribute{Optional: true},
+									"username":       schema.StringAttribute{Optional: true},
+									"password":       schema.StringAttribute{Optional: true},
+									"token":          schema.StringAttribute{Optional: true},
+									"labels": schema.MapAttribute{
+										Optional:    true,
+										ElementType: types.StringType,
+									},
+								},
+							},
+						},
+					},
+					"table_topic": schema.SingleNestedAttribute{
+						Optional:            true,
+						MarkdownDescription: "Inline table topic (Iceberg/Hive) configuration replacing legacy integration references.",
+						Attributes: map[string]schema.Attribute{
+							"warehouse": schema.StringAttribute{
+								Required: true,
+							},
+							"catalog_type": schema.StringAttribute{
+								Required: true,
+							},
+							"metastore_uri":      schema.StringAttribute{Optional: true},
+							"hive_auth_mode":     schema.StringAttribute{Optional: true},
+							"kerberos_principal": schema.StringAttribute{Optional: true},
+							"user_principal":     schema.StringAttribute{Optional: true},
+							"keytab_file":        schema.StringAttribute{Optional: true},
+							"krb5conf_file":      schema.StringAttribute{Optional: true},
+						},
+						PlanModifiers: []planmodifier.Object{
+							objectplanmodifier.RequiresReplace(),
 						},
 					},
 				},
@@ -316,12 +465,115 @@ func (r *KafkaInstanceResource) Configure(ctx context.Context, req resource.Conf
 		return
 	}
 	r.client = client
+	r.api = defaultKafkaInstanceAPI{client: client}
+}
+
+func resolvePlannedStringValue(plan types.String, state *types.String) (string, bool) {
+	if !plan.IsNull() && !plan.IsUnknown() {
+		value := strings.TrimSpace(plan.ValueString())
+		if value == "" {
+			return "", false
+		}
+		return value, true
+	}
+	if plan.IsUnknown() && state != nil && !state.IsNull() && !state.IsUnknown() {
+		value := strings.TrimSpace(state.ValueString())
+		if value == "" {
+			return "", false
+		}
+		return value, true
+	}
+	return "", false
+}
+
+func isStringValueSet(attr types.String) bool {
+	return !attr.IsNull() && !attr.IsUnknown() && strings.TrimSpace(attr.ValueString()) != ""
+}
+
+func validateKafkaInstanceConfiguration(ctx context.Context, plan *models.KafkaInstanceResourceModel, state *models.KafkaInstanceResourceModel) diag.Diagnostics {
+	var diagnostics diag.Diagnostics
+	if plan == nil || plan.ComputeSpecs == nil {
+		return diagnostics
+	}
+
+	var stateSpecs *models.ComputeSpecsModel
+	if state != nil {
+		stateSpecs = state.ComputeSpecs
+	}
+
+	var stateDeploy *types.String
+	if stateSpecs != nil {
+		stateDeploy = &stateSpecs.DeployType
+	}
+
+	if deployType, ok := resolvePlannedStringValue(plan.ComputeSpecs.DeployType, stateDeploy); ok && strings.EqualFold(deployType, "K8S") {
+		nodeGroups := plan.ComputeSpecs.KubernetesNodeGroups
+		if nodeGroups == nil && stateSpecs != nil {
+			nodeGroups = stateSpecs.KubernetesNodeGroups
+		}
+		if len(nodeGroups) == 0 {
+			diagnostics.AddError(
+				"Invalid Configuration",
+				"When compute_specs.deploy_type is K8S, at least one compute_specs.kubernetes_node_groups block must be provided.",
+			)
+		} else {
+			for i, ng := range nodeGroups {
+				if !isStringValueSet(ng.ID) {
+					diagnostics.AddError(
+						"Invalid Configuration",
+						fmt.Sprintf("compute_specs.kubernetes_node_groups[%d].id must be provided when deploy_type is K8S.", i),
+					)
+				}
+			}
+		}
+
+		var stateCluster *types.String
+		if stateSpecs != nil {
+			stateCluster = &stateSpecs.KubernetesClusterID
+		}
+		if _, ok := resolvePlannedStringValue(plan.ComputeSpecs.KubernetesClusterID, stateCluster); !ok {
+			diagnostics.AddError(
+				"Invalid Configuration",
+				"When compute_specs.deploy_type is K8S, compute_specs.kubernetes_cluster_id must be provided.",
+			)
+		}
+	}
+
+	if !plan.ComputeSpecs.DataBuckets.IsNull() && !plan.ComputeSpecs.DataBuckets.IsUnknown() {
+		planBuckets, bucketDiags := models.DataBucketListToModels(ctx, plan.ComputeSpecs.DataBuckets)
+		if bucketDiags.HasError() {
+			diagnostics.Append(bucketDiags...)
+		}
+		for i, bucket := range planBuckets {
+			if !isStringValueSet(bucket.BucketName) {
+				diagnostics.AddError(
+					"Invalid Configuration",
+					fmt.Sprintf("compute_specs.data_buckets[%d].bucket_name must be provided when data_buckets is configured.", i),
+				)
+			}
+		}
+	}
+
+	if plan.Features != nil && plan.Features.MetricsExporter != nil {
+		if plan.Features.MetricsExporter.Prometheus == nil || !models.PrometheusExporterHasConfig(plan.Features.MetricsExporter.Prometheus) {
+			diagnostics.AddError(
+				"Invalid Configuration",
+				"features.metrics_exporter must include a prometheus block with required attributes. Remove the metrics_exporter block entirely to disable metrics export.",
+			)
+		}
+	}
+
+	return diagnostics
 }
 
 func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var instance models.KafkaInstanceResourceModel
 	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &instance)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(validateKafkaInstanceConfiguration(ctx, &instance, nil)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -339,9 +591,16 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 		resp.Diagnostics.AddError("Model Expansion Error", fmt.Sprintf("Failed to expand Kafka instance resource: %s", err))
 		return
 	}
-	tflog.Debug(ctx, fmt.Sprintf("Creating new Kafka Cluster: %s", fmt.Sprintf("%v", in)))
+	logFields := map[string]any{
+		"environment_id": instance.EnvironmentID.ValueString(),
+		"name":           instance.Name.ValueString(),
+	}
+	if instance.ComputeSpecs != nil {
+		logFields["reserved_aku"] = instance.ComputeSpecs.ReservedAku.ValueInt64()
+	}
+	tflog.Debug(ctx, "Creating new Kafka Cluster", logFields)
 
-	out, err := r.client.CreateKafkaInstance(ctx, in)
+	out, err := r.api.CreateKafkaInstance(ctx, in)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create Kafka instance, got error: %s", err))
 		return
@@ -351,11 +610,16 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	// Persist the initial state so Terraform is aware of the in-flight resource
+	resp.Diagnostics.Append(resp.State.Set(ctx, &instance)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	instanceId := instance.InstanceID.ValueString()
 
 	createTimeout := r.CreateTimeout(ctx, instance.Timeouts)
-	if err := framework.WaitForKafkaClusterToProvision(ctx, r.client, instanceId, models.StateCreating, createTimeout); err != nil {
+	if err := waitForKafkaClusterToProvisionFunc(ctx, r.client, instanceId, models.StateCreating, createTimeout); err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error waiting for Kafka Cluster %q to provision: %s", instanceId, err))
 		return
 	}
@@ -379,7 +643,7 @@ func (r *KafkaInstanceResource) Read(ctx context.Context, req resource.ReadReque
 	}
 	ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
 	instanceId := state.InstanceID.ValueString()
-	instance, err := r.client.GetKafkaInstance(ctx, instanceId)
+	instance, err := r.api.GetKafkaInstance(ctx, instanceId)
 	if err != nil {
 		if framework.IsNotFoundError(err) {
 			// Treat HTTP 404 Not Found status as a signal to recreate resource and return early
@@ -389,22 +653,19 @@ func (r *KafkaInstanceResource) Read(ctx context.Context, req resource.ReadReque
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", state.InstanceID.ValueString(), err))
 		return
 	}
-	// Get instance integrations
-	integrations, err := r.client.ListInstanceIntegrations(ctx, instanceId)
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to list integrations for Kafka instance %q, got error: %s", state.InstanceID.ValueString(), err))
-		return
-	}
-	// Get instance endpoints
-	endpoints, err := r.client.GetInstanceEndpoints(ctx, instanceId)
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get endpoints for Kafka instance %q, got error: %s", state.InstanceID.ValueString(), err))
-		return
-	}
-	// Flatten API response into Terraform state
 	resp.Diagnostics.Append(models.FlattenKafkaInstanceModel(instance, &state)...)
-	resp.Diagnostics.Append(models.FlattenKafkaInstanceModelWithIntegrations(integrations, &state)...)
-	resp.Diagnostics.Append(models.FlattenKafkaInstanceModelWithEndpoints(endpoints, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if instance.State != nil && *instance.State == models.StateRunning {
+		endpoints, err := r.api.GetInstanceEndpoints(ctx, instanceId)
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get endpoints for Kafka instance %q, got error: %s", state.InstanceID.ValueString(), err))
+			return
+		}
+		resp.Diagnostics.Append(models.FlattenKafkaInstanceModelWithEndpoints(endpoints, &state)...)
+	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -415,17 +676,20 @@ func (r *KafkaInstanceResource) Read(ctx context.Context, req resource.ReadReque
 func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan, state models.KafkaInstanceResourceModel
 
-	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	resp.Diagnostics.Append(validateKafkaInstanceConfiguration(ctx, &plan, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	ctx = context.WithValue(ctx, client.EnvIdKey, plan.EnvironmentID.ValueString())
 
-	// check if the instance exists
 	instanceId := plan.InstanceID.ValueString()
-	instance, err := r.client.GetKafkaInstance(ctx, instanceId)
+	instance, err := r.api.GetKafkaInstance(ctx, instanceId)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", instanceId, err))
 		return
@@ -434,249 +698,195 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Kafka instance %q not found", instanceId))
 		return
 	}
-	// check if the instance is in available state
-	if *instance.State != models.StateRunning {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Kafka instance %q is Currently in %q state, only instances in 'Running' state can be updated", instanceId, *instance.State))
+	if instance.State == nil || *instance.State != models.StateRunning {
+		current := models.StateUnknown
+		if instance.State != nil {
+			current = *instance.State
+		}
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Kafka instance %q is Currently in %q state, only instances in 'Running' state can be updated", instanceId, current))
 		return
-	}
-
-	// Check if the basic info has changed
-	if state.Name.ValueString() != plan.Name.ValueString() ||
-		state.Description.ValueString() != plan.Description.ValueString() {
-		// Generate API request body from plan
-		basicUpdate := client.InstanceBasicParam{
-			DisplayName: plan.Name.ValueString(),
-			Description: plan.Description.ValueString(),
-		}
-		err = r.client.UpdateKafkaInstanceBasicInfo(ctx, instanceId, basicUpdate)
-		if err != nil {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update Kafka instance %q basicInfo, got error: %s", instanceId, err))
-			return
-		}
-		// get latest info
-		resp.Diagnostics.Append(ReadKafkaInstance(ctx, r, instanceId, &state)...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		// Save updated data into Terraform state
-		resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
 	}
 
 	updateTimeout := r.UpdateTimeout(ctx, state.Timeouts)
 
-	// Check if the Integrations has changed
-	planIntegration := models.ExpandSetValueList(plan.Features.Integrations)
-	stateIntegration := models.ExpandSetValueList(state.Features.Integrations)
+	updateParam := client.InstanceUpdateParam{}
+	shouldWait := false
+	hasUpdate := false
+	instanceConfigsChanged := false
+	certificateChanged := false
 
-	// Initialize slices to track integration changes
-	needAddIntegration := []string{}
-	needRemoveIntegration := []string{}
-
-	// Convert plan and state integrations to map for efficient lookup
-	planMap := make(map[string]bool)
-	stateMap := make(map[string]bool)
-
-	for _, v := range planIntegration {
-		planMap[v] = true
-	}
-	for _, v := range stateIntegration {
-		stateMap[v] = true
+	ensureSpec := func() *client.SpecificationUpdateParam {
+		if updateParam.Spec == nil {
+			updateParam.Spec = &client.SpecificationUpdateParam{}
+		}
+		return updateParam.Spec
 	}
 
-	// Find integrations that need to be added
-	for integration := range planMap {
-		if !stateMap[integration] {
-			needAddIntegration = append(needAddIntegration, integration)
+	ensureFeatures := func() *client.InstanceFeatureParam {
+		if updateParam.Features == nil {
+			updateParam.Features = &client.InstanceFeatureParam{}
+		}
+		return updateParam.Features
+	}
+
+	if planName := plan.Name.ValueString(); planName != state.Name.ValueString() {
+		name := planName
+		updateParam.Name = &name
+		hasUpdate = true
+	}
+
+	if planDesc := plan.Description.ValueString(); planDesc != state.Description.ValueString() {
+		desc := planDesc
+		updateParam.Description = &desc
+		hasUpdate = true
+	}
+
+	if plan.Features != nil && state.Features != nil && !plan.Features.InstanceConfigs.IsUnknown() && !state.Features.InstanceConfigs.IsUnknown() {
+		planConfig := plan.Features.InstanceConfigs
+		stateConfig := state.Features.InstanceConfigs
+		if !models.MapsEqual(planConfig, stateConfig) {
+			if !stateConfig.IsNull() {
+				for name := range stateConfig.Elements() {
+					if _, ok := planConfig.Elements()[name]; !ok {
+						resp.Diagnostics.AddError("Config Update Error", fmt.Sprintf("Error occurred while updating Kafka Instance %q. "+
+							" At present, we don't support the removal of instance settings from the 'configs' block, "+
+							"meaning you can't reset to the instance's default settings. "+
+							"As a workaround, you can find the default value and manually set the current value to match the default.", instanceId))
+						return
+					}
+				}
+			}
+			features := ensureFeatures()
+			features.InstanceConfigs = models.ExpandStringValueMap(planConfig)
+			hasUpdate = true
+			shouldWait = true
+			instanceConfigsChanged = true
 		}
 	}
 
-	// Find integrations that need to be removed
-	for integration := range stateMap {
-		if !planMap[integration] {
-			needRemoveIntegration = append(needRemoveIntegration, integration)
+	if plan.Features != nil && plan.Features.Security != nil && state.Features != nil && state.Features.Security != nil {
+		if !plan.Features.Security.CertificateAuthority.Equal(state.Features.Security.CertificateAuthority) ||
+			!plan.Features.Security.CertificateChain.Equal(state.Features.Security.CertificateChain) ||
+			!plan.Features.Security.PrivateKey.Equal(state.Features.Security.PrivateKey) {
+			features := ensureFeatures()
+			security := &client.InstanceSecurityParam{}
+			ca := plan.Features.Security.CertificateAuthority.ValueString()
+			security.CertificateAuthority = &ca
+			chain := plan.Features.Security.CertificateChain.ValueString()
+			security.CertificateChain = &chain
+			privateKey := plan.Features.Security.PrivateKey.ValueString()
+			security.PrivateKey = &privateKey
+			features.Security = security
+			hasUpdate = true
+			shouldWait = true
+			certificateChanged = true
 		}
 	}
 
-	if len(needAddIntegration) > 0 {
-		// Generate API request body from plan
-		param := client.IntegrationInstanceAddParam{
-			Codes: needAddIntegration,
+	planVersion := plan.Version.ValueString()
+	if planVersion != "" && planVersion != state.Version.ValueString() {
+		version := planVersion
+		updateParam.Version = &version
+		hasUpdate = true
+		shouldWait = true
+	}
+
+	if plan.Features != nil {
+		var stateMetrics *models.MetricsExporterModel
+		if state.Features != nil {
+			stateMetrics = state.Features.MetricsExporter
 		}
-		err = r.client.AddInstanceIntergation(ctx, instanceId, &param)
-		if err != nil {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to add integrations for Kafka instance %q intergations, got error: %s", instanceId, err))
+		if metricsExporterChanged(plan.Features.MetricsExporter, stateMetrics) {
+			exporter, hasExporter := buildMetricsExporterParam(plan.Features.MetricsExporter)
+			features := ensureFeatures()
+			if hasExporter {
+				features.MetricsExporter = exporter
+				hasUpdate = true
+				shouldWait = true
+			} else if stateMetrics != nil {
+				enabled := false
+				prom := &client.InstancePrometheusExporterParam{Enabled: &enabled}
+				features.MetricsExporter = &client.InstanceMetricsExporterParam{Prometheus: prom}
+				hasUpdate = true
+				shouldWait = true
+			}
+		}
+	}
+
+	if plan.ComputeSpecs != nil && instance.Spec != nil && instance.Spec.ReservedAku != nil {
+		planAKU := int32(plan.ComputeSpecs.ReservedAku.ValueInt64())
+		if planAKU != *instance.Spec.ReservedAku {
+			aku := planAKU
+			spec := ensureSpec()
+			spec.ReservedAku = &aku
+			hasUpdate = true
+			shouldWait = true
+		}
+	}
+
+	if plan.ComputeSpecs != nil {
+		var stateNodeGroups []models.NodeGroupModel
+		if state.ComputeSpecs != nil {
+			stateNodeGroups = state.ComputeSpecs.KubernetesNodeGroups
+		}
+		if !areNodeGroupsEqual(plan.ComputeSpecs.KubernetesNodeGroups, stateNodeGroups) {
+			groups := make([]client.KubernetesNodeGroupParam, 0, len(plan.ComputeSpecs.KubernetesNodeGroups))
+			for _, group := range plan.ComputeSpecs.KubernetesNodeGroups {
+				if group.ID.IsNull() || group.ID.IsUnknown() {
+					continue
+				}
+				id := group.ID.ValueString()
+				groups = append(groups, client.KubernetesNodeGroupParam{Id: &id})
+			}
+			spec := ensureSpec()
+			spec.KubernetesNodeGroups = groups
+			hasUpdate = true
+			shouldWait = true
+		}
+	}
+
+	if instanceConfigsChanged && plan.Features != nil {
+		if state.Features == nil {
+			state.Features = &models.FeaturesModel{}
+		}
+		state.Features.InstanceConfigs = plan.Features.InstanceConfigs
+	}
+
+	if certificateChanged && plan.Features != nil && plan.Features.Security != nil {
+		if state.Features == nil {
+			state.Features = &models.FeaturesModel{}
+		}
+		if state.Features.Security == nil {
+			state.Features.Security = &models.SecurityModel{}
+		}
+		state.Features.Security.CertificateAuthority = plan.Features.Security.CertificateAuthority
+		state.Features.Security.CertificateChain = plan.Features.Security.CertificateChain
+		state.Features.Security.PrivateKey = plan.Features.Security.PrivateKey
+	}
+
+	if hasUpdate {
+		if err := r.api.UpdateKafkaInstance(ctx, instanceId, updateParam); err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update Kafka instance %q, got error: %s", instanceId, err))
 			return
 		}
-		// wait for version update
-		if err := framework.WaitForKafkaClusterToProvision(ctx, r.client, instanceId, models.StateChanging, updateTimeout); err != nil {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error waiting for Kafka Cluster %q to provision: %s", instanceId, err))
-			return
+		if shouldWait {
+			if err := waitForKafkaClusterToProvisionFunc(ctx, r.client, instanceId, models.StateChanging, updateTimeout); err != nil {
+				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error waiting for Kafka Cluster %q to provision: %s", instanceId, err))
+				return
+			}
 		}
 		resp.Diagnostics.Append(ReadKafkaInstance(ctx, r, instanceId, &state)...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		// Save updated data into Terraform state
 		resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
+		return
 	}
 
-	if len(needRemoveIntegration) > 0 {
-		// Generate API request body from plan
-		for _, integration := range needRemoveIntegration {
-			err = r.client.RemoveInstanceIntergation(ctx, instanceId, integration)
-			if err != nil {
-				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to remove integrations for Kafka instance %q intergations, got error: %s", instanceId, err))
-				return
-			}
-			// wait for version update
-			if err := framework.WaitForKafkaClusterToProvision(ctx, r.client, instanceId, models.StateChanging, updateTimeout); err != nil {
-				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error waiting for Kafka Cluster %q to provision: %s", instanceId, err))
-				return
-			}
-			resp.Diagnostics.Append(ReadKafkaInstance(ctx, r, instanceId, &state)...)
-			if resp.Diagnostics.HasError() {
-				return
-			}
-			// Save updated data into Terraform state
-			resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
-			if resp.Diagnostics.HasError() {
-				return
-			}
-		}
-	}
-
-	planConfig := plan.Features.InstanceConfigs
-	stateConfig := state.Features.InstanceConfigs
-	// check if the config has changed
-	if !models.MapsEqual(planConfig, stateConfig) {
-		// Check if the plan config has removed any settings
-		for name := range stateConfig.Elements() {
-			if _, ok := planConfig.Elements()[name]; !ok {
-				resp.Diagnostics.AddError("Config Update Error", fmt.Sprintf("Error occurred while updating Kafka Instance %q. "+
-					" At present, we don't support the removal of instance settings from the 'configs' block, "+
-					"meaning you can't reset to the instance's default settings. "+
-					"As a workaround, you can find the default value and manually set the current value to match the default.", instanceId))
-				return
-			}
-		}
-
-		in := client.InstanceConfigParam{}
-		in.Configs = models.ExpandStringValueMap(planConfig)
-
-		err := r.client.UpdateKafkaInstanceConfig(ctx, instanceId, in)
-		if err != nil {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update Kafka instance %q configs, got error: %s", instanceId, err))
-			return
-		}
-
-		// wait for version update
-		if err := framework.WaitForKafkaClusterToProvision(ctx, r.client, instanceId, models.StateChanging, updateTimeout); err != nil {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error waiting for Kafka Cluster %q to provision: %s", instanceId, err))
-			return
-		}
-
-		state.Features.InstanceConfigs = planConfig
-		resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-	}
-
-	// Check if the Security has changed
-	isCertificateChanged := false
-	if plan.Features.Security != nil && instance.Features.Security != nil {
-		// Check if any of the certificate fields have changed
-		if !plan.Features.Security.CertificateAuthority.Equal(state.Features.Security.CertificateAuthority) ||
-			!plan.Features.Security.CertificateChain.Equal(state.Features.Security.CertificateChain) ||
-			!plan.Features.Security.PrivateKey.Equal(state.Features.Security.PrivateKey) {
-			isCertificateChanged = true
-		}
-	}
-
-	if isCertificateChanged {
-		param := client.InstanceCertificateParam{
-			CertificateAuthority: plan.Features.Security.CertificateAuthority.ValueString(),
-			CertificateChain:     plan.Features.Security.CertificateChain.ValueString(),
-			PrivateKey:           plan.Features.Security.PrivateKey.ValueString(),
-		}
-
-		// Call API to update certificate
-		err := r.client.UpdateKafkaInstanceCertificate(ctx, instanceId, param)
-		if err != nil {
-			resp.Diagnostics.AddError("Client Error",
-				fmt.Sprintf("Unable to update Kafka instance %q certificate, got error: %s", instanceId, err))
-			return
-		}
-
-		// Wait for certificate update to complete
-		if err := framework.WaitForKafkaClusterToProvision(ctx, r.client, instanceId, models.StateChanging, updateTimeout); err != nil {
-			resp.Diagnostics.AddError("Client Error",
-				fmt.Sprintf("Error waiting for Kafka Cluster %q certificate update: %s", instanceId, err))
-			return
-		}
-
-		// updated instance state
-		state.Features.Security.PrivateKey = plan.Features.Security.PrivateKey
-		state.Features.Security.CertificateChain = plan.Features.Security.CertificateChain
-		state.Features.Security.CertificateAuthority = plan.Features.Security.CertificateAuthority
-
-		// Save updated data into Terraform state
-		resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-	}
-
-	planAKU := int32(plan.ComputeSpecs.ReservedAku.ValueInt64())
-	planVersion := plan.Version.ValueString()
-	planNodeGroup := make([]client.KubernetesNodeGroupParam, 0, len(plan.ComputeSpecs.KubernetesNodeGroups))
-	for _, group := range plan.ComputeSpecs.KubernetesNodeGroups {
-		id := group.ID.ValueString()
-		planNodeGroup = append(planNodeGroup, client.KubernetesNodeGroupParam{
-			Id: &id,
-		})
-	}
-
-	// Check and update version if needed
-	stateVersion := state.Version.ValueString()
-	if planVersion != "" && planVersion != stateVersion {
-		updateParam := client.InstanceUpdateParam{
-			Version: &planVersion,
-		}
-		if err := updateInstanceAndWait(ctx, r, instanceId, updateParam, "version", updateTimeout, &state, resp); err != nil {
-			return
-		}
-	}
-	// Check and update AKU if needed
-	stateAKU := *instance.Spec.ReservedAku
-	if planAKU != stateAKU {
-		updateParam := client.InstanceUpdateParam{
-			Spec: &client.SpecificationUpdateParam{
-				ReservedAku: planAKU,
-			},
-		}
-		if err := updateInstanceAndWait(ctx, r, instanceId, updateParam, "aku", updateTimeout, &state, resp); err != nil {
-			return
-		}
-	}
-
-	// Check and update node groups if needed
-	if !areNodeGroupsEqual(plan.ComputeSpecs.KubernetesNodeGroups, state.ComputeSpecs.KubernetesNodeGroups) {
-		updateParam := client.InstanceUpdateParam{
-			Spec: &client.SpecificationUpdateParam{
-				KubernetesNodeGroups: planNodeGroup,
-			},
-		}
-		if err := updateInstanceAndWait(ctx, r, instanceId, updateParam, "node_groups", updateTimeout, &state, resp); err != nil {
-			return
-		}
-	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *KafkaInstanceResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -690,7 +900,7 @@ func (r *KafkaInstanceResource) Delete(ctx context.Context, req resource.DeleteR
 	ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
 
 	instanceId := state.InstanceID.ValueString()
-	instance, err := r.client.GetKafkaInstance(ctx, instanceId)
+	instance, err := r.api.GetKafkaInstance(ctx, instanceId)
 	if err != nil {
 		if framework.IsNotFoundError(err) {
 			return
@@ -703,7 +913,7 @@ func (r *KafkaInstanceResource) Delete(ctx context.Context, req resource.DeleteR
 	}
 
 	if *instance.State != models.StateDeleting {
-		err = r.client.DeleteKafkaInstance(ctx, instanceId)
+		err = r.api.DeleteKafkaInstance(ctx, instanceId)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete Kafka instance %q, got error: %s", instanceId, err))
 			return
@@ -711,10 +921,14 @@ func (r *KafkaInstanceResource) Delete(ctx context.Context, req resource.DeleteR
 	}
 
 	deleteTimeout := r.DeleteTimeout(ctx, state.Timeouts)
+	tflog.Info(ctx, "waiting for Kafka instance to be deleted", map[string]any{"instance_id": instanceId, "timeout": deleteTimeout.String()})
+	// Wait until control plane reports NotFound so acceptance tests don't leave dangling clusters.
 	if err := framework.WaitForKafkaClusterToDeleted(ctx, r.client, instanceId, deleteTimeout); err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error waiting for Kafka Cluster %q to provision: %s", instanceId, err))
 		return
 	}
+	tflog.Info(ctx, "Kafka instance deletion completed", map[string]any{"instance_id": instanceId})
+	resp.State.RemoveResource(ctx)
 }
 
 func (r *KafkaInstanceResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -736,16 +950,14 @@ func (r *KafkaInstanceResource) ImportState(ctx context.Context, req resource.Im
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), instanceId)...)
 
 	config := types.MapValueMust(types.StringType, map[string]attr.Value{})
-	integration := types.SetValueMust(types.StringType, []attr.Value{})
 	features := models.FeaturesModel{
 		InstanceConfigs: config,
-		Integrations:    integration,
 	}
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("features"), features)...)
 }
 
 func ReadKafkaInstance(ctx context.Context, r *KafkaInstanceResource, instanceId string, plan *models.KafkaInstanceResourceModel) diag.Diagnostics {
-	instance, err := r.client.GetKafkaInstance(ctx, instanceId)
+	instance, err := r.api.GetKafkaInstance(ctx, instanceId)
 	if err != nil {
 		if framework.IsNotFoundError(err) {
 			return nil
@@ -756,19 +968,13 @@ func ReadKafkaInstance(ctx context.Context, r *KafkaInstanceResource, instanceId
 		return diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Kafka instance %q not found", plan.InstanceID.ValueString()))}
 	}
 
-	integrations, err := r.client.ListInstanceIntegrations(ctx, instanceId)
-	if err != nil {
-		return diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to list integrations for Kafka instance %q, got error: %s", plan.InstanceID.ValueString(), err))}
-	}
-
-	endpoints, err := r.client.GetInstanceEndpoints(ctx, instanceId)
+	endpoints, err := r.api.GetInstanceEndpoints(ctx, instanceId)
 	if err != nil {
 		return diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get endpoints for Kafka instance %q, got error: %s", plan.InstanceID.ValueString(), err))}
 	}
 
 	diags := diag.Diagnostics{}
 	diags.Append(models.FlattenKafkaInstanceModel(instance, plan)...)
-	diags.Append(models.FlattenKafkaInstanceModelWithIntegrations(integrations, plan)...)
 	diags.Append(models.FlattenKafkaInstanceModelWithEndpoints(endpoints, plan)...)
 	return diags
 }
@@ -795,46 +1001,145 @@ func areNodeGroupsEqual(plan, state []models.NodeGroupModel) bool {
 	return true
 }
 
-// Helper function to handle instance updates
-func updateInstanceAndWait(
-	ctx context.Context,
-	r *KafkaInstanceResource,
-	instanceId string,
-	param client.InstanceUpdateParam,
-	updateType string,
-	timeout time.Duration,
-	state *models.KafkaInstanceResourceModel,
-	resp *resource.UpdateResponse,
-) error {
-	tflog.Debug(ctx, fmt.Sprintf("Updating Kafka instance compute specs due to changes in %s", updateType))
-
-	err := r.client.UpdateKafkaInstanceComputeSpecs(ctx, instanceId, param)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Client Error",
-			fmt.Sprintf("Unable to update Kafka instance %q compute specs (%s), got error: %s",
-				instanceId, updateType, err),
-		)
-		return err
+func metricsExporterChanged(plan, state *models.MetricsExporterModel) bool {
+	if plan == nil {
+		return state != nil
 	}
-
-	if err := framework.WaitForKafkaClusterToProvision(ctx, r.client, instanceId, models.StateChanging, timeout); err != nil {
-		resp.Diagnostics.AddError(
-			"Client Error",
-			fmt.Sprintf("Error waiting for Kafka Cluster %q compute specs update: %s", instanceId, err),
-		)
-		return err
+	if state == nil {
+		return models.MetricsExporterHasConfig(plan)
 	}
-
-	resp.Diagnostics.Append(ReadKafkaInstance(ctx, r, instanceId, state)...)
-	if resp.Diagnostics.HasError() {
-		return fmt.Errorf("failed to read updated instance state")
+	if !prometheusExporterEqual(plan.Prometheus, state.Prometheus) {
+		return true
 	}
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
-	if resp.Diagnostics.HasError() {
-		return fmt.Errorf("failed to set updated instance state")
-	}
-
-	return nil
+	return false
 }
+
+func prometheusExporterEqual(plan, state *models.PrometheusExporterModel) bool {
+	if plan == nil || state == nil {
+		return plan == nil && state == nil
+	}
+	if !stringAttrEqual(plan.AuthType, state.AuthType) {
+		return false
+	}
+	if !stringAttrEqual(plan.EndPoint, state.EndPoint) {
+		return false
+	}
+	if !stringAttrEqual(plan.PrometheusArn, state.PrometheusArn) {
+		return false
+	}
+	if !stringAttrEqual(plan.Username, state.Username) {
+		return false
+	}
+	if !stringAttrEqual(plan.Password, state.Password) {
+		return false
+	}
+	if !stringAttrEqual(plan.Token, state.Token) {
+		return false
+	}
+	if !mapAttrEqual(plan.Labels, state.Labels) {
+		return false
+	}
+	return true
+}
+
+func buildMetricsExporterParam(model *models.MetricsExporterModel) (*client.InstanceMetricsExporterParam, bool) {
+	if model == nil {
+		return nil, false
+	}
+	exporter := client.InstanceMetricsExporterParam{}
+	hasConfig := false
+	if model.Prometheus != nil {
+		prom, ok := buildPrometheusExporterParam(model.Prometheus)
+		if ok {
+			exporter.Prometheus = prom
+			hasConfig = true
+		}
+	}
+	if !hasConfig {
+		return nil, false
+	}
+	return &exporter, true
+}
+
+func buildPrometheusExporterParam(model *models.PrometheusExporterModel) (*client.InstancePrometheusExporterParam, bool) {
+	if model == nil {
+		return nil, false
+	}
+	if !models.PrometheusExporterHasConfig(model) {
+		return nil, false
+	}
+	prom := &client.InstancePrometheusExporterParam{}
+	enabled := true
+	prom.Enabled = &enabled
+	if !model.AuthType.IsNull() && !model.AuthType.IsUnknown() {
+		auth := model.AuthType.ValueString()
+		prom.AuthType = &auth
+	}
+	if !model.EndPoint.IsNull() && !model.EndPoint.IsUnknown() {
+		endpoint := model.EndPoint.ValueString()
+		prom.EndPoint = &endpoint
+	}
+	if !model.PrometheusArn.IsNull() && !model.PrometheusArn.IsUnknown() {
+		arn := model.PrometheusArn.ValueString()
+		prom.PrometheusArn = &arn
+	}
+	if !model.Username.IsNull() && !model.Username.IsUnknown() {
+		username := model.Username.ValueString()
+		prom.Username = &username
+	}
+	if !model.Password.IsNull() && !model.Password.IsUnknown() {
+		password := model.Password.ValueString()
+		prom.Password = &password
+	}
+	if !model.Token.IsNull() && !model.Token.IsUnknown() {
+		token := model.Token.ValueString()
+		prom.Token = &token
+	}
+	if !model.Labels.IsNull() && !model.Labels.IsUnknown() && len(model.Labels.Elements()) > 0 {
+		labels := models.ExpandStringValueMap(model.Labels)
+		if len(labels) > 0 {
+			promLabels := make([]client.MetricsLabelParam, len(labels))
+			for i, label := range labels {
+				name := ""
+				if label.Key != nil {
+					name = *label.Key
+				}
+				value := ""
+				if label.Value != nil {
+					value = *label.Value
+				}
+				promLabels[i] = client.MetricsLabelParam{Name: name, Value: value}
+			}
+			prom.Labels = promLabels
+		}
+	}
+	return prom, true
+}
+
+func stringAttrEqual(plan, state types.String) bool {
+	if plan.IsUnknown() {
+		return true
+	}
+	if plan.IsNull() {
+		return state.IsNull() || state.IsUnknown()
+	}
+	if state.IsNull() || state.IsUnknown() {
+		return false
+	}
+	return plan.ValueString() == state.ValueString()
+}
+
+func mapAttrEqual(plan, state types.Map) bool {
+	if plan.IsUnknown() {
+		return true
+	}
+	if plan.IsNull() {
+		return state.IsNull() || state.IsUnknown()
+	}
+	if state.IsNull() || state.IsUnknown() {
+		return false
+	}
+	return plan.Equal(state)
+}
+
+var waitForKafkaClusterToProvisionFunc = framework.WaitForKafkaClusterToProvision

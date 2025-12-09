@@ -2,7 +2,6 @@ package provider
 
 import (
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -10,88 +9,53 @@ import (
 )
 
 func TestAccKafkaTopicResource(t *testing.T) {
-	if os.Getenv("AUTOMQ_BYOC_ENDPOINT") == "" {
-		t.Skip("Skipping test as AUTOMQ_TEST_DEPLOY_PROFILE is not set")
-	}
-	if os.Getenv("TF_ACC_TIMEOUT") == "" {
-		t.Setenv("TF_ACC_TIMEOUT", "2h")
-	}
+	env := loadAccConfig(t)
+	env.requireVM(t)
+	ensureAccTimeout(t)
 
-	envVars := getRequiredEnvVars(t)
 	suffix := generateRandomSuffix()
+	instanceCfg := newVMInstanceConfig(env, fmt.Sprintf("acc-topic-instance-%s", suffix), "Topic acceptance instance")
+	instanceHCL := renderKafkaInstanceConfig(env, instanceCfg)
+	topicName := fmt.Sprintf("acc-topic-%s", suffix)
 
-	// First create an instance that we can reference
-	instanceConfig := map[string]interface{}{
-		"environment_id": envVars["AUTOMQ_TEST_ENV_ID"],
-		"name":           fmt.Sprintf("test-topic-instance-%s", suffix),
-		"description":    "Test instance for data source testing",
-		"deploy_profile": envVars["AUTOMQ_TEST_DEPLOY_PROFILE"],
-		"version":        "1.3.10",
-		"reserved_aku":   6,
-		"zone":           envVars["AUTOMQ_TEST_ZONE"],
-		"subnet":         envVars["AUTOMQ_TEST_SUBNET_ID"],
-	}
-
-	// Initial configuration
-	initialConfig := map[string]interface{}{
-		"environment_id": envVars["AUTOMQ_TEST_ENV_ID"],
-		"name":           fmt.Sprintf("test-topic-%s", suffix),
-		"partition":      16,
-		"configs_str": `{
-			"cleanup.policy" = "delete"
-			"retention.ms" = "86400000"
-		}`,
-		"automq_byoc_endpoint":      envVars["AUTOMQ_BYOC_ENDPOINT"],
-		"automq_byoc_access_key_id": envVars["AUTOMQ_BYOC_ACCESS_KEY_ID"],
-		"automq_byoc_secret_key":    envVars["AUTOMQ_BYOC_SECRET_KEY"],
-	}
-
-	// Updated configuration
-	updatedConfig := map[string]interface{}{
-		"environment_id": envVars["AUTOMQ_TEST_ENV_ID"],
-		"name":           fmt.Sprintf("test-topic-%s", suffix),
-		"partition":      32,
-		"configs_str": `{
-			"cleanup.policy" = "delete"
-			"retention.ms" = "172800000"
-		}`,
-		"automq_byoc_endpoint":      envVars["AUTOMQ_BYOC_ENDPOINT"],
-		"automq_byoc_access_key_id": envVars["AUTOMQ_BYOC_ACCESS_KEY_ID"],
-		"automq_byoc_secret_key":    envVars["AUTOMQ_BYOC_SECRET_KEY"],
-	}
+	initialTopic := fmt.Sprintf(topicResourceTemplate,
+		env.EnvironmentID,
+		topicName,
+		16,
+		"86400000",
+	)
+	updatedTopic := fmt.Sprintf(topicResourceTemplate,
+		env.EnvironmentID,
+		topicName,
+		32,
+		"172800000",
+	)
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             testAccCheckKafkaTopicDestroy,
 		PreCheck:                 func() { testAccPreCheck(t) },
 		Steps: []resource.TestStep{
-			// Create the instance
 			{
-				Config: testAccKafkaInstanceResourceConfig(instanceConfig, envVars),
-			},
-			// Initial creation
-			{
-				Config: testAccKafkaInstanceResourceConfig(instanceConfig, envVars) + testAccKafkaTopicConfig(initialConfig),
+				Config: instanceHCL + initialTopic,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckKafkaTopicExists("automq_kafka_topic.test"),
-					resource.TestCheckResourceAttr("automq_kafka_topic.test", "name", initialConfig["name"].(string)), //nolint:forcetypeassert
-					resource.TestCheckResourceAttr("automq_kafka_topic.test", "partition", fmt.Sprintf("%d", initialConfig["partition"])),
+					resource.TestCheckResourceAttr("automq_kafka_topic.test", "name", topicName),
+					resource.TestCheckResourceAttr("automq_kafka_topic.test", "partition", "16"),
 					resource.TestCheckResourceAttr("automq_kafka_topic.test", "configs.cleanup.policy", "delete"),
 					resource.TestCheckResourceAttr("automq_kafka_topic.test", "configs.retention.ms", "86400000"),
 					resource.TestCheckResourceAttrSet("automq_kafka_topic.test", "topic_id"),
 				),
 			},
-			// Update test
 			{
-				Config: testAccKafkaInstanceResourceConfig(instanceConfig, envVars) + testAccKafkaTopicConfig(updatedConfig),
+				Config: instanceHCL + updatedTopic,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckKafkaTopicExists("automq_kafka_topic.test"),
-					resource.TestCheckResourceAttr("automq_kafka_topic.test", "partition", fmt.Sprintf("%d", updatedConfig["partition"])),
+					resource.TestCheckResourceAttr("automq_kafka_topic.test", "partition", "32"),
 					resource.TestCheckResourceAttr("automq_kafka_topic.test", "configs.cleanup.policy", "delete"),
 					resource.TestCheckResourceAttr("automq_kafka_topic.test", "configs.retention.ms", "172800000"),
 				),
 			},
-			// Import test
 			{
 				ResourceName:                         "automq_kafka_topic.test",
 				ImportState:                          true,
@@ -115,23 +79,19 @@ func TestAccKafkaTopicResource(t *testing.T) {
 	})
 }
 
-func testAccKafkaTopicConfig(config map[string]interface{}) string {
-	return fmt.Sprintf(`
-
+// topicResourceTemplate renders the minimal topic resource used in tests.
+const topicResourceTemplate = `
 resource "automq_kafka_topic" "test" {
   environment_id    = "%s"
   kafka_instance_id = automq_kafka_instance.test.id
-  name             = "%s"
-  partition        = %d
-  configs          = %s
+  name              = "%s"
+  partition         = %d
+  configs = {
+    "cleanup.policy" = "delete"
+    "retention.ms"   = "%s"
+  }
 }
-`,
-		config["environment_id"].(string), //nolint:forcetypeassert
-		config["name"].(string),           //nolint:forcetypeassert
-		config["partition"].(int),         //nolint:forcetypeassert
-		config["configs_str"].(string),    //nolint:forcetypeassert
-	)
-}
+`
 
 func testAccCheckKafkaTopicDestroy(s *terraform.State) error {
 	// Check if the instance is destroyed

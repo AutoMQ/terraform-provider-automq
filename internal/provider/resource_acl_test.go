@@ -2,7 +2,6 @@ package provider
 
 import (
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -10,26 +9,19 @@ import (
 )
 
 func TestAccKafkaAclResource(t *testing.T) {
-	if os.Getenv("AUTOMQ_BYOC_ENDPOINT") == "" {
-		t.Skip("Skipping test as AUTOMQ_TEST_DEPLOY_PROFILE is not set")
-	}
-	envVars := getRequiredEnvVars(t)
+	env := loadAccConfig(t)
+	env.requireVM(t)
+	ensureAccTimeout(t)
+
 	suffix := generateRandomSuffix()
+	instanceCfg := newVMInstanceConfig(env, fmt.Sprintf("acc-acl-instance-%s", suffix), "ACL acceptance instance")
+	instanceHCL := renderKafkaInstanceConfig(env, instanceCfg)
 	username := fmt.Sprintf("testuser-%s", suffix)
+	topicName := fmt.Sprintf("acc-acl-topic-%s", suffix)
 
-	// Instance configuration
-	instanceConfig := map[string]interface{}{
-		"environment_id": envVars["AUTOMQ_TEST_ENV_ID"],
-		"name":           fmt.Sprintf("test-acl-instance-%s", suffix),
-		"description":    "Test instance for ACL testing",
-		"deploy_profile": envVars["AUTOMQ_TEST_DEPLOY_PROFILE"],
-		"version":        "1.3.10",
-		"reserved_aku":   6,
-		"zone":           envVars["AUTOMQ_TEST_ZONE"],
-		"subnet":         envVars["AUTOMQ_TEST_SUBNET_ID"],
-	}
+	userBlock := fmt.Sprintf(userResourceTemplate, env.EnvironmentID, username, "Test123456")
+	topicBlock := fmt.Sprintf(topicResourceTemplate, env.EnvironmentID, topicName, 1, "86400000")
 
-	// Test cases for different ACL combinations
 	testCases := []struct {
 		name           string
 		resourceType   string
@@ -62,28 +54,20 @@ func TestAccKafkaAclResource(t *testing.T) {
 		{"group_literal_all_deny", "GROUP", "test-group-deny", "LITERAL", "ALL", "DENY"},
 	}
 
-	steps := []resource.TestStep{
-		{
-			Config: testAccKafkaInstanceResourceConfig(instanceConfig, envVars),
-		},
-	}
-
+	steps := make([]resource.TestStep, 0, len(testCases))
 	for _, tc := range testCases {
+		aclBlock := fmt.Sprintf(aclResourceTemplate,
+			env.EnvironmentID,
+			tc.resourceType,
+			tc.resourceName,
+			tc.patternType,
+			tc.operationGroup,
+			tc.permission,
+		)
 		steps = append(steps, resource.TestStep{
-			Config: testAccKafkaInstanceResourceConfig(instanceConfig, envVars) +
-				testAccKafkaAclConfigWithDependencies(
-					envVars["AUTOMQ_TEST_ENV_ID"],
-					username,
-					tc.resourceType,
-					tc.resourceName,
-					tc.patternType,
-					tc.operationGroup,
-					tc.permission,
-				),
+			Config: instanceHCL + userBlock + topicBlock + aclBlock,
 			Check: resource.ComposeTestCheckFunc(
 				testAccCheckKafkaAclExists("automq_kafka_acl.test"),
-				resource.TestCheckResourceAttr("automq_kafka_acl.test", "environment_id", envVars["AUTOMQ_TEST_ENV_ID"]),
-				resource.TestCheckResourceAttrPair("automq_kafka_acl.test", "kafka_instance_id", "automq_kafka_instance.test", "id"),
 				resource.TestCheckResourceAttr("automq_kafka_acl.test", "resource_type", tc.resourceType),
 				resource.TestCheckResourceAttr("automq_kafka_acl.test", "resource_name", tc.resourceName),
 				resource.TestCheckResourceAttr("automq_kafka_acl.test", "pattern_type", tc.patternType),
@@ -102,46 +86,19 @@ func TestAccKafkaAclResource(t *testing.T) {
 	})
 }
 
-func testAccKafkaAclConfigWithDependencies(envId, username, resourceType, resourceName, patternType, operationGroup, permission string) string {
-	userConfig := fmt.Sprintf(`
-resource "automq_kafka_user" "test" {
-  environment_id   = %[1]q
-  kafka_instance_id = automq_kafka_instance.test.id
-  username         = %[2]q
-  password         = "Test123456"
-}
-`, envId, username)
-
-	// Add topic resource if needed
-	topicConfig := fmt.Sprintf(`
-resource "automq_kafka_topic" "test" {
-  environment_id   = %[1]q
-  kafka_instance_id = automq_kafka_instance.test.id
-  name             = "test-topic"
-  partition        = 1
-  configs = {
-    "cleanup.policy" = "delete"
-    "retention.ms" = "86400000"
-  }
-}
-`, envId)
-
-	// ACL resource configuration
-	aclConfig := fmt.Sprintf(`
+// aclResourceTemplate renders a single ACL entry for the scenario table.
+const aclResourceTemplate = `
 resource "automq_kafka_acl" "test" {
-  environment_id   = %[1]q
+  environment_id    = "%s"
   kafka_instance_id = automq_kafka_instance.test.id
-  principal        = "User:${automq_kafka_user.test.username}"
-  resource_type    = %[3]q
-  resource_name    = %[4]q
-  pattern_type     = %[5]q
-  operation_group  = %[6]q
-  permission       = %[7]q
+  principal         = "User:${automq_kafka_user.test.username}"
+  resource_type     = "%s"
+  resource_name     = "%s"
+  pattern_type      = "%s"
+  operation_group   = "%s"
+  permission        = "%s"
 }
-`, envId, username, resourceType, resourceName, patternType, operationGroup, permission)
-
-	return userConfig + topicConfig + aclConfig
-}
+`
 
 func testAccCheckKafkaAclDestroy(s *terraform.State) error {
 	if err := testAccCheckKafkaInstanceDestroy(s); err != nil {

@@ -33,17 +33,19 @@ func ExpandSetValueList(v basetypes.SetValuable) []string {
 }
 
 func ExpandStringValueMap(planConfig basetypes.MapValue) []client.ConfigItemParam {
-	configs := make([]client.ConfigItemParam, len(planConfig.Elements()))
-	i := 0
+	configs := make([]client.ConfigItemParam, 0, len(planConfig.Elements()))
 	for name, value := range planConfig.Elements() {
 		config, ok := value.(types.String)
-		if ok {
-			configs[i] = client.ConfigItemParam{
-				Key:   name,
-				Value: config.ValueString(),
-			}
+		if !ok {
+			continue
 		}
-		i += 1
+
+		key := name
+		val := config.ValueString()
+		configs = append(configs, client.ConfigItemParam{
+			Key:   &key,
+			Value: &val,
+		})
 	}
 	return configs
 }
@@ -51,7 +53,10 @@ func ExpandStringValueMap(planConfig basetypes.MapValue) []client.ConfigItemPara
 func FlattenStringValueMap(configs []client.ConfigItemParam) basetypes.MapValue {
 	configMap := make(map[string]attr.Value, len(configs))
 	for _, config := range configs {
-		configMap[config.Key] = types.StringValue(config.Value)
+		if config.Key == nil || config.Value == nil {
+			continue
+		}
+		configMap[*config.Key] = types.StringValue(*config.Value)
 	}
 	return types.MapValueMust(types.StringType, configMap)
 }

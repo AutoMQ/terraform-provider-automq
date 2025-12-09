@@ -1,59 +1,23 @@
-data "automq_deploy_profile" "default" {
-  environment_id = "env-example"
-  name           = "default"
-}
-
-data "automq_data_bucket_profiles" "test" {
-  environment_id = "env-example"
-  profile_name   = data.automq_deploy_profile.test.name
-}
-
-resource "automq_kafka_instance" "test" {
-  environment_id = "env-example"
-  name           = "example-1"
-  description    = "example"
-  deploy_profile = data.automq_deploy_profile.default.name
-  version        = "1.4.0"
+resource "automq_kafka_instance" "example" {
+  environment_id = var.automq_environment_id
+  name           = "automq-example"
+  description    = "example deployment using inline compute specs"
+  version        = "1.5.0"
 
   compute_specs = {
     reserved_aku = 6
+    deploy_type  = "IAAS"
+
     networks = [
       {
         zone    = "us-east-1a"
-        subnets = ["subnet-xxxxxx"]
+        subnets = ["subnet-aaaaaa"]
       }
     ]
-    bucket_profiles = [
+
+    data_buckets = [
       {
-        id = data.automq_data_bucket_profiles.test.data_buckets[0].id
-      }
-    ]
-  }
-
-  features = {
-    wal_mode = "EBSWAL"
-    security = {
-      authentication_methods   = ["anonymous"]
-      transit_encryption_modes = ["plaintext"]
-    }
-  }
-}
-
-resource "automq_kafka_instance" "test" {
-  environment_id = "env-example"
-  name           = "example-1"
-  description    = "example"
-  deploy_profile = data.automq_deploy_profile.default.name
-  version        = "1.4.0"
-
-  compute_specs = {
-    reserved_aku = 6
-    kubernetes_node_groups = [{
-      id = "k8s-node-group-1"
-    }]
-    bucket_profiles = [
-      {
-        id = data.automq_data_bucket_profiles.test.data_buckets[0].id
+        bucket_name = "automq-data-bucket"
       }
     ]
   }
@@ -63,11 +27,26 @@ resource "automq_kafka_instance" "test" {
     security = {
       authentication_methods   = ["sasl"]
       transit_encryption_modes = ["tls"]
-      data_encryption_mode     = "CPMK"
-      certificate_authority    = file("${path.module}/certificate.pem")
-      certificate_chain        = file("${path.module}/certificate.pem")
-      private_key              = file("${path.module}/private_key.pem")
+    }
+
+    metrics_exporter = {
+      prometheus = {
+        auth_type = "noauth"
+        endpoint  = "http://prometheus.example.com/api/v1/write"
+        labels = {
+          "env" = "test"
+        }
+      }
+    }
+
+    table_topic = {
+      warehouse     = "default"
+      catalog_type  = "HIVE"
+      metastore_uri = "thrift://hive-metastore.example.com:9083"
     }
   }
 }
 
+variable "automq_environment_id" {
+  type = string
+}
