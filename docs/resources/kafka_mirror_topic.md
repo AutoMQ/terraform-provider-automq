@@ -10,6 +10,8 @@ description: |-
 
 Manage mirrored topics within a Kafka link.
 
+> **Important**: Deleting this resource also deletes the mirrored topic inside the target AutoMQ cluster. After you finish a migration or replication cutover, keep this resource in state unless you intentionally want to drop the downstream topic.
+
 ## Example Usage
 
 ```terraform

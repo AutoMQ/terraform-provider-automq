@@ -96,7 +96,7 @@ func (r *KafkaLinkResource) Schema(ctx context.Context, req resource.SchemaReque
 						Required:            true,
 					},
 					"security_protocol": schema.StringAttribute{
-						MarkdownDescription: "Security protocol to use when connecting to the source cluster (e.g. `PLAINTEXT`, `SSL`, `SASL_SSL`).",
+						MarkdownDescription: "Security protocol to use when connecting to the source cluster (e.g. `PLAINTEXT`, `SSL`, `SASL_SSL`, `SASL_PLAINTEXT`).",
 						Optional:            true,
 					},
 					"sasl_mechanism": schema.StringAttribute{
@@ -133,7 +133,7 @@ func (r *KafkaLinkResource) Schema(ctx context.Context, req resource.SchemaReque
 						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 					},
 					"disable_endpoint_identification": schema.BoolAttribute{
-						MarkdownDescription: "Disable TLS endpoint identification when required by the source cluster.",
+						MarkdownDescription: "Disable TLS endpoint identification when required by the source cluster. Defaults to `false`.",
 						Optional:            true,
 						Computed:            true,
 						Default:             booldefault.StaticBool(false),
