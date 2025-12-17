@@ -7,7 +7,7 @@ description: |-
 # AutoMQ Provider
 ![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)
 
-> **Note** This provider release currently targets AutoMQ Control Plane **8.0 or later on AWS** only. It introduces **breaking changes** compared to version v0.2.3 and earlier. If your control plane runs on other clouds or on a version older than 8.0, do not use this build. After upgrading the AWS control plane to 8.0+, update the provider, align your Terraform configuration to the new schema, and re-import managed resources.
+> **Note**: This provider release currently targets AutoMQ Control Plane **8.0 or later on AWS** only. It introduces **breaking changes** compared to version v0.2.3 and earlier. If your control plane runs on other clouds or on a version older than 8.0, do not use this build. After upgrading the AWS control plane to 8.0+, update the provider, align your Terraform configuration to the new schema, and re-import managed resources.
 
 ## Prerequisites
 
