@@ -27,6 +27,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"terraform-provider-automq/client"
@@ -111,6 +112,13 @@ type accInstanceConfig struct {
 	MetricsExporter       *accMetricsExporter
 	Security              *accSecurity
 	WalMode               string
+	FileSystemParam       *accFileSystemParam
+}
+
+type accFileSystemParam struct {
+	ThroughputMibpsPerFileSystem int64
+	FileSystemCount              int64
+	SecurityGroup                string
 }
 
 func loadAccConfig(t *testing.T) accConfig {
@@ -241,6 +249,114 @@ func TestAccKafkaInstance_K8S_Scenario(t *testing.T) {
 	ensureAccTimeout(t)
 	scenario := buildK8SInstanceScenario(env)
 	runAccKafkaInstanceScenario(t, env, scenario)
+}
+
+func TestAccKafkaInstance_FSWAL_Scenario(t *testing.T) {
+	env := loadAccConfig(t)
+	env.requireVM(t)
+	ensureAccTimeout(t)
+	scenario := buildFSWALInstanceScenario(env)
+	runAccKafkaInstanceScenario(t, env, scenario)
+}
+
+func TestAccKafkaInstance_FSWAL_ValidationErrors(t *testing.T) {
+	env := loadAccConfig(t)
+	env.requireVM(t)
+
+	suffix := generateRandomSuffix()
+	baseConfig := accInstanceConfig{
+		EnvironmentID: env.EnvironmentID,
+		Name:          fmt.Sprintf("acc-fswal-err-%s", suffix),
+		Description:   "FSWAL validation error test",
+		Version:       env.Version,
+		DeployType:    "IAAS",
+		ReservedAKU:   6,
+		Networks:      env.vmNetworks(),
+		Security: &accSecurity{
+			AuthenticationMethods:  []string{"sasl"},
+			TransitEncryptionModes: []string{"plaintext"},
+			DataEncryptionMode:     "NONE",
+		},
+	}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Test FSWAL mode without file_system_param
+			{
+				Config: renderKafkaInstanceConfig(env, accInstanceConfig{
+					EnvironmentID: baseConfig.EnvironmentID,
+					Name:          baseConfig.Name + "-missing-fs",
+					Description:   baseConfig.Description,
+					Version:       baseConfig.Version,
+					DeployType:    baseConfig.DeployType,
+					ReservedAKU:   baseConfig.ReservedAKU,
+					Networks:      baseConfig.Networks,
+					WalMode:       "FSWAL",
+					Security:      baseConfig.Security,
+				}),
+				ExpectError: regexp.MustCompile("当 wal_mode 为 FSWAL 时，必须提供 file_system_param 配置"),
+			},
+			// Test file_system_param without FSWAL mode
+			{
+				Config: renderKafkaInstanceConfig(env, accInstanceConfig{
+					EnvironmentID: baseConfig.EnvironmentID,
+					Name:          baseConfig.Name + "-fs-without-fswal",
+					Description:   baseConfig.Description,
+					Version:       baseConfig.Version,
+					DeployType:    baseConfig.DeployType,
+					ReservedAKU:   baseConfig.ReservedAKU,
+					Networks:      baseConfig.Networks,
+					WalMode:       "EBSWAL",
+					FileSystemParam: &accFileSystemParam{
+						ThroughputMibpsPerFileSystem: 1000,
+						FileSystemCount:              2,
+					},
+					Security: baseConfig.Security,
+				}),
+				ExpectError: regexp.MustCompile("file_system_param 配置仅在 wal_mode 为 FSWAL 时有效"),
+			},
+			// Test invalid throughput value (zero)
+			{
+				Config: renderKafkaInstanceConfig(env, accInstanceConfig{
+					EnvironmentID: baseConfig.EnvironmentID,
+					Name:          baseConfig.Name + "-invalid-throughput",
+					Description:   baseConfig.Description,
+					Version:       baseConfig.Version,
+					DeployType:    baseConfig.DeployType,
+					ReservedAKU:   baseConfig.ReservedAKU,
+					Networks:      baseConfig.Networks,
+					WalMode:       "FSWAL",
+					FileSystemParam: &accFileSystemParam{
+						ThroughputMibpsPerFileSystem: 0,
+						FileSystemCount:              2,
+					},
+					Security: baseConfig.Security,
+				}),
+				ExpectError: regexp.MustCompile("Attribute compute_specs.file_system_param.throughput_mibps_per_file_system value must be at least 1"),
+			},
+			// Test invalid file system count (zero)
+			{
+				Config: renderKafkaInstanceConfig(env, accInstanceConfig{
+					EnvironmentID: baseConfig.EnvironmentID,
+					Name:          baseConfig.Name + "-invalid-count",
+					Description:   baseConfig.Description,
+					Version:       baseConfig.Version,
+					DeployType:    baseConfig.DeployType,
+					ReservedAKU:   baseConfig.ReservedAKU,
+					Networks:      baseConfig.Networks,
+					WalMode:       "FSWAL",
+					FileSystemParam: &accFileSystemParam{
+						ThroughputMibpsPerFileSystem: 1000,
+						FileSystemCount:              0,
+					},
+					Security: baseConfig.Security,
+				}),
+				ExpectError: regexp.MustCompile("Attribute compute_specs.file_system_param.file_system_count value must be at least 1"),
+			},
+		},
+	})
 }
 
 // accInstanceScenario describes a linear acceptance flow (create, update, import)
@@ -508,6 +624,88 @@ func buildK8SInstanceScenario(env accConfig) accInstanceScenario {
 	}
 }
 
+// buildFSWALInstanceScenario tests FSWAL mode with file system parameters:
+// creation, parameter updates, and security group replacement.
+func buildFSWALInstanceScenario(env accConfig) accInstanceScenario {
+	vmNetworks := env.vmNetworks()
+	if len(vmNetworks) == 0 {
+		panic("vmNetworks called without networks; requireVM should have skipped earlier")
+	}
+	suffix := generateRandomSuffix()
+	base := accInstanceConfig{
+		EnvironmentID: env.EnvironmentID,
+		Name:          fmt.Sprintf("acc-fswal-%s", suffix),
+		Description:   "FSWAL acceptance baseline",
+		Version:       env.Version,
+		DeployType:    "IAAS",
+		ReservedAKU:   6,
+		Networks:      cloneNetworks(vmNetworks),
+		WalMode:       "FSWAL",
+		FileSystemParam: &accFileSystemParam{
+			ThroughputMibpsPerFileSystem: 1000,
+			FileSystemCount:              2,
+		},
+		Security: &accSecurity{
+			AuthenticationMethods:  []string{"sasl"},
+			TransitEncryptionModes: []string{"plaintext"},
+			DataEncryptionMode:     "NONE",
+		},
+	}
+
+	steps := []accInstanceScenarioStep{
+		{
+			Config: base,
+			Checks: []resource.TestCheckFunc{
+				checkAttr("name", base.Name),
+				checkAttr("description", base.Description),
+				checkAttr("features.wal_mode", "FSWAL"),
+				checkAttr("compute_specs.file_system_param.throughput_mibps_per_file_system", "1000"),
+				checkAttr("compute_specs.file_system_param.file_system_count", "2"),
+			},
+		},
+	}
+
+	current := cloneInstanceConfig(base)
+
+	// Test updating throughput_mibps_per_file_system
+	throughputUpdate := cloneInstanceConfig(current)
+	throughputUpdate.FileSystemParam.ThroughputMibpsPerFileSystem = 1500
+	steps = append(steps, accInstanceScenarioStep{
+		Config: throughputUpdate,
+		Checks: []resource.TestCheckFunc{
+			checkAttr("compute_specs.file_system_param.throughput_mibps_per_file_system", "1500"),
+		},
+	})
+	current = throughputUpdate
+
+	// Test updating file_system_count
+	countUpdate := cloneInstanceConfig(current)
+	countUpdate.FileSystemParam.FileSystemCount = 3
+	steps = append(steps, accInstanceScenarioStep{
+		Config: countUpdate,
+		Checks: []resource.TestCheckFunc{
+			checkAttr("compute_specs.file_system_param.file_system_count", "3"),
+		},
+	})
+	current = countUpdate
+
+	// Test security_group change triggers replacement
+	sgUpdate := cloneInstanceConfig(current)
+	sgUpdate.FileSystemParam.SecurityGroup = "sg-test-replacement"
+	steps = append(steps, accInstanceScenarioStep{
+		Config: sgUpdate,
+		Checks: []resource.TestCheckFunc{
+			checkAttr("compute_specs.file_system_param.security_group", "sg-test-replacement"),
+		},
+	})
+
+	return accInstanceScenario{
+		Name:       "FSWAL scenario",
+		RequiresVM: true,
+		Steps:      steps,
+	}
+}
+
 // newVMInstanceConfig creates the minimal IAAS instance config shared by
 // topic/user/ACL acceptance tests.
 func newVMInstanceConfig(env accConfig, name, description string) accInstanceConfig {
@@ -547,6 +745,9 @@ func cloneInstanceConfig(src accInstanceConfig) accInstanceConfig {
 	}
 	if src.TableTopic != nil {
 		clone.TableTopic = cloneTableTopic(src.TableTopic)
+	}
+	if src.FileSystemParam != nil {
+		clone.FileSystemParam = cloneFileSystemParam(src.FileSystemParam)
 	}
 	return clone
 }
@@ -604,6 +805,14 @@ func cloneSecurity(in *accSecurity) *accSecurity {
 }
 
 func cloneTableTopic(in *accTableTopic) *accTableTopic {
+	if in == nil {
+		return nil
+	}
+	clone := *in
+	return &clone
+}
+
+func cloneFileSystemParam(in *accFileSystemParam) *accFileSystemParam {
 	if in == nil {
 		return nil
 	}
@@ -765,6 +974,15 @@ func renderKafkaInstanceConfig(env accConfig, cfg accInstanceConfig) string {
 	}
 	if cfg.InstanceRole != "" {
 		fmt.Fprintf(&b, "    instance_role = %q\n", cfg.InstanceRole)
+	}
+	if cfg.FileSystemParam != nil {
+		b.WriteString("    file_system_param = {\n")
+		fmt.Fprintf(&b, "      throughput_mibps_per_file_system = %d\n", cfg.FileSystemParam.ThroughputMibpsPerFileSystem)
+		fmt.Fprintf(&b, "      file_system_count = %d\n", cfg.FileSystemParam.FileSystemCount)
+		if cfg.FileSystemParam.SecurityGroup != "" {
+			fmt.Fprintf(&b, "      security_group = %q\n", cfg.FileSystemParam.SecurityGroup)
+		}
+		b.WriteString("    }\n")
 	}
 	b.WriteString("  }\n\n")
 

@@ -191,6 +191,74 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				Features: nil,
 			},
 		},
+		{
+			name: "FSWAL configuration",
+			input: KafkaInstanceResourceModel{
+				Name:    types.StringValue("fswal-instance"),
+				Version: types.StringValue("1.0.0"),
+				ComputeSpecs: &ComputeSpecsModel{
+					ReservedAku: types.Int64Value(4),
+					FileSystemParam: &FileSystemParamModel{
+						ThroughputMibpsPerFileSystem: types.Int64Value(1000),
+						FileSystemCount:              types.Int64Value(2),
+						SecurityGroup:                types.StringValue("sg-12345"),
+					},
+				},
+				Features: &FeaturesModel{
+					WalMode: types.StringValue("FSWAL"),
+				},
+			},
+			expected: client.InstanceCreateParam{
+				Name:    "fswal-instance",
+				Version: "1.0.0",
+				Spec: client.SpecificationParam{
+					ReservedAku: 4,
+					NodeConfig:  &client.NodeConfigParam{},
+					FileSystem: &client.FileSystemParam{
+						ThroughputMiBpsPerFileSystem: 1000,
+						FileSystemCount:              2,
+						SecurityGroup:                stringPtr("sg-12345"),
+					},
+				},
+				Features: &client.InstanceFeatureParam{
+					WalMode: stringPtr("FSWAL"),
+				},
+			},
+		},
+		{
+			name: "FSWAL configuration without security group",
+			input: KafkaInstanceResourceModel{
+				Name:    types.StringValue("fswal-no-sg"),
+				Version: types.StringValue("1.0.0"),
+				ComputeSpecs: &ComputeSpecsModel{
+					ReservedAku: types.Int64Value(4),
+					FileSystemParam: &FileSystemParamModel{
+						ThroughputMibpsPerFileSystem: types.Int64Value(500),
+						FileSystemCount:              types.Int64Value(1),
+						SecurityGroup:                types.StringNull(),
+					},
+				},
+				Features: &FeaturesModel{
+					WalMode: types.StringValue("FSWAL"),
+				},
+			},
+			expected: client.InstanceCreateParam{
+				Name:    "fswal-no-sg",
+				Version: "1.0.0",
+				Spec: client.SpecificationParam{
+					ReservedAku: 4,
+					NodeConfig:  &client.NodeConfigParam{},
+					FileSystem: &client.FileSystemParam{
+						ThroughputMiBpsPerFileSystem: 500,
+						FileSystemCount:              1,
+						SecurityGroup:                nil, // Should not be included when null/empty
+					},
+				},
+				Features: &client.InstanceFeatureParam{
+					WalMode: stringPtr("FSWAL"),
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -391,9 +459,176 @@ func TestFlattenKafkaInstanceModel_RemovesMetricsExporterWhenAPIEmitsNone(t *tes
 	}
 }
 
+func TestFlattenKafkaInstanceModel_FSWAL(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    *client.InstanceVO
+		expected *KafkaInstanceResourceModel
+	}{
+		{
+			name: "FSWAL with all parameters",
+			input: &client.InstanceVO{
+				InstanceId:  strPtr("fswal-instance"),
+				Name:        strPtr("test-fswal"),
+				Description: strPtr("FSWAL test instance"),
+				Version:     strPtr("1.0.0"),
+				State:       strPtr("Running"),
+				Spec: &client.SpecificationVO{
+					ReservedAku: int32Ptr(4),
+					FileSystem: &client.FileSystemVO{
+						ThroughputMiBpsPerFileSystem: int32Ptr(1000),
+						FileSystemCount:              int32Ptr(2),
+						SecurityGroup:                strPtr("sg-12345"),
+					},
+				},
+				Features: &client.InstanceFeatureVO{
+					WalMode: strPtr("FSWAL"),
+				},
+			},
+			expected: &KafkaInstanceResourceModel{
+				InstanceID:     types.StringValue("fswal-instance"),
+				Name:           types.StringValue("test-fswal"),
+				Description:    types.StringValue("FSWAL test instance"),
+				Version:        types.StringValue("1.0.0"),
+				InstanceStatus: types.StringValue("Running"),
+				ComputeSpecs: &ComputeSpecsModel{
+					ReservedAku: types.Int64Value(4),
+					FileSystemParam: &FileSystemParamModel{
+						ThroughputMibpsPerFileSystem: types.Int64Value(1000),
+						FileSystemCount:              types.Int64Value(2),
+						SecurityGroup:                types.StringValue("sg-12345"),
+					},
+				},
+				Features: &FeaturesModel{
+					WalMode: types.StringValue("FSWAL"),
+				},
+			},
+		},
+		{
+			name: "FSWAL without security group",
+			input: &client.InstanceVO{
+				InstanceId:  strPtr("fswal-no-sg"),
+				Name:        strPtr("test-fswal-no-sg"),
+				Description: strPtr("FSWAL without security group"),
+				Version:     strPtr("1.0.0"),
+				State:       strPtr("Running"),
+				Spec: &client.SpecificationVO{
+					ReservedAku: int32Ptr(2),
+					FileSystem: &client.FileSystemVO{
+						ThroughputMiBpsPerFileSystem: int32Ptr(500),
+						FileSystemCount:              int32Ptr(1),
+						SecurityGroup:                nil,
+					},
+				},
+				Features: &client.InstanceFeatureVO{
+					WalMode: strPtr("FSWAL"),
+				},
+			},
+			expected: &KafkaInstanceResourceModel{
+				InstanceID:     types.StringValue("fswal-no-sg"),
+				Name:           types.StringValue("test-fswal-no-sg"),
+				Description:    types.StringValue("FSWAL without security group"),
+				Version:        types.StringValue("1.0.0"),
+				InstanceStatus: types.StringValue("Running"),
+				ComputeSpecs: &ComputeSpecsModel{
+					ReservedAku: types.Int64Value(2),
+					FileSystemParam: &FileSystemParamModel{
+						ThroughputMibpsPerFileSystem: types.Int64Value(500),
+						FileSystemCount:              types.Int64Value(1),
+						SecurityGroup:                types.StringNull(),
+					},
+				},
+				Features: &FeaturesModel{
+					WalMode: types.StringValue("FSWAL"),
+				},
+			},
+		},
+		{
+			name: "Non-FSWAL instance without file system",
+			input: &client.InstanceVO{
+				InstanceId:  strPtr("ebswal-instance"),
+				Name:        strPtr("test-ebswal"),
+				Description: strPtr("EBSWAL test instance"),
+				Version:     strPtr("1.0.0"),
+				State:       strPtr("Running"),
+				Spec: &client.SpecificationVO{
+					ReservedAku: int32Ptr(4),
+					FileSystem:  nil, // No file system for non-FSWAL
+				},
+				Features: &client.InstanceFeatureVO{
+					WalMode: strPtr("EBSWAL"),
+				},
+			},
+			expected: &KafkaInstanceResourceModel{
+				InstanceID:     types.StringValue("ebswal-instance"),
+				Name:           types.StringValue("test-ebswal"),
+				Description:    types.StringValue("EBSWAL test instance"),
+				Version:        types.StringValue("1.0.0"),
+				InstanceStatus: types.StringValue("Running"),
+				ComputeSpecs: &ComputeSpecsModel{
+					ReservedAku:     types.Int64Value(4),
+					FileSystemParam: nil, // Should be nil for non-FSWAL
+				},
+				Features: &FeaturesModel{
+					WalMode: types.StringValue("EBSWAL"),
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resource := &KafkaInstanceResourceModel{}
+			diags := FlattenKafkaInstanceModel(tt.input, resource)
+			
+			assert.False(t, diags.HasError(), "FlattenKafkaInstanceModel should not return errors")
+			
+			// Check basic fields
+			assert.Equal(t, tt.expected.InstanceID, resource.InstanceID)
+			assert.Equal(t, tt.expected.Name, resource.Name)
+			assert.Equal(t, tt.expected.Description, resource.Description)
+			assert.Equal(t, tt.expected.Version, resource.Version)
+			assert.Equal(t, tt.expected.InstanceStatus, resource.InstanceStatus)
+			
+			// Check compute specs
+			if tt.expected.ComputeSpecs == nil {
+				assert.Nil(t, resource.ComputeSpecs)
+			} else {
+				assert.NotNil(t, resource.ComputeSpecs)
+				assert.Equal(t, tt.expected.ComputeSpecs.ReservedAku, resource.ComputeSpecs.ReservedAku)
+				
+				// Check file system parameters
+				if tt.expected.ComputeSpecs.FileSystemParam == nil {
+					assert.Nil(t, resource.ComputeSpecs.FileSystemParam)
+				} else {
+					assert.NotNil(t, resource.ComputeSpecs.FileSystemParam)
+					assert.Equal(t, tt.expected.ComputeSpecs.FileSystemParam.ThroughputMibpsPerFileSystem, 
+						resource.ComputeSpecs.FileSystemParam.ThroughputMibpsPerFileSystem)
+					assert.Equal(t, tt.expected.ComputeSpecs.FileSystemParam.FileSystemCount, 
+						resource.ComputeSpecs.FileSystemParam.FileSystemCount)
+					assert.Equal(t, tt.expected.ComputeSpecs.FileSystemParam.SecurityGroup, 
+						resource.ComputeSpecs.FileSystemParam.SecurityGroup)
+				}
+			}
+			
+			// Check features
+			if tt.expected.Features == nil {
+				assert.Nil(t, resource.Features)
+			} else {
+				assert.NotNil(t, resource.Features)
+				assert.Equal(t, tt.expected.Features.WalMode, resource.Features.WalMode)
+			}
+		})
+	}
+}
+
 // Helper functions
 func strPtr(s string) *string {
 	return &s
+}
+
+func int32Ptr(i int32) *int32 {
+	return &i
 }
 
 func timePtr(s string) *time.Time {

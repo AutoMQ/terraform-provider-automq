@@ -112,6 +112,24 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 							},
 						},
 					},
+					"file_system_param": schema.SingleNestedAttribute{
+						Computed:    true,
+						Description: "File system configuration for FSWAL mode",
+						Attributes: map[string]schema.Attribute{
+							"throughput_mibps_per_file_system": schema.Int64Attribute{
+								Computed:    true,
+								Description: "Throughput in MiBps per file system",
+							},
+							"file_system_count": schema.Int64Attribute{
+								Computed:    true,
+								Description: "Number of file systems",
+							},
+							"security_group": schema.StringAttribute{
+								Computed:    true,
+								Description: "Security group for file systems",
+							},
+						},
+					},
 				},
 			},
 			"features": schema.SingleNestedAttribute{
@@ -119,7 +137,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 				Attributes: map[string]schema.Attribute{
 					"wal_mode": schema.StringAttribute{
 						Computed:    true,
-						Description: "Write-Ahead Logging mode: EBSWAL (using EBS as write buffer) or S3WAL (using object storage as write buffer). Defaults to EBSWAL.",
+						Description: "Write-Ahead Logging mode: EBSWAL (using EBS as write buffer), S3WAL (using object storage as write buffer), or FSWAL (using file system as write buffer). Defaults to EBSWAL.",
 					},
 					"instance_configs": schema.MapAttribute{
 						ElementType:         types.StringType,
