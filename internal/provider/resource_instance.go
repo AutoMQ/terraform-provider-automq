@@ -609,7 +609,7 @@ func validateKafkaInstanceConfiguration(ctx context.Context, plan *models.KafkaI
 			if !hasFileSystemParam {
 				diagnostics.AddError(
 					"Invalid Configuration",
-					"当 wal_mode 为 FSWAL 时，必须提供 file_system_param 配置",
+					"file_system_param configuration is required when wal_mode is FSWAL",
 				)
 			} else {
 				// Validate required fields in file_system_param
@@ -617,14 +617,14 @@ func validateKafkaInstanceConfiguration(ctx context.Context, plan *models.KafkaI
 				   plan.ComputeSpecs.FileSystemParam.ThroughputMibpsPerFileSystem.IsUnknown() {
 					diagnostics.AddError(
 						"Invalid Configuration",
-						"当 wal_mode 为 FSWAL 时，file_system_param.throughput_mibps_per_file_system 是必填字段",
+						"throughput_mibps_per_file_system is required when wal_mode is FSWAL",
 					)
 				}
 				if plan.ComputeSpecs.FileSystemParam.FileSystemCount.IsNull() || 
 				   plan.ComputeSpecs.FileSystemParam.FileSystemCount.IsUnknown() {
 					diagnostics.AddError(
 						"Invalid Configuration",
-						"当 wal_mode 为 FSWAL 时，file_system_param.file_system_count 是必填字段",
+						"file_system_count is required when wal_mode is FSWAL",
 					)
 				}
 			}
@@ -633,7 +633,7 @@ func validateKafkaInstanceConfiguration(ctx context.Context, plan *models.KafkaI
 			if !walModeSet || !strings.EqualFold(walMode, "FSWAL") {
 				diagnostics.AddError(
 					"Invalid Configuration",
-					"file_system_param 配置仅在 wal_mode 为 FSWAL 时有效",
+					"file_system_param configuration is only valid when wal_mode is FSWAL",
 				)
 			}
 		}
@@ -641,7 +641,7 @@ func validateKafkaInstanceConfiguration(ctx context.Context, plan *models.KafkaI
 		// When file_system_param is provided but no features are set, it's invalid
 		diagnostics.AddError(
 			"Invalid Configuration",
-			"file_system_param 配置仅在 wal_mode 为 FSWAL 时有效",
+			"file_system_param configuration is only valid when wal_mode is FSWAL",
 		)
 	}
 

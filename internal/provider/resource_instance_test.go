@@ -296,7 +296,7 @@ func TestAccKafkaInstance_FSWAL_ValidationErrors(t *testing.T) {
 					WalMode:       "FSWAL",
 					Security:      baseConfig.Security,
 				}),
-				ExpectError: regexp.MustCompile("当 wal_mode 为 FSWAL 时，必须提供 file_system_param 配置"),
+				ExpectError: regexp.MustCompile("file_system_param configuration is required when wal_mode is FSWAL"),
 			},
 			// Test file_system_param without FSWAL mode
 			{
@@ -315,7 +315,7 @@ func TestAccKafkaInstance_FSWAL_ValidationErrors(t *testing.T) {
 					},
 					Security: baseConfig.Security,
 				}),
-				ExpectError: regexp.MustCompile("file_system_param 配置仅在 wal_mode 为 FSWAL 时有效"),
+				ExpectError: regexp.MustCompile("file_system_param configuration is only valid when wal_mode is FSWAL"),
 			},
 			// Test invalid throughput value (zero)
 			{

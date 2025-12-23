@@ -278,7 +278,7 @@ func TestValidateKafkaInstanceConfiguration_FSWALMissingFileSystem(t *testing.T)
 	found := false
 	for _, d := range diags {
 		if d.Summary() == "Invalid Configuration" &&
-			strings.Contains(d.Detail(), "当 wal_mode 为 FSWAL 时，必须提供 file_system_param 配置") {
+			strings.Contains(d.Detail(), "file_system_param configuration is required when wal_mode is FSWAL") {
 			found = true
 			break
 		}
@@ -318,7 +318,7 @@ func TestValidateKafkaInstanceConfiguration_FileSystemWithoutFSWAL(t *testing.T)
 	found := false
 	for _, d := range diags {
 		if d.Summary() == "Invalid Configuration" &&
-			strings.Contains(d.Detail(), "file_system_param 配置仅在 wal_mode 为 FSWAL 时有效") {
+			strings.Contains(d.Detail(), "file_system_param configuration is only valid when wal_mode is FSWAL") {
 			found = true
 			break
 		}
@@ -386,7 +386,7 @@ func TestValidateKafkaInstanceConfiguration_FSWALMissingThroughput(t *testing.T)
 	found := false
 	for _, d := range diags {
 		if d.Summary() == "Invalid Configuration" &&
-			strings.Contains(d.Detail(), "file_system_param.throughput_mibps_per_file_system 是必填字段") {
+			strings.Contains(d.Detail(), "throughput_mibps_per_file_system is required when wal_mode is FSWAL") {
 			found = true
 			break
 		}
@@ -426,7 +426,7 @@ func TestValidateKafkaInstanceConfiguration_FSWALMissingFileSystemCount(t *testi
 	found := false
 	for _, d := range diags {
 		if d.Summary() == "Invalid Configuration" &&
-			strings.Contains(d.Detail(), "file_system_param.file_system_count 是必填字段") {
+			strings.Contains(d.Detail(), "file_system_count is required when wal_mode is FSWAL") {
 			found = true
 			break
 		}
@@ -464,7 +464,7 @@ func TestValidateKafkaInstanceConfiguration_FileSystemWithoutFeatures(t *testing
 	found := false
 	for _, d := range diags {
 		if d.Summary() == "Invalid Configuration" &&
-			strings.Contains(d.Detail(), "file_system_param 配置仅在 wal_mode 为 FSWAL 时有效") {
+			strings.Contains(d.Detail(), "file_system_param configuration is only valid when wal_mode is FSWAL") {
 			found = true
 			break
 		}
