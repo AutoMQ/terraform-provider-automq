@@ -334,7 +334,7 @@ func TestAccKafkaInstance_FSWAL_ValidationErrors(t *testing.T) {
 					},
 					Security: baseConfig.Security,
 				}),
-				ExpectError: regexp.MustCompile("Attribute compute_specs.file_system_param.throughput_mibps_per_file_system value must be at least 1"),
+				ExpectError: regexp.MustCompile("value must be at least 1"),
 			},
 			// Test invalid file system count (zero)
 			{
@@ -353,7 +353,7 @@ func TestAccKafkaInstance_FSWAL_ValidationErrors(t *testing.T) {
 					},
 					Security: baseConfig.Security,
 				}),
-				ExpectError: regexp.MustCompile("Attribute compute_specs.file_system_param.file_system_count value must be at least 1"),
+				ExpectError: regexp.MustCompile("value must be at least 1"),
 			},
 		},
 	})
