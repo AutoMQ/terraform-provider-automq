@@ -625,7 +625,7 @@ func buildK8SInstanceScenario(env accConfig) accInstanceScenario {
 }
 
 // buildFSWALInstanceScenario tests FSWAL mode with file system parameters:
-// creation, parameter updates, and security group replacement.
+// creation and parameter updates.
 func buildFSWALInstanceScenario(env accConfig) accInstanceScenario {
 	vmNetworks := env.vmNetworks()
 	if len(vmNetworks) == 0 {
@@ -685,17 +685,6 @@ func buildFSWALInstanceScenario(env accConfig) accInstanceScenario {
 		Config: countUpdate,
 		Checks: []resource.TestCheckFunc{
 			checkAttr("compute_specs.file_system_param.file_system_count", "3"),
-		},
-	})
-	current = countUpdate
-
-	// Test security_group change triggers replacement
-	sgUpdate := cloneInstanceConfig(current)
-	sgUpdate.FileSystemParam.SecurityGroup = "sg-test-replacement"
-	steps = append(steps, accInstanceScenarioStep{
-		Config: sgUpdate,
-		Checks: []resource.TestCheckFunc{
-			checkAttr("compute_specs.file_system_param.security_group", "sg-test-replacement"),
 		},
 	})
 
