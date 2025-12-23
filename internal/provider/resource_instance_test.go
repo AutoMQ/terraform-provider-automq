@@ -642,8 +642,8 @@ func buildFSWALInstanceScenario(env accConfig) accInstanceScenario {
 		Networks:      cloneNetworks(vmNetworks),
 		WalMode:       "FSWAL",
 		FileSystemParam: &accFileSystemParam{
-			ThroughputMibpsPerFileSystem: 1000,
-			FileSystemCount:              2,
+			ThroughputMibpsPerFileSystem: 384,
+			FileSystemCount:              1,
 		},
 		Security: &accSecurity{
 			AuthenticationMethods:  []string{"sasl"},
@@ -659,8 +659,8 @@ func buildFSWALInstanceScenario(env accConfig) accInstanceScenario {
 				checkAttr("name", base.Name),
 				checkAttr("description", base.Description),
 				checkAttr("features.wal_mode", "FSWAL"),
-				checkAttr("compute_specs.file_system_param.throughput_mibps_per_file_system", "1000"),
-				checkAttr("compute_specs.file_system_param.file_system_count", "2"),
+				checkAttr("compute_specs.file_system_param.throughput_mibps_per_file_system", "384"),
+				checkAttr("compute_specs.file_system_param.file_system_count", "1"),
 			},
 		},
 	}
@@ -669,22 +669,22 @@ func buildFSWALInstanceScenario(env accConfig) accInstanceScenario {
 
 	// Test updating throughput_mibps_per_file_system
 	throughputUpdate := cloneInstanceConfig(current)
-	throughputUpdate.FileSystemParam.ThroughputMibpsPerFileSystem = 1500
+	throughputUpdate.FileSystemParam.ThroughputMibpsPerFileSystem = 768
 	steps = append(steps, accInstanceScenarioStep{
 		Config: throughputUpdate,
 		Checks: []resource.TestCheckFunc{
-			checkAttr("compute_specs.file_system_param.throughput_mibps_per_file_system", "1500"),
+			checkAttr("compute_specs.file_system_param.throughput_mibps_per_file_system", "768"),
 		},
 	})
 	current = throughputUpdate
 
 	// Test updating file_system_count
 	countUpdate := cloneInstanceConfig(current)
-	countUpdate.FileSystemParam.FileSystemCount = 3
+	countUpdate.FileSystemParam.FileSystemCount = 2
 	steps = append(steps, accInstanceScenarioStep{
 		Config: countUpdate,
 		Checks: []resource.TestCheckFunc{
-			checkAttr("compute_specs.file_system_param.file_system_count", "3"),
+			checkAttr("compute_specs.file_system_param.file_system_count", "2"),
 		},
 	})
 
