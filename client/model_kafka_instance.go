@@ -57,9 +57,9 @@ type BucketProfileVO struct {
 }
 
 type FileSystemParam struct {
-	ThroughputMiBpsPerFileSystem int32   `json:"throughputMiBpsPerFileSystem"`
-	FileSystemCount              int32   `json:"fileSystemCount"`
-	SecurityGroup                *string `json:"securityGroup,omitempty"`
+	ThroughputMiBpsPerFileSystem int32    `json:"throughputMiBpsPerFileSystem"`
+	FileSystemCount              int32    `json:"fileSystemCount"`
+	SecurityGroups               []string `json:"securityGroups,omitempty"`
 }
 
 type NodeConfigParam struct {
@@ -257,9 +257,9 @@ type BucketProfileSummaryVO struct {
 }
 
 type FileSystemVO struct {
-	ThroughputMiBpsPerFileSystem *int32  `json:"throughputMiBpsPerFileSystem,omitempty"`
-	FileSystemCount              *int32  `json:"fileSystemCount,omitempty"`
-	SecurityGroup                *string `json:"securityGroup,omitempty"`
+	ThroughputMiBpsPerFileSystem *int32   `json:"throughputMiBpsPerFileSystem,omitempty"`
+	FileSystemCount              *int32   `json:"fileSystemCount,omitempty"`
+	SecurityGroups               []string `json:"securityGroups,omitempty"`
 }
 
 type InstanceFeatureVO struct {
