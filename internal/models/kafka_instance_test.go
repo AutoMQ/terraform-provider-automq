@@ -201,7 +201,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 					FileSystemParam: &FileSystemParamModel{
 						ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 						FileSystemCount:              types.Int64Value(2),
-						SecurityGroup:                types.StringValue("sg-12345"),
+						SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-12345")}),
 					},
 				},
 				Features: &FeaturesModel{
@@ -217,7 +217,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 					FileSystem: &client.FileSystemParam{
 						ThroughputMiBpsPerFileSystem: 1000,
 						FileSystemCount:              2,
-						SecurityGroup:                stringPtr("sg-12345"),
+						SecurityGroups:               []string{"sg-12345"},
 					},
 				},
 				Features: &client.InstanceFeatureParam{
@@ -235,7 +235,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 					FileSystemParam: &FileSystemParamModel{
 						ThroughputMibpsPerFileSystem: types.Int64Value(500),
 						FileSystemCount:              types.Int64Value(1),
-						SecurityGroup:                types.StringNull(),
+						SecurityGroups:               types.ListNull(types.StringType),
 					},
 				},
 				Features: &FeaturesModel{
@@ -251,7 +251,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 					FileSystem: &client.FileSystemParam{
 						ThroughputMiBpsPerFileSystem: 500,
 						FileSystemCount:              1,
-						SecurityGroup:                nil, // Should not be included when null/empty
+						SecurityGroups:               nil, // Should not be included when null/empty
 					},
 				},
 				Features: &client.InstanceFeatureParam{
@@ -264,7 +264,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			request := &client.InstanceCreateParam{}
-			err := ExpandKafkaInstanceResource(tt.input, request)
+			err := ExpandKafkaInstanceResource(context.Background(), tt.input, request)
 			assert.Equal(t, tt.expected, *request)
 			assert.NoError(t, err)
 		})
@@ -449,7 +449,7 @@ func TestFlattenKafkaInstanceModel_RemovesMetricsExporterWhenAPIEmitsNone(t *tes
 				},
 			}
 
-			diags := FlattenKafkaInstanceModel(instance, resource)
+			diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
 			assert.False(t, diags.HasError())
 			if resource.Features == nil {
 				t.Fatalf("features unexpectedly nil")
@@ -478,7 +478,7 @@ func TestFlattenKafkaInstanceModel_FSWAL(t *testing.T) {
 					FileSystem: &client.FileSystemVO{
 						ThroughputMiBpsPerFileSystem: int32Ptr(1000),
 						FileSystemCount:              int32Ptr(2),
-						SecurityGroup:                strPtr("sg-12345"),
+						SecurityGroups:               []string{"sg-12345"},
 					},
 				},
 				Features: &client.InstanceFeatureVO{
@@ -496,7 +496,7 @@ func TestFlattenKafkaInstanceModel_FSWAL(t *testing.T) {
 					FileSystemParam: &FileSystemParamModel{
 						ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 						FileSystemCount:              types.Int64Value(2),
-						SecurityGroup:                types.StringValue("sg-12345"),
+						SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-12345")}),
 					},
 				},
 				Features: &FeaturesModel{
@@ -517,7 +517,7 @@ func TestFlattenKafkaInstanceModel_FSWAL(t *testing.T) {
 					FileSystem: &client.FileSystemVO{
 						ThroughputMiBpsPerFileSystem: int32Ptr(500),
 						FileSystemCount:              int32Ptr(1),
-						SecurityGroup:                nil,
+						SecurityGroups:               nil,
 					},
 				},
 				Features: &client.InstanceFeatureVO{
@@ -535,7 +535,7 @@ func TestFlattenKafkaInstanceModel_FSWAL(t *testing.T) {
 					FileSystemParam: &FileSystemParamModel{
 						ThroughputMibpsPerFileSystem: types.Int64Value(500),
 						FileSystemCount:              types.Int64Value(1),
-						SecurityGroup:                types.StringNull(),
+						SecurityGroups:               types.ListNull(types.StringType),
 					},
 				},
 				Features: &FeaturesModel{
@@ -579,7 +579,7 @@ func TestFlattenKafkaInstanceModel_FSWAL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resource := &KafkaInstanceResourceModel{}
-			diags := FlattenKafkaInstanceModel(tt.input, resource)
+			diags := FlattenKafkaInstanceModel(context.Background(), tt.input, resource)
 			
 			assert.False(t, diags.HasError(), "FlattenKafkaInstanceModel should not return errors")
 			
@@ -606,8 +606,8 @@ func TestFlattenKafkaInstanceModel_FSWAL(t *testing.T) {
 						resource.ComputeSpecs.FileSystemParam.ThroughputMibpsPerFileSystem)
 					assert.Equal(t, tt.expected.ComputeSpecs.FileSystemParam.FileSystemCount, 
 						resource.ComputeSpecs.FileSystemParam.FileSystemCount)
-					assert.Equal(t, tt.expected.ComputeSpecs.FileSystemParam.SecurityGroup, 
-						resource.ComputeSpecs.FileSystemParam.SecurityGroup)
+					assert.Equal(t, tt.expected.ComputeSpecs.FileSystemParam.SecurityGroups, 
+						resource.ComputeSpecs.FileSystemParam.SecurityGroups)
 				}
 			}
 			

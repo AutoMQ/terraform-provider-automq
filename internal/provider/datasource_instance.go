@@ -124,9 +124,10 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 								Computed:    true,
 								Description: "Number of file systems",
 							},
-							"security_group": schema.StringAttribute{
+							"security_groups": schema.ListAttribute{
+								ElementType: types.StringType,
 								Computed:    true,
-								Description: "Security group for file systems",
+								Description: "Security groups for file systems",
 							},
 						},
 					},
@@ -343,7 +344,7 @@ func (r *KafkaInstanceDataSource) Read(ctx context.Context, req datasource.ReadR
 	}
 	model := models.KafkaInstanceModel{}
 	// Flatten API response into Terraform state
-	resp.Diagnostics.Append(models.FlattenKafkaInstanceModel(out, &instance)...)
+	resp.Diagnostics.Append(models.FlattenKafkaInstanceModel(ctx, out, &instance)...)
 	resp.Diagnostics.Append(models.FlattenKafkaInstanceModelWithEndpoints(endpoints, &instance)...)
 	if resp.Diagnostics.HasError() {
 		return

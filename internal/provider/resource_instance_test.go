@@ -118,7 +118,7 @@ type accInstanceConfig struct {
 type accFileSystemParam struct {
 	ThroughputMibpsPerFileSystem int64
 	FileSystemCount              int64
-	SecurityGroup                string
+	SecurityGroups               []string
 }
 
 func loadAccConfig(t *testing.T) accConfig {
@@ -968,8 +968,15 @@ func renderKafkaInstanceConfig(env accConfig, cfg accInstanceConfig) string {
 		b.WriteString("    file_system_param = {\n")
 		fmt.Fprintf(&b, "      throughput_mibps_per_file_system = %d\n", cfg.FileSystemParam.ThroughputMibpsPerFileSystem)
 		fmt.Fprintf(&b, "      file_system_count = %d\n", cfg.FileSystemParam.FileSystemCount)
-		if cfg.FileSystemParam.SecurityGroup != "" {
-			fmt.Fprintf(&b, "      security_group = %q\n", cfg.FileSystemParam.SecurityGroup)
+		if len(cfg.FileSystemParam.SecurityGroups) > 0 {
+			b.WriteString("      security_groups = [")
+			for i, sg := range cfg.FileSystemParam.SecurityGroups {
+				if i > 0 {
+					b.WriteString(", ")
+				}
+				fmt.Fprintf(&b, "%q", sg)
+			}
+			b.WriteString("]\n")
 		}
 		b.WriteString("    }\n")
 	}

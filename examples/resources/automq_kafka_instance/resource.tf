@@ -74,7 +74,7 @@ resource "automq_kafka_instance" "fswal_example" {
     file_system_param = {
       throughput_mibps_per_file_system = 1000
       file_system_count                = 2
-      security_group                   = "sg-example123" # Optional, auto-generated if not provided
+      security_groups                  = ["sg-example123"] # Optional, auto-generated if not provided
     }
   }
 

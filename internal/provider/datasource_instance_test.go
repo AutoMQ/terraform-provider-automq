@@ -38,8 +38,8 @@ func TestKafkaInstanceDataSourceSchema(t *testing.T) {
 	_, exists = fileSystemParamNested.Attributes["file_system_count"]
 	assert.True(t, exists, "file_system_count should exist")
 	
-	_, exists = fileSystemParamNested.Attributes["security_group"]
-	assert.True(t, exists, "security_group should exist")
+	_, exists = fileSystemParamNested.Attributes["security_groups"]
+	assert.True(t, exists, "security_groups should exist")
 	
 	// Verify WAL mode description includes FSWAL
 	features, exists := resp.Schema.Attributes["features"]

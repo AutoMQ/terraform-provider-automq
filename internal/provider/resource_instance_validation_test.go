@@ -252,6 +252,15 @@ func hasStringRequiresReplace(mods []planmodifier.String) bool {
 	return false
 }
 
+func hasListRequiresReplace(mods []planmodifier.List) bool {
+	for _, m := range mods {
+		if strings.Contains(strings.ToLower(reflect.TypeOf(m).String()), "requiresreplace") {
+			return true
+		}
+	}
+	return false
+}
+
 func TestValidateKafkaInstanceConfiguration_FSWALMissingFileSystem(t *testing.T) {
 	plan := &models.KafkaInstanceResourceModel{
 		ComputeSpecs: &models.ComputeSpecsModel{
@@ -302,7 +311,7 @@ func TestValidateKafkaInstanceConfiguration_FileSystemWithoutFSWAL(t *testing.T)
 			FileSystemParam: &models.FileSystemParamModel{
 				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 				FileSystemCount:              types.Int64Value(2),
-				SecurityGroup:                types.StringValue("sg-test"),
+				SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-test")}),
 			},
 		},
 		Features: &models.FeaturesModel{
@@ -342,7 +351,7 @@ func TestValidateKafkaInstanceConfiguration_FSWALValid(t *testing.T) {
 			FileSystemParam: &models.FileSystemParamModel{
 				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 				FileSystemCount:              types.Int64Value(2),
-				SecurityGroup:                types.StringValue("sg-test"),
+				SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-test")}),
 			},
 		},
 		Features: &models.FeaturesModel{
@@ -370,7 +379,7 @@ func TestValidateKafkaInstanceConfiguration_FSWALMissingThroughput(t *testing.T)
 			FileSystemParam: &models.FileSystemParamModel{
 				ThroughputMibpsPerFileSystem: types.Int64Null(), // Missing required field
 				FileSystemCount:              types.Int64Value(2),
-				SecurityGroup:                types.StringValue("sg-test"),
+				SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-test")}),
 			},
 		},
 		Features: &models.FeaturesModel{
@@ -410,7 +419,7 @@ func TestValidateKafkaInstanceConfiguration_FSWALMissingFileSystemCount(t *testi
 			FileSystemParam: &models.FileSystemParamModel{
 				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 				FileSystemCount:              types.Int64Null(), // Missing required field
-				SecurityGroup:                types.StringValue("sg-test"),
+				SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-test")}),
 			},
 		},
 		Features: &models.FeaturesModel{
@@ -450,7 +459,7 @@ func TestValidateKafkaInstanceConfiguration_FileSystemWithoutFeatures(t *testing
 			FileSystemParam: &models.FileSystemParamModel{
 				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 				FileSystemCount:              types.Int64Value(2),
-				SecurityGroup:                types.StringValue("sg-test"),
+				SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-test")}),
 			},
 		},
 		// Features is nil
@@ -567,22 +576,22 @@ func TestFileSystemParamValidators(t *testing.T) {
 		}
 	}
 
-	// Test security_group attribute properties
-	securityGroupAttrRaw, ok := fileSystemAttr.Attributes["security_group"].(schema.StringAttribute)
+	// Test security_groups attribute properties
+	securityGroupsAttrRaw, ok := fileSystemAttr.Attributes["security_groups"].(schema.ListAttribute)
 	if !ok {
-		t.Fatalf("security_group attribute has unexpected type %T", fileSystemAttr.Attributes["security_group"])
+		t.Fatalf("security_groups attribute has unexpected type %T", fileSystemAttr.Attributes["security_groups"])
 	}
-	securityGroupAttr := securityGroupAttrRaw
-	if !securityGroupAttr.Optional {
-		t.Fatalf("security_group should be optional")
+	securityGroupsAttr := securityGroupsAttrRaw
+	if !securityGroupsAttr.Optional {
+		t.Fatalf("security_groups should be optional")
 	}
-	if !securityGroupAttr.Computed {
-		t.Fatalf("security_group should be computed")
+	if !securityGroupsAttr.Computed {
+		t.Fatalf("security_groups should be computed")
 	}
-	if len(securityGroupAttr.PlanModifiers) == 0 {
-		t.Fatalf("security_group plan modifiers missing")
+	if len(securityGroupsAttr.PlanModifiers) == 0 {
+		t.Fatalf("security_groups plan modifiers missing")
 	}
-	if !hasStringRequiresReplace(securityGroupAttr.PlanModifiers) {
-		t.Fatalf("expected security_group to require replacement, modifiers: %v", securityGroupAttr.PlanModifiers)
+	if !hasListRequiresReplace(securityGroupsAttr.PlanModifiers) {
+		t.Fatalf("expected security_groups to require replacement, modifiers: %v", securityGroupsAttr.PlanModifiers)
 	}
 }
