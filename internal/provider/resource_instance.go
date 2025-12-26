@@ -282,6 +282,9 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 									listplanmodifier.RequiresReplace(),
 									listplanmodifier.UseStateForUnknown(),
 								},
+								Validators: []validator.List{
+									listvalidator.SizeAtLeast(1),
+								},
 							},
 						},
 					},
