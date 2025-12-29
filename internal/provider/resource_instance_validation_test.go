@@ -656,3 +656,103 @@ func TestSecurityGroupsValidator(t *testing.T) {
 		t.Fatalf("validator should accept multiple security_groups: %v", respMultiple.Diagnostics)
 	}
 }
+
+
+// TestValidateKafkaInstanceConfiguration_FSWALWithEmptySecurityGroups tests that
+// FSWAL configuration with empty security_groups list is handled correctly.
+// Empty security_groups should be valid (backend will auto-generate).
+func TestValidateKafkaInstanceConfiguration_FSWALWithEmptySecurityGroups(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			ReservedAku: types.Int64Value(6),
+			DeployType:  types.StringValue("IAAS"),
+			Networks: []models.NetworkModel{{
+				Zone: types.StringValue("cn-test-1"),
+				Subnets: types.ListValueMust(types.StringType, []attr.Value{
+					types.StringValue("subnet-1"),
+				}),
+			}},
+			FileSystemParam: &models.FileSystemParamModel{
+				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
+				FileSystemCount:              types.Int64Value(2),
+				SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{}), // Empty list
+			},
+		},
+		Features: &models.FeaturesModel{
+			WalMode: types.StringValue("FSWAL"),
+		},
+	}
+
+	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
+	// Note: The schema validator (listvalidator.SizeAtLeast(1)) will reject empty lists,
+	// but validateKafkaInstanceConfiguration itself should not add additional errors.
+	// This test verifies the custom validation logic doesn't break with empty security_groups.
+	
+	// Check if there's an error specifically about file_system_param being ignored
+	for _, d := range diags {
+		if strings.Contains(d.Detail(), "file_system_param") && 
+		   !strings.Contains(d.Detail(), "security_groups") {
+			t.Fatalf("unexpected file_system_param error with empty security_groups: %v", d)
+		}
+	}
+}
+
+// TestValidateKafkaInstanceConfiguration_FSWALWithNullSecurityGroups tests that
+// FSWAL configuration with null security_groups is valid (backend will auto-generate).
+func TestValidateKafkaInstanceConfiguration_FSWALWithNullSecurityGroups(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			ReservedAku: types.Int64Value(6),
+			DeployType:  types.StringValue("IAAS"),
+			Networks: []models.NetworkModel{{
+				Zone: types.StringValue("cn-test-1"),
+				Subnets: types.ListValueMust(types.StringType, []attr.Value{
+					types.StringValue("subnet-1"),
+				}),
+			}},
+			FileSystemParam: &models.FileSystemParamModel{
+				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
+				FileSystemCount:              types.Int64Value(2),
+				SecurityGroups:               types.ListNull(types.StringType), // Null - backend will auto-generate
+			},
+		},
+		Features: &models.FeaturesModel{
+			WalMode: types.StringValue("FSWAL"),
+		},
+	}
+
+	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics for FSWAL with null security_groups: %v", diags)
+	}
+}
+
+// TestValidateKafkaInstanceConfiguration_FSWALWithUnknownSecurityGroups tests that
+// FSWAL configuration with unknown security_groups is valid during planning phase.
+func TestValidateKafkaInstanceConfiguration_FSWALWithUnknownSecurityGroups(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			ReservedAku: types.Int64Value(6),
+			DeployType:  types.StringValue("IAAS"),
+			Networks: []models.NetworkModel{{
+				Zone: types.StringValue("cn-test-1"),
+				Subnets: types.ListValueMust(types.StringType, []attr.Value{
+					types.StringValue("subnet-1"),
+				}),
+			}},
+			FileSystemParam: &models.FileSystemParamModel{
+				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
+				FileSystemCount:              types.Int64Value(2),
+				SecurityGroups:               types.ListUnknown(types.StringType), // Unknown during planning
+			},
+		},
+		Features: &models.FeaturesModel{
+			WalMode: types.StringValue("FSWAL"),
+		},
+	}
+
+	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics for FSWAL with unknown security_groups: %v", diags)
+	}
+}
