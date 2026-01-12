@@ -86,7 +86,7 @@ Read-Only:
 Read-Only:
 
 - `file_system_count` (Number) Number of file systems
-- `security_group` (String) Security group for file systems
+- `security_groups` (List of String) Security groups for file systems
 - `throughput_mibps_per_file_system` (Number) Throughput in MiBps per file system
 
 
