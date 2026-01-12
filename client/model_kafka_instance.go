@@ -19,7 +19,7 @@ type SpecificationParam struct {
 	NodeConfig               *NodeConfigParam           `json:"nodeConfig,omitempty"`
 	Networks                 []InstanceNetworkParam     `json:"networks,omitempty"`
 	KubernetesNodeGroups     []KubernetesNodeGroupParam `json:"kubernetesNodeGroups,omitempty"`
-	SecurityGroup            *string                    `json:"securityGroup,omitempty"`
+	SecurityGroups           []string                   `json:"securityGroups,omitempty"`
 	Template                 *string                    `json:"template,omitempty"`
 	FileSystem               *FileSystemParam           `json:"fileSystemForFsWal,omitempty"`
 	DeployType               *string                    `json:"deployType,omitempty"`
@@ -223,6 +223,7 @@ type SpecificationVO struct {
 	BucketProfiles           []BucketProfileSummaryVO `json:"bucketProfiles,omitempty"`
 	DataBuckets              []BucketProfileVO        `json:"dataBuckets,omitempty"`
 	SecurityGroupId          *string                  `json:"securityGroupId,omitempty"`
+	SecurityGroups           []string                 `json:"securityGroups,omitempty"`
 	FileSystem               *FileSystemVO            `json:"fileSystemForFsWal,omitempty"`
 	Provider                 *string                  `json:"provider,omitempty"`
 	Region                   *string                  `json:"region,omitempty"`
@@ -365,7 +366,7 @@ type InstanceConfigParam struct {
 type SpecificationUpdateParam struct {
 	ReservedAku              *int32                     `json:"reservedAku,omitempty"`
 	NodeConfig               *NodeConfigParam           `json:"nodeConfig,omitempty"`
-	SecurityGroup            *string                    `json:"securityGroup,omitempty"`
+	SecurityGroups           []string                   `json:"securityGroups,omitempty"`
 	Template                 *string                    `json:"template,omitempty"`
 	Networks                 []InstanceNetworkParam     `json:"networks,omitempty"`
 	KubernetesNodeGroups     []KubernetesNodeGroupParam `json:"kubernetesNodeGroups,omitempty"`

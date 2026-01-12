@@ -40,6 +40,8 @@ resource "automq_kafka_instance" "example" {
         bucket_name = "automq-data-bucket"
       }
     ]
+
+    # security_groups = ["sg-example123"] # Optional. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group.
   }
 
   features = {
@@ -155,6 +157,7 @@ Optional:
 - `kubernetes_namespace` (String)
 - `kubernetes_node_groups` (Attributes List) Node groups (or node pools) are units for unified configuration management of physical nodes in Kubernetes. Different Kubernetes providers may use different terms for node groups. Select target node groups that must be created in advance and configured for either single-AZ or three-AZ deployment. The instance node type must meet the requirements specified in the documentation. If you select a single-AZ node group, the AutoMQ instance will be deployed in a single availability zone; if you select a three-AZ node group, the instance will be deployed across three availability zones. (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
 - `kubernetes_service_account` (String)
+- `security_groups` (List of String) Security groups for the instance. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group.
 
 <a id="nestedatt--compute_specs--networks"></a>
 ### Nested Schema for `compute_specs.networks`

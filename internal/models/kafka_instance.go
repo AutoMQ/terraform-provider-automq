@@ -77,6 +77,7 @@ type ComputeSpecsModel struct {
 	KubernetesServiceAcct types.String          `tfsdk:"kubernetes_service_account"`
 	InstanceRole          types.String          `tfsdk:"instance_role"`
 	DataBuckets           types.List            `tfsdk:"data_buckets"`
+	SecurityGroups        types.List            `tfsdk:"security_groups"`
 	FileSystemParam       *FileSystemParamModel `tfsdk:"file_system_param"`
 }
 
@@ -314,6 +315,16 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 				dataBuckets = append(dataBuckets, profile)
 			}
 			request.Spec.DataBuckets = dataBuckets
+		}
+
+		// Security Groups for compute specs
+		if !instance.ComputeSpecs.SecurityGroups.IsNull() &&
+			!instance.ComputeSpecs.SecurityGroups.IsUnknown() {
+			var securityGroups []string
+			diags := instance.ComputeSpecs.SecurityGroups.ElementsAs(ctx, &securityGroups, false)
+			if !diags.HasError() && len(securityGroups) > 0 {
+				request.Spec.SecurityGroups = securityGroups
+			}
 		}
 
 		// File System Parameters for FSWAL
@@ -654,6 +665,7 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 				Networks:              []NetworkModel{},
 				KubernetesNodeGroups:  []NodeGroupModel{},
 				DataBuckets:           types.ListNull(DataBucketObjectType),
+				SecurityGroups:        types.ListNull(types.StringType),
 				DeployType:            types.StringNull(),
 				DnsZone:               types.StringNull(),
 				KubernetesClusterID:   types.StringNull(),
@@ -740,6 +752,18 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 			resource.ComputeSpecs.DataBuckets = previousSpecs.DataBuckets
 		} else {
 			resource.ComputeSpecs.DataBuckets = types.ListNull(DataBucketObjectType)
+		}
+
+		// Security Groups for compute specs
+		if len(instance.Spec.SecurityGroups) > 0 {
+			securityGroupsList, sgDiags := types.ListValueFrom(ctx, types.StringType, instance.Spec.SecurityGroups)
+			if !sgDiags.HasError() {
+				resource.ComputeSpecs.SecurityGroups = securityGroupsList
+			}
+		} else if previousSpecs != nil && !previousSpecs.SecurityGroups.IsNull() {
+			resource.ComputeSpecs.SecurityGroups = previousSpecs.SecurityGroups
+		} else {
+			resource.ComputeSpecs.SecurityGroups = types.ListNull(types.StringType)
 		}
 
 		// File System Parameters for FSWAL

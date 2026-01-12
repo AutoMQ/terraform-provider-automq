@@ -20,6 +20,8 @@ resource "automq_kafka_instance" "example" {
         bucket_name = "automq-data-bucket"
       }
     ]
+
+    # security_groups = ["sg-example123"] # Optional. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group.
   }
 
   features = {

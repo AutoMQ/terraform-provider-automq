@@ -112,6 +112,11 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 							},
 						},
 					},
+					"security_groups": schema.ListAttribute{
+						ElementType: types.StringType,
+						Computed:    true,
+						Description: "Security groups for the instance",
+					},
 					"file_system_param": schema.SingleNestedAttribute{
 						Computed:    true,
 						Description: "File system configuration for FSWAL mode",
