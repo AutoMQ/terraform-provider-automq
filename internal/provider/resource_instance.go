@@ -601,13 +601,13 @@ func validateKafkaInstanceConfiguration(ctx context.Context, plan *models.KafkaI
 	if state != nil && state.Features != nil {
 		stateWalMode = &state.Features.WalMode
 	}
-	
+
 	hasFileSystemParam := plan.ComputeSpecs.FileSystemParam != nil
-	
+
 	if plan.Features != nil {
 		planWalMode := plan.Features.WalMode
 		walMode, walModeSet := resolvePlannedStringValue(planWalMode, stateWalMode)
-		
+
 		if walModeSet && strings.EqualFold(walMode, "FSWAL") {
 			// When wal_mode is FSWAL, file_system_param must be provided
 			if !hasFileSystemParam {
@@ -617,15 +617,15 @@ func validateKafkaInstanceConfiguration(ctx context.Context, plan *models.KafkaI
 				)
 			} else {
 				// Validate required fields in file_system_param
-				if plan.ComputeSpecs.FileSystemParam.ThroughputMibpsPerFileSystem.IsNull() || 
-				   plan.ComputeSpecs.FileSystemParam.ThroughputMibpsPerFileSystem.IsUnknown() {
+				if plan.ComputeSpecs.FileSystemParam.ThroughputMibpsPerFileSystem.IsNull() ||
+					plan.ComputeSpecs.FileSystemParam.ThroughputMibpsPerFileSystem.IsUnknown() {
 					diagnostics.AddError(
 						"Invalid Configuration",
 						"throughput_mibps_per_file_system is required when wal_mode is FSWAL",
 					)
 				}
-				if plan.ComputeSpecs.FileSystemParam.FileSystemCount.IsNull() || 
-				   plan.ComputeSpecs.FileSystemParam.FileSystemCount.IsUnknown() {
+				if plan.ComputeSpecs.FileSystemParam.FileSystemCount.IsNull() ||
+					plan.ComputeSpecs.FileSystemParam.FileSystemCount.IsUnknown() {
 					diagnostics.AddError(
 						"Invalid Configuration",
 						"file_system_count is required when wal_mode is FSWAL",
@@ -935,7 +935,7 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		if state.ComputeSpecs != nil {
 			stateFileSystemParam = state.ComputeSpecs.FileSystemParam
 		}
-		
+
 		planFileSystemParam := plan.ComputeSpecs.FileSystemParam
 		if fileSystemParamChanged(planFileSystemParam, stateFileSystemParam) {
 			if planFileSystemParam != nil {
@@ -943,18 +943,18 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 					ThroughputMiBpsPerFileSystem: int32(planFileSystemParam.ThroughputMibpsPerFileSystem.ValueInt64()),
 					FileSystemCount:              int32(planFileSystemParam.FileSystemCount.ValueInt64()),
 				}
-				
+
 				// Security groups protection logic: only include if not empty and not changing from existing value
 				// This prevents overwriting auto-generated security groups
-				if !planFileSystemParam.SecurityGroups.IsNull() && 
-				   !planFileSystemParam.SecurityGroups.IsUnknown() {
+				if !planFileSystemParam.SecurityGroups.IsNull() &&
+					!planFileSystemParam.SecurityGroups.IsUnknown() {
 					var securityGroups []string
 					diags := planFileSystemParam.SecurityGroups.ElementsAs(ctx, &securityGroups, false)
 					if !diags.HasError() && len(securityGroups) > 0 {
 						fileSystemParam.SecurityGroups = securityGroups
 					}
 				}
-				
+
 				spec := ensureSpec()
 				spec.FileSystem = fileSystemParam
 				hasUpdate = true
@@ -1280,23 +1280,23 @@ func fileSystemParamChanged(plan, state *models.FileSystemParamModel) bool {
 	if state == nil {
 		return plan != nil
 	}
-	
+
 	// Compare throughput
 	if !int64AttrEqual(plan.ThroughputMibpsPerFileSystem, state.ThroughputMibpsPerFileSystem) {
 		return true
 	}
-	
+
 	// Compare file system count
 	if !int64AttrEqual(plan.FileSystemCount, state.FileSystemCount) {
 		return true
 	}
-	
+
 	// Compare security groups - note: security groups changes should trigger replacement, not update
 	// But we still need to detect the change for validation purposes
 	if !listAttrEqual(plan.SecurityGroups, state.SecurityGroups) {
 		return true
 	}
-	
+
 	return false
 }
 

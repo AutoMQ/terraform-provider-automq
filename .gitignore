@@ -37,3 +37,6 @@ override.tf.json
 terraform.rc
 
 dist/
+
+# Local configuration files
+acc.config

@@ -580,37 +580,37 @@ func TestFlattenKafkaInstanceModel_FSWAL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			resource := &KafkaInstanceResourceModel{}
 			diags := FlattenKafkaInstanceModel(context.Background(), tt.input, resource)
-			
+
 			assert.False(t, diags.HasError(), "FlattenKafkaInstanceModel should not return errors")
-			
+
 			// Check basic fields
 			assert.Equal(t, tt.expected.InstanceID, resource.InstanceID)
 			assert.Equal(t, tt.expected.Name, resource.Name)
 			assert.Equal(t, tt.expected.Description, resource.Description)
 			assert.Equal(t, tt.expected.Version, resource.Version)
 			assert.Equal(t, tt.expected.InstanceStatus, resource.InstanceStatus)
-			
+
 			// Check compute specs
 			if tt.expected.ComputeSpecs == nil {
 				assert.Nil(t, resource.ComputeSpecs)
 			} else {
 				assert.NotNil(t, resource.ComputeSpecs)
 				assert.Equal(t, tt.expected.ComputeSpecs.ReservedAku, resource.ComputeSpecs.ReservedAku)
-				
+
 				// Check file system parameters
 				if tt.expected.ComputeSpecs.FileSystemParam == nil {
 					assert.Nil(t, resource.ComputeSpecs.FileSystemParam)
 				} else {
 					assert.NotNil(t, resource.ComputeSpecs.FileSystemParam)
-					assert.Equal(t, tt.expected.ComputeSpecs.FileSystemParam.ThroughputMibpsPerFileSystem, 
+					assert.Equal(t, tt.expected.ComputeSpecs.FileSystemParam.ThroughputMibpsPerFileSystem,
 						resource.ComputeSpecs.FileSystemParam.ThroughputMibpsPerFileSystem)
-					assert.Equal(t, tt.expected.ComputeSpecs.FileSystemParam.FileSystemCount, 
+					assert.Equal(t, tt.expected.ComputeSpecs.FileSystemParam.FileSystemCount,
 						resource.ComputeSpecs.FileSystemParam.FileSystemCount)
-					assert.Equal(t, tt.expected.ComputeSpecs.FileSystemParam.SecurityGroups, 
+					assert.Equal(t, tt.expected.ComputeSpecs.FileSystemParam.SecurityGroups,
 						resource.ComputeSpecs.FileSystemParam.SecurityGroups)
 				}
 			}
-			
+
 			// Check features
 			if tt.expected.Features == nil {
 				assert.Nil(t, resource.Features)

@@ -657,7 +657,6 @@ func TestSecurityGroupsValidator(t *testing.T) {
 	}
 }
 
-
 // TestValidateKafkaInstanceConfiguration_FSWALWithEmptySecurityGroups tests that
 // FSWAL configuration with empty security_groups list is handled correctly.
 // Empty security_groups should be valid (backend will auto-generate).
@@ -687,11 +686,11 @@ func TestValidateKafkaInstanceConfiguration_FSWALWithEmptySecurityGroups(t *test
 	// Note: The schema validator (listvalidator.SizeAtLeast(1)) will reject empty lists,
 	// but validateKafkaInstanceConfiguration itself should not add additional errors.
 	// This test verifies the custom validation logic doesn't break with empty security_groups.
-	
+
 	// Check if there's an error specifically about file_system_param being ignored
 	for _, d := range diags {
-		if strings.Contains(d.Detail(), "file_system_param") && 
-		   !strings.Contains(d.Detail(), "security_groups") {
+		if strings.Contains(d.Detail(), "file_system_param") &&
+			!strings.Contains(d.Detail(), "security_groups") {
 			t.Fatalf("unexpected file_system_param error with empty security_groups: %v", d)
 		}
 	}
