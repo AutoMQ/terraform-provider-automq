@@ -659,7 +659,8 @@ func TestSecurityGroupsValidator(t *testing.T) {
 
 // TestValidateKafkaInstanceConfiguration_FSWALWithEmptySecurityGroups tests that
 // FSWAL configuration with empty security_groups list is handled correctly.
-// Empty security_groups should be valid (backend will auto-generate).
+// Note: Empty list [] is rejected by schema validator (SizeAtLeast(1)).
+// Users should omit the field entirely (null) to trigger backend auto-generation.
 func TestValidateKafkaInstanceConfiguration_FSWALWithEmptySecurityGroups(t *testing.T) {
 	plan := &models.KafkaInstanceResourceModel{
 		ComputeSpecs: &models.ComputeSpecsModel{
@@ -697,7 +698,8 @@ func TestValidateKafkaInstanceConfiguration_FSWALWithEmptySecurityGroups(t *test
 }
 
 // TestValidateKafkaInstanceConfiguration_FSWALWithNullSecurityGroups tests that
-// FSWAL configuration with null security_groups is valid (backend will auto-generate).
+// FSWAL configuration with null security_groups is valid.
+// Omitting the field (null) triggers backend auto-generation of security groups.
 func TestValidateKafkaInstanceConfiguration_FSWALWithNullSecurityGroups(t *testing.T) {
 	plan := &models.KafkaInstanceResourceModel{
 		ComputeSpecs: &models.ComputeSpecsModel{
