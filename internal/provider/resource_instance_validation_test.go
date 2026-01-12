@@ -161,8 +161,9 @@ func TestWalModeValidatorRejectsUnsupportedValue(t *testing.T) {
 		t.Fatalf("wal_mode validators missing")
 	}
 
+	// Test that an unsupported value is rejected
 	req := validator.StringRequest{
-		ConfigValue: types.StringValue("FSWAL"),
+		ConfigValue: types.StringValue("INVALID_WAL"),
 		Path:        path.Root("features").AtName("wal_mode"),
 	}
 	resp := validator.StringResponse{}
@@ -171,13 +172,17 @@ func TestWalModeValidatorRejectsUnsupportedValue(t *testing.T) {
 		t.Fatalf("expected validator error for unsupported wal mode")
 	}
 
-	respOk := validator.StringResponse{}
-	walAttr.Validators[0].ValidateString(context.Background(), validator.StringRequest{
-		ConfigValue: types.StringValue("S3WAL"),
-		Path:        req.Path,
-	}, &respOk)
-	if respOk.Diagnostics.HasError() {
-		t.Fatalf("validator should accept S3WAL: %v", respOk.Diagnostics)
+	// Test that all supported values are accepted
+	supportedValues := []string{"EBSWAL", "S3WAL", "FSWAL"}
+	for _, value := range supportedValues {
+		respOk := validator.StringResponse{}
+		walAttr.Validators[0].ValidateString(context.Background(), validator.StringRequest{
+			ConfigValue: types.StringValue(value),
+			Path:        req.Path,
+		}, &respOk)
+		if respOk.Diagnostics.HasError() {
+			t.Fatalf("validator should accept %s: %v", value, respOk.Diagnostics)
+		}
 	}
 }
 
@@ -245,4 +250,510 @@ func hasStringRequiresReplace(mods []planmodifier.String) bool {
 		}
 	}
 	return false
+}
+
+func hasListRequiresReplace(mods []planmodifier.List) bool {
+	for _, m := range mods {
+		if strings.Contains(strings.ToLower(reflect.TypeOf(m).String()), "requiresreplace") {
+			return true
+		}
+	}
+	return false
+}
+
+func TestValidateKafkaInstanceConfiguration_FSWALMissingFileSystem(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			ReservedAku: types.Int64Value(6),
+			DeployType:  types.StringValue("IAAS"),
+			Networks: []models.NetworkModel{{
+				Zone: types.StringValue("cn-test-1"),
+				Subnets: types.ListValueMust(types.StringType, []attr.Value{
+					types.StringValue("subnet-1"),
+				}),
+			}},
+			// FileSystemParam is intentionally nil
+		},
+		Features: &models.FeaturesModel{
+			WalMode: types.StringValue("FSWAL"),
+		},
+	}
+
+	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
+	if !diags.HasError() {
+		t.Fatalf("expected diagnostics when FSWAL mode is missing file_system_param")
+	}
+
+	found := false
+	for _, d := range diags {
+		if d.Summary() == "Invalid Configuration" &&
+			strings.Contains(d.Detail(), "file_system_param configuration is required when wal_mode is FSWAL") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected error about missing file_system_param for FSWAL, got: %v", diags)
+	}
+}
+
+func TestValidateKafkaInstanceConfiguration_FileSystemWithoutFSWAL(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			ReservedAku: types.Int64Value(6),
+			DeployType:  types.StringValue("IAAS"),
+			Networks: []models.NetworkModel{{
+				Zone: types.StringValue("cn-test-1"),
+				Subnets: types.ListValueMust(types.StringType, []attr.Value{
+					types.StringValue("subnet-1"),
+				}),
+			}},
+			FileSystemParam: &models.FileSystemParamModel{
+				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
+				FileSystemCount:              types.Int64Value(2),
+				SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-test")}),
+			},
+		},
+		Features: &models.FeaturesModel{
+			WalMode: types.StringValue("EBSWAL"), // Not FSWAL
+		},
+	}
+
+	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
+	if !diags.HasError() {
+		t.Fatalf("expected diagnostics when file_system_param is provided without FSWAL mode")
+	}
+
+	found := false
+	for _, d := range diags {
+		if d.Summary() == "Invalid Configuration" &&
+			strings.Contains(d.Detail(), "file_system_param configuration is only valid when wal_mode is FSWAL") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected error about file_system_param only valid with FSWAL, got: %v", diags)
+	}
+}
+
+func TestValidateKafkaInstanceConfiguration_FSWALValid(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			ReservedAku: types.Int64Value(6),
+			DeployType:  types.StringValue("IAAS"),
+			Networks: []models.NetworkModel{{
+				Zone: types.StringValue("cn-test-1"),
+				Subnets: types.ListValueMust(types.StringType, []attr.Value{
+					types.StringValue("subnet-1"),
+				}),
+			}},
+			FileSystemParam: &models.FileSystemParamModel{
+				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
+				FileSystemCount:              types.Int64Value(2),
+				SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-test")}),
+			},
+		},
+		Features: &models.FeaturesModel{
+			WalMode: types.StringValue("FSWAL"),
+		},
+	}
+
+	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics for valid FSWAL configuration: %v", diags)
+	}
+}
+
+func TestValidateKafkaInstanceConfiguration_FSWALMissingThroughput(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			ReservedAku: types.Int64Value(6),
+			DeployType:  types.StringValue("IAAS"),
+			Networks: []models.NetworkModel{{
+				Zone: types.StringValue("cn-test-1"),
+				Subnets: types.ListValueMust(types.StringType, []attr.Value{
+					types.StringValue("subnet-1"),
+				}),
+			}},
+			FileSystemParam: &models.FileSystemParamModel{
+				ThroughputMibpsPerFileSystem: types.Int64Null(), // Missing required field
+				FileSystemCount:              types.Int64Value(2),
+				SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-test")}),
+			},
+		},
+		Features: &models.FeaturesModel{
+			WalMode: types.StringValue("FSWAL"),
+		},
+	}
+
+	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
+	if !diags.HasError() {
+		t.Fatalf("expected diagnostics when throughput_mibps_per_file_system is missing")
+	}
+
+	found := false
+	for _, d := range diags {
+		if d.Summary() == "Invalid Configuration" &&
+			strings.Contains(d.Detail(), "throughput_mibps_per_file_system is required when wal_mode is FSWAL") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected error about missing throughput_mibps_per_file_system, got: %v", diags)
+	}
+}
+
+func TestValidateKafkaInstanceConfiguration_FSWALMissingFileSystemCount(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			ReservedAku: types.Int64Value(6),
+			DeployType:  types.StringValue("IAAS"),
+			Networks: []models.NetworkModel{{
+				Zone: types.StringValue("cn-test-1"),
+				Subnets: types.ListValueMust(types.StringType, []attr.Value{
+					types.StringValue("subnet-1"),
+				}),
+			}},
+			FileSystemParam: &models.FileSystemParamModel{
+				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
+				FileSystemCount:              types.Int64Null(), // Missing required field
+				SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-test")}),
+			},
+		},
+		Features: &models.FeaturesModel{
+			WalMode: types.StringValue("FSWAL"),
+		},
+	}
+
+	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
+	if !diags.HasError() {
+		t.Fatalf("expected diagnostics when file_system_count is missing")
+	}
+
+	found := false
+	for _, d := range diags {
+		if d.Summary() == "Invalid Configuration" &&
+			strings.Contains(d.Detail(), "file_system_count is required when wal_mode is FSWAL") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected error about missing file_system_count, got: %v", diags)
+	}
+}
+
+func TestValidateKafkaInstanceConfiguration_FileSystemWithoutFeatures(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			ReservedAku: types.Int64Value(6),
+			DeployType:  types.StringValue("IAAS"),
+			Networks: []models.NetworkModel{{
+				Zone: types.StringValue("cn-test-1"),
+				Subnets: types.ListValueMust(types.StringType, []attr.Value{
+					types.StringValue("subnet-1"),
+				}),
+			}},
+			FileSystemParam: &models.FileSystemParamModel{
+				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
+				FileSystemCount:              types.Int64Value(2),
+				SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-test")}),
+			},
+		},
+		// Features is nil
+	}
+
+	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
+	if !diags.HasError() {
+		t.Fatalf("expected diagnostics when file_system_param is provided without features")
+	}
+
+	found := false
+	for _, d := range diags {
+		if d.Summary() == "Invalid Configuration" &&
+			strings.Contains(d.Detail(), "file_system_param configuration is only valid when wal_mode is FSWAL") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected error about file_system_param only valid with FSWAL, got: %v", diags)
+	}
+}
+
+func TestFileSystemParamValidators(t *testing.T) {
+	s := getKafkaInstanceResourceSchema(t)
+	computeAttrRaw, ok := s.Attributes["compute_specs"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("compute_specs attribute has unexpected type %T", s.Attributes["compute_specs"])
+	}
+	computeAttr := computeAttrRaw
+	fileSystemAttrRaw, ok := computeAttr.Attributes["file_system_param"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("file_system_param attribute has unexpected type %T", computeAttr.Attributes["file_system_param"])
+	}
+	fileSystemAttr := fileSystemAttrRaw
+
+	// Test throughput_mibps_per_file_system validator
+	throughputAttrRaw, ok := fileSystemAttr.Attributes["throughput_mibps_per_file_system"].(schema.Int64Attribute)
+	if !ok {
+		t.Fatalf("throughput_mibps_per_file_system attribute has unexpected type %T", fileSystemAttr.Attributes["throughput_mibps_per_file_system"])
+	}
+	throughputAttr := throughputAttrRaw
+	if !throughputAttr.Required {
+		t.Fatalf("throughput_mibps_per_file_system should be required")
+	}
+	if len(throughputAttr.Validators) == 0 {
+		t.Fatalf("throughput_mibps_per_file_system validators missing")
+	}
+
+	// Test that zero and negative values are rejected
+	invalidValues := []int64{0, -1, -100}
+	for _, value := range invalidValues {
+		req := validator.Int64Request{
+			ConfigValue: types.Int64Value(value),
+			Path:        path.Root("compute_specs").AtName("file_system_param").AtName("throughput_mibps_per_file_system"),
+		}
+		resp := validator.Int64Response{}
+		throughputAttr.Validators[0].ValidateInt64(context.Background(), req, &resp)
+		if !resp.Diagnostics.HasError() {
+			t.Fatalf("expected validator error for throughput value %d", value)
+		}
+	}
+
+	// Test that positive values are accepted
+	validValues := []int64{1, 100, 1000, 5000}
+	for _, value := range validValues {
+		req := validator.Int64Request{
+			ConfigValue: types.Int64Value(value),
+			Path:        path.Root("compute_specs").AtName("file_system_param").AtName("throughput_mibps_per_file_system"),
+		}
+		resp := validator.Int64Response{}
+		throughputAttr.Validators[0].ValidateInt64(context.Background(), req, &resp)
+		if resp.Diagnostics.HasError() {
+			t.Fatalf("validator should accept throughput value %d: %v", value, resp.Diagnostics)
+		}
+	}
+
+	// Test file_system_count validator
+	countAttrRaw, ok := fileSystemAttr.Attributes["file_system_count"].(schema.Int64Attribute)
+	if !ok {
+		t.Fatalf("file_system_count attribute has unexpected type %T", fileSystemAttr.Attributes["file_system_count"])
+	}
+	countAttr := countAttrRaw
+	if !countAttr.Required {
+		t.Fatalf("file_system_count should be required")
+	}
+	if len(countAttr.Validators) == 0 {
+		t.Fatalf("file_system_count validators missing")
+	}
+
+	// Test that zero and negative values are rejected for file_system_count
+	for _, value := range invalidValues {
+		req := validator.Int64Request{
+			ConfigValue: types.Int64Value(value),
+			Path:        path.Root("compute_specs").AtName("file_system_param").AtName("file_system_count"),
+		}
+		resp := validator.Int64Response{}
+		countAttr.Validators[0].ValidateInt64(context.Background(), req, &resp)
+		if !resp.Diagnostics.HasError() {
+			t.Fatalf("expected validator error for file_system_count value %d", value)
+		}
+	}
+
+	// Test that positive values are accepted for file_system_count
+	for _, value := range validValues {
+		req := validator.Int64Request{
+			ConfigValue: types.Int64Value(value),
+			Path:        path.Root("compute_specs").AtName("file_system_param").AtName("file_system_count"),
+		}
+		resp := validator.Int64Response{}
+		countAttr.Validators[0].ValidateInt64(context.Background(), req, &resp)
+		if resp.Diagnostics.HasError() {
+			t.Fatalf("validator should accept file_system_count value %d: %v", value, resp.Diagnostics)
+		}
+	}
+
+	// Test security_groups attribute properties
+	securityGroupsAttrRaw, ok := fileSystemAttr.Attributes["security_groups"].(schema.ListAttribute)
+	if !ok {
+		t.Fatalf("security_groups attribute has unexpected type %T", fileSystemAttr.Attributes["security_groups"])
+	}
+	securityGroupsAttr := securityGroupsAttrRaw
+	if !securityGroupsAttr.Optional {
+		t.Fatalf("security_groups should be optional")
+	}
+	if !securityGroupsAttr.Computed {
+		t.Fatalf("security_groups should be computed")
+	}
+	if len(securityGroupsAttr.PlanModifiers) == 0 {
+		t.Fatalf("security_groups plan modifiers missing")
+	}
+	if !hasListRequiresReplace(securityGroupsAttr.PlanModifiers) {
+		t.Fatalf("expected security_groups to require replacement, modifiers: %v", securityGroupsAttr.PlanModifiers)
+	}
+}
+func TestSecurityGroupsValidator(t *testing.T) {
+	s := getKafkaInstanceResourceSchema(t)
+	computeAttrRaw, ok := s.Attributes["compute_specs"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("compute_specs attribute has unexpected type %T", s.Attributes["compute_specs"])
+	}
+	computeAttr := computeAttrRaw
+	fileSystemAttrRaw, ok := computeAttr.Attributes["file_system_param"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("file_system_param attribute has unexpected type %T", computeAttr.Attributes["file_system_param"])
+	}
+	fileSystemAttr := fileSystemAttrRaw
+
+	// Test security_groups validator
+	securityGroupsAttrRaw, ok := fileSystemAttr.Attributes["security_groups"].(schema.ListAttribute)
+	if !ok {
+		t.Fatalf("security_groups attribute has unexpected type %T", fileSystemAttr.Attributes["security_groups"])
+	}
+	securityGroupsAttr := securityGroupsAttrRaw
+	if len(securityGroupsAttr.Validators) == 0 {
+		t.Fatalf("security_groups validators missing")
+	}
+
+	// Test that empty list is rejected
+	req := validator.ListRequest{
+		ConfigValue: types.ListValueMust(types.StringType, []attr.Value{}),
+		Path:        path.Root("compute_specs").AtName("file_system_param").AtName("security_groups"),
+	}
+	resp := validator.ListResponse{}
+	securityGroupsAttr.Validators[0].ValidateList(context.Background(), req, &resp)
+	if !resp.Diagnostics.HasError() {
+		t.Fatalf("expected validator error for empty security_groups list")
+	}
+
+	// Test that list with one element is accepted
+	reqValid := validator.ListRequest{
+		ConfigValue: types.ListValueMust(types.StringType, []attr.Value{
+			types.StringValue("sg-12345"),
+		}),
+		Path: path.Root("compute_specs").AtName("file_system_param").AtName("security_groups"),
+	}
+	respValid := validator.ListResponse{}
+	securityGroupsAttr.Validators[0].ValidateList(context.Background(), reqValid, &respValid)
+	if respValid.Diagnostics.HasError() {
+		t.Fatalf("validator should accept non-empty security_groups list: %v", respValid.Diagnostics)
+	}
+
+	// Test that list with multiple elements is accepted
+	reqMultiple := validator.ListRequest{
+		ConfigValue: types.ListValueMust(types.StringType, []attr.Value{
+			types.StringValue("sg-12345"),
+			types.StringValue("sg-67890"),
+		}),
+		Path: path.Root("compute_specs").AtName("file_system_param").AtName("security_groups"),
+	}
+	respMultiple := validator.ListResponse{}
+	securityGroupsAttr.Validators[0].ValidateList(context.Background(), reqMultiple, &respMultiple)
+	if respMultiple.Diagnostics.HasError() {
+		t.Fatalf("validator should accept multiple security_groups: %v", respMultiple.Diagnostics)
+	}
+}
+
+// TestValidateKafkaInstanceConfiguration_FSWALWithEmptySecurityGroups tests that
+// FSWAL configuration with empty security_groups list is handled correctly.
+// Note: Empty list [] is rejected by schema validator (SizeAtLeast(1)).
+// Users should omit the field entirely (null) to trigger backend auto-generation.
+func TestValidateKafkaInstanceConfiguration_FSWALWithEmptySecurityGroups(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			ReservedAku: types.Int64Value(6),
+			DeployType:  types.StringValue("IAAS"),
+			Networks: []models.NetworkModel{{
+				Zone: types.StringValue("cn-test-1"),
+				Subnets: types.ListValueMust(types.StringType, []attr.Value{
+					types.StringValue("subnet-1"),
+				}),
+			}},
+			FileSystemParam: &models.FileSystemParamModel{
+				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
+				FileSystemCount:              types.Int64Value(2),
+				SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{}), // Empty list
+			},
+		},
+		Features: &models.FeaturesModel{
+			WalMode: types.StringValue("FSWAL"),
+		},
+	}
+
+	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
+	// Note: The schema validator (listvalidator.SizeAtLeast(1)) will reject empty lists,
+	// but validateKafkaInstanceConfiguration itself should not add additional errors.
+	// This test verifies the custom validation logic doesn't break with empty security_groups.
+
+	// Check if there's an error specifically about file_system_param being ignored
+	for _, d := range diags {
+		if strings.Contains(d.Detail(), "file_system_param") &&
+			!strings.Contains(d.Detail(), "security_groups") {
+			t.Fatalf("unexpected file_system_param error with empty security_groups: %v", d)
+		}
+	}
+}
+
+// TestValidateKafkaInstanceConfiguration_FSWALWithNullSecurityGroups tests that
+// FSWAL configuration with null security_groups is valid.
+// Omitting the field (null) triggers backend auto-generation of security groups.
+func TestValidateKafkaInstanceConfiguration_FSWALWithNullSecurityGroups(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			ReservedAku: types.Int64Value(6),
+			DeployType:  types.StringValue("IAAS"),
+			Networks: []models.NetworkModel{{
+				Zone: types.StringValue("cn-test-1"),
+				Subnets: types.ListValueMust(types.StringType, []attr.Value{
+					types.StringValue("subnet-1"),
+				}),
+			}},
+			FileSystemParam: &models.FileSystemParamModel{
+				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
+				FileSystemCount:              types.Int64Value(2),
+				SecurityGroups:               types.ListNull(types.StringType), // Null - backend will auto-generate
+			},
+		},
+		Features: &models.FeaturesModel{
+			WalMode: types.StringValue("FSWAL"),
+		},
+	}
+
+	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics for FSWAL with null security_groups: %v", diags)
+	}
+}
+
+// TestValidateKafkaInstanceConfiguration_FSWALWithUnknownSecurityGroups tests that
+// FSWAL configuration with unknown security_groups is valid during planning phase.
+func TestValidateKafkaInstanceConfiguration_FSWALWithUnknownSecurityGroups(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			ReservedAku: types.Int64Value(6),
+			DeployType:  types.StringValue("IAAS"),
+			Networks: []models.NetworkModel{{
+				Zone: types.StringValue("cn-test-1"),
+				Subnets: types.ListValueMust(types.StringType, []attr.Value{
+					types.StringValue("subnet-1"),
+				}),
+			}},
+			FileSystemParam: &models.FileSystemParamModel{
+				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
+				FileSystemCount:              types.Int64Value(2),
+				SecurityGroups:               types.ListUnknown(types.StringType), // Unknown during planning
+			},
+		},
+		Features: &models.FeaturesModel{
+			WalMode: types.StringValue("FSWAL"),
+		},
+	}
+
+	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics for FSWAL with unknown security_groups: %v", diags)
+	}
 }

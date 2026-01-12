@@ -1,11 +1,69 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/stretchr/testify/assert"
 )
+
+func TestKafkaInstanceDataSourceSchema(t *testing.T) {
+	ds := NewKafkaInstanceDataSource()
+
+	req := datasource.SchemaRequest{}
+	resp := &datasource.SchemaResponse{}
+
+	ds.Schema(context.Background(), req, resp)
+
+	assert.False(t, resp.Diagnostics.HasError(), "Schema should not have errors")
+
+	// Verify that file_system_param is present in compute_specs
+	computeSpecs, exists := resp.Schema.Attributes["compute_specs"]
+	assert.True(t, exists, "compute_specs should exist in schema")
+
+	computeSpecsNested, ok := computeSpecs.(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("compute_specs has unexpected type %T", computeSpecs)
+	}
+	fileSystemParam, exists := computeSpecsNested.Attributes["file_system_param"]
+	assert.True(t, exists, "file_system_param should exist in compute_specs")
+
+	// Verify file_system_param attributes
+	fileSystemParamNested, ok := fileSystemParam.(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("file_system_param has unexpected type %T", fileSystemParam)
+	}
+
+	_, exists = fileSystemParamNested.Attributes["throughput_mibps_per_file_system"]
+	assert.True(t, exists, "throughput_mibps_per_file_system should exist")
+
+	_, exists = fileSystemParamNested.Attributes["file_system_count"]
+	assert.True(t, exists, "file_system_count should exist")
+
+	_, exists = fileSystemParamNested.Attributes["security_groups"]
+	assert.True(t, exists, "security_groups should exist")
+
+	// Verify WAL mode description includes FSWAL
+	features, exists := resp.Schema.Attributes["features"]
+	assert.True(t, exists, "features should exist in schema")
+
+	featuresNested, ok := features.(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("features has unexpected type %T", features)
+	}
+	walMode, exists := featuresNested.Attributes["wal_mode"]
+	assert.True(t, exists, "wal_mode should exist in features")
+
+	walModeAttr, ok := walMode.(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("wal_mode has unexpected type %T", walMode)
+	}
+	assert.Contains(t, walModeAttr.Description, "FSWAL", "wal_mode description should mention FSWAL")
+}
 
 func TestAccKafkaInstanceDataSource(t *testing.T) {
 	env := loadAccConfig(t)

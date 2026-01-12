@@ -255,6 +255,39 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							stringplanmodifier.UseStateForUnknown(),
 						},
 					},
+					"file_system_param": schema.SingleNestedAttribute{
+						Optional:    true,
+						Description: "File system configuration for FSWAL mode",
+						Attributes: map[string]schema.Attribute{
+							"throughput_mibps_per_file_system": schema.Int64Attribute{
+								Required:    true,
+								Description: "Throughput in MiBps per file system",
+								Validators: []validator.Int64{
+									int64validator.AtLeast(1),
+								},
+							},
+							"file_system_count": schema.Int64Attribute{
+								Required:    true,
+								Description: "Number of file systems",
+								Validators: []validator.Int64{
+									int64validator.AtLeast(1),
+								},
+							},
+							"security_groups": schema.ListAttribute{
+								ElementType: types.StringType,
+								Optional:    true,
+								Computed:    true,
+								Description: "Security groups for file systems. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group.",
+								PlanModifiers: []planmodifier.List{
+									listplanmodifier.RequiresReplace(),
+									listplanmodifier.UseStateForUnknown(),
+								},
+								Validators: []validator.List{
+									listvalidator.SizeAtLeast(1),
+								},
+							},
+						},
+					},
 				},
 			},
 			"features": schema.SingleNestedAttribute{
@@ -262,9 +295,9 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				Attributes: map[string]schema.Attribute{
 					"wal_mode": schema.StringAttribute{
 						Required:    true,
-						Description: "Write-Ahead Logging mode: EBSWAL (using EBS as write buffer) or S3WAL (using object storage as write buffer). Defaults to EBSWAL.",
+						Description: "Write-Ahead Logging mode: EBSWAL (using EBS as write buffer), S3WAL (using object storage as write buffer), or FSWAL (using file system as write buffer). Defaults to EBSWAL.",
 						Validators: []validator.String{
-							stringvalidator.OneOf("EBSWAL", "S3WAL"),
+							stringvalidator.OneOf("EBSWAL", "S3WAL", "FSWAL"),
 						},
 						// Default:       stringdefault.StaticString("EBSWAL"),
 						PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
@@ -563,6 +596,59 @@ func validateKafkaInstanceConfiguration(ctx context.Context, plan *models.KafkaI
 		}
 	}
 
+	// FSWAL configuration validation
+	var stateWalMode *types.String
+	if state != nil && state.Features != nil {
+		stateWalMode = &state.Features.WalMode
+	}
+
+	hasFileSystemParam := plan.ComputeSpecs.FileSystemParam != nil
+
+	if plan.Features != nil {
+		planWalMode := plan.Features.WalMode
+		walMode, walModeSet := resolvePlannedStringValue(planWalMode, stateWalMode)
+
+		if walModeSet && strings.EqualFold(walMode, "FSWAL") {
+			// When wal_mode is FSWAL, file_system_param must be provided
+			if !hasFileSystemParam {
+				diagnostics.AddError(
+					"Invalid Configuration",
+					"file_system_param configuration is required when wal_mode is FSWAL",
+				)
+			} else {
+				// Validate required fields in file_system_param
+				if plan.ComputeSpecs.FileSystemParam.ThroughputMibpsPerFileSystem.IsNull() ||
+					plan.ComputeSpecs.FileSystemParam.ThroughputMibpsPerFileSystem.IsUnknown() {
+					diagnostics.AddError(
+						"Invalid Configuration",
+						"throughput_mibps_per_file_system is required when wal_mode is FSWAL",
+					)
+				}
+				if plan.ComputeSpecs.FileSystemParam.FileSystemCount.IsNull() ||
+					plan.ComputeSpecs.FileSystemParam.FileSystemCount.IsUnknown() {
+					diagnostics.AddError(
+						"Invalid Configuration",
+						"file_system_count is required when wal_mode is FSWAL",
+					)
+				}
+			}
+		} else if hasFileSystemParam {
+			// When file_system_param is provided, wal_mode must be FSWAL
+			if !walModeSet || !strings.EqualFold(walMode, "FSWAL") {
+				diagnostics.AddError(
+					"Invalid Configuration",
+					"file_system_param configuration is only valid when wal_mode is FSWAL",
+				)
+			}
+		}
+	} else if hasFileSystemParam {
+		// When file_system_param is provided but no features are set, it's invalid
+		diagnostics.AddError(
+			"Invalid Configuration",
+			"file_system_param configuration is only valid when wal_mode is FSWAL",
+		)
+	}
+
 	return diagnostics
 }
 
@@ -587,7 +673,7 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 
 	// Generate API request body from plan
 	in := client.InstanceCreateParam{}
-	if err := models.ExpandKafkaInstanceResource(instance, &in); err != nil {
+	if err := models.ExpandKafkaInstanceResource(ctx, instance, &in); err != nil {
 		resp.Diagnostics.AddError("Model Expansion Error", fmt.Sprintf("Failed to expand Kafka instance resource: %s", err))
 		return
 	}
@@ -653,7 +739,7 @@ func (r *KafkaInstanceResource) Read(ctx context.Context, req resource.ReadReque
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", state.InstanceID.ValueString(), err))
 		return
 	}
-	resp.Diagnostics.Append(models.FlattenKafkaInstanceModel(instance, &state)...)
+	resp.Diagnostics.Append(models.FlattenKafkaInstanceModel(ctx, instance, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -843,6 +929,38 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 			hasUpdate = true
 			shouldWait = true
 		}
+
+		// File System Parameters update for FSWAL
+		var stateFileSystemParam *models.FileSystemParamModel
+		if state.ComputeSpecs != nil {
+			stateFileSystemParam = state.ComputeSpecs.FileSystemParam
+		}
+
+		planFileSystemParam := plan.ComputeSpecs.FileSystemParam
+		if fileSystemParamChanged(planFileSystemParam, stateFileSystemParam) {
+			if planFileSystemParam != nil {
+				fileSystemParam := &client.FileSystemParam{
+					ThroughputMiBpsPerFileSystem: int32(planFileSystemParam.ThroughputMibpsPerFileSystem.ValueInt64()),
+					FileSystemCount:              int32(planFileSystemParam.FileSystemCount.ValueInt64()),
+				}
+
+				// Security groups protection logic: only include if not empty and not changing from existing value
+				// This prevents overwriting auto-generated security groups
+				if !planFileSystemParam.SecurityGroups.IsNull() &&
+					!planFileSystemParam.SecurityGroups.IsUnknown() {
+					var securityGroups []string
+					diags := planFileSystemParam.SecurityGroups.ElementsAs(ctx, &securityGroups, false)
+					if !diags.HasError() && len(securityGroups) > 0 {
+						fileSystemParam.SecurityGroups = securityGroups
+					}
+				}
+
+				spec := ensureSpec()
+				spec.FileSystem = fileSystemParam
+				hasUpdate = true
+				shouldWait = true
+			}
+		}
 	}
 
 	if instanceConfigsChanged && plan.Features != nil {
@@ -974,7 +1092,7 @@ func ReadKafkaInstance(ctx context.Context, r *KafkaInstanceResource, instanceId
 	}
 
 	diags := diag.Diagnostics{}
-	diags.Append(models.FlattenKafkaInstanceModel(instance, plan)...)
+	diags.Append(models.FlattenKafkaInstanceModel(ctx, instance, plan)...)
 	diags.Append(models.FlattenKafkaInstanceModelWithEndpoints(endpoints, plan)...)
 	return diags
 }
@@ -1129,6 +1247,19 @@ func stringAttrEqual(plan, state types.String) bool {
 	return plan.ValueString() == state.ValueString()
 }
 
+func listAttrEqual(plan, state types.List) bool {
+	if plan.IsUnknown() {
+		return true
+	}
+	if plan.IsNull() {
+		return state.IsNull() || state.IsUnknown()
+	}
+	if state.IsNull() || state.IsUnknown() {
+		return false
+	}
+	return plan.Equal(state)
+}
+
 func mapAttrEqual(plan, state types.Map) bool {
 	if plan.IsUnknown() {
 		return true
@@ -1140,6 +1271,46 @@ func mapAttrEqual(plan, state types.Map) bool {
 		return false
 	}
 	return plan.Equal(state)
+}
+
+func fileSystemParamChanged(plan, state *models.FileSystemParamModel) bool {
+	if plan == nil {
+		return state != nil
+	}
+	if state == nil {
+		return plan != nil
+	}
+
+	// Compare throughput
+	if !int64AttrEqual(plan.ThroughputMibpsPerFileSystem, state.ThroughputMibpsPerFileSystem) {
+		return true
+	}
+
+	// Compare file system count
+	if !int64AttrEqual(plan.FileSystemCount, state.FileSystemCount) {
+		return true
+	}
+
+	// Compare security groups - note: security groups changes should trigger replacement, not update
+	// But we still need to detect the change for validation purposes
+	if !listAttrEqual(plan.SecurityGroups, state.SecurityGroups) {
+		return true
+	}
+
+	return false
+}
+
+func int64AttrEqual(plan, state types.Int64) bool {
+	if plan.IsUnknown() {
+		return true
+	}
+	if plan.IsNull() {
+		return state.IsNull() || state.IsUnknown()
+	}
+	if state.IsNull() || state.IsUnknown() {
+		return false
+	}
+	return plan.ValueInt64() == state.ValueInt64()
 }
 
 var waitForKafkaClusterToProvisionFunc = framework.WaitForKafkaClusterToProvision

@@ -63,6 +63,7 @@ Read-Only:
 - `data_buckets` (Attributes List) Inline bucket configuration replacing legacy bucket profiles. (see [below for nested schema](#nestedatt--compute_specs--data_buckets))
 - `deploy_type` (String) Deployment platform for the instance.
 - `dns_zone` (String)
+- `file_system_param` (Attributes) File system configuration for FSWAL mode (see [below for nested schema](#nestedatt--compute_specs--file_system_param))
 - `instance_role` (String)
 - `kubernetes_cluster_id` (String)
 - `kubernetes_namespace` (String)
@@ -77,6 +78,16 @@ Read-Only:
 Read-Only:
 
 - `bucket_name` (String)
+
+
+<a id="nestedatt--compute_specs--file_system_param"></a>
+### Nested Schema for `compute_specs.file_system_param`
+
+Read-Only:
+
+- `file_system_count` (Number) Number of file systems
+- `security_groups` (List of String) Security groups for file systems
+- `throughput_mibps_per_file_system` (Number) Throughput in MiBps per file system
 
 
 <a id="nestedatt--compute_specs--kubernetes_node_groups"></a>
@@ -118,7 +129,7 @@ Read-Only:
 - `metrics_exporter` (Attributes) Metrics exporter configuration for Prometheus or Kafka sinks. (see [below for nested schema](#nestedatt--features--metrics_exporter))
 - `security` (Attributes) (see [below for nested schema](#nestedatt--features--security))
 - `table_topic` (Attributes) Table topic configuration (warehouse/catalog settings). (see [below for nested schema](#nestedatt--features--table_topic))
-- `wal_mode` (String) Write-Ahead Logging mode: EBSWAL (using EBS as write buffer) or S3WAL (using object storage as write buffer). Defaults to EBSWAL.
+- `wal_mode` (String) Write-Ahead Logging mode: EBSWAL (using EBS as write buffer), S3WAL (using object storage as write buffer), or FSWAL (using file system as write buffer). Defaults to EBSWAL.
 
 <a id="nestedatt--features--metrics_exporter"></a>
 ### Nested Schema for `features.metrics_exporter`

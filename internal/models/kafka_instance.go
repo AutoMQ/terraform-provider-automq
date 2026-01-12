@@ -67,16 +67,17 @@ type NetworkModel struct {
 }
 
 type ComputeSpecsModel struct {
-	ReservedAku           types.Int64      `tfsdk:"reserved_aku"`
-	Networks              []NetworkModel   `tfsdk:"networks"`
-	KubernetesNodeGroups  []NodeGroupModel `tfsdk:"kubernetes_node_groups"`
-	DeployType            types.String     `tfsdk:"deploy_type"`
-	DnsZone               types.String     `tfsdk:"dns_zone"`
-	KubernetesClusterID   types.String     `tfsdk:"kubernetes_cluster_id"`
-	KubernetesNamespace   types.String     `tfsdk:"kubernetes_namespace"`
-	KubernetesServiceAcct types.String     `tfsdk:"kubernetes_service_account"`
-	InstanceRole          types.String     `tfsdk:"instance_role"`
-	DataBuckets           types.List       `tfsdk:"data_buckets"`
+	ReservedAku           types.Int64           `tfsdk:"reserved_aku"`
+	Networks              []NetworkModel        `tfsdk:"networks"`
+	KubernetesNodeGroups  []NodeGroupModel      `tfsdk:"kubernetes_node_groups"`
+	DeployType            types.String          `tfsdk:"deploy_type"`
+	DnsZone               types.String          `tfsdk:"dns_zone"`
+	KubernetesClusterID   types.String          `tfsdk:"kubernetes_cluster_id"`
+	KubernetesNamespace   types.String          `tfsdk:"kubernetes_namespace"`
+	KubernetesServiceAcct types.String          `tfsdk:"kubernetes_service_account"`
+	InstanceRole          types.String          `tfsdk:"instance_role"`
+	DataBuckets           types.List            `tfsdk:"data_buckets"`
+	FileSystemParam       *FileSystemParamModel `tfsdk:"file_system_param"`
 }
 
 type NodeGroupModel struct {
@@ -85,6 +86,12 @@ type NodeGroupModel struct {
 
 type DataBucketModel struct {
 	BucketName types.String `tfsdk:"bucket_name"`
+}
+
+type FileSystemParamModel struct {
+	ThroughputMibpsPerFileSystem types.Int64 `tfsdk:"throughput_mibps_per_file_system"`
+	FileSystemCount              types.Int64 `tfsdk:"file_system_count"`
+	SecurityGroups               types.List  `tfsdk:"security_groups"`
 }
 
 var DataBucketObjectType = types.ObjectType{
@@ -209,7 +216,7 @@ type TableTopicModel struct {
 
 // ExpandKafkaInstanceResource converts a KafkaInstanceResourceModel to a client.InstanceCreateParam.
 // It handles the conversion of all nested structures and validates required fields.
-func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *client.InstanceCreateParam) error {
+func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceResourceModel, request *client.InstanceCreateParam) error {
 	if request == nil {
 		return fmt.Errorf("request parameter cannot be nil")
 	}
@@ -307,6 +314,26 @@ func ExpandKafkaInstanceResource(instance KafkaInstanceResourceModel, request *c
 				dataBuckets = append(dataBuckets, profile)
 			}
 			request.Spec.DataBuckets = dataBuckets
+		}
+
+		// File System Parameters for FSWAL
+		if instance.ComputeSpecs.FileSystemParam != nil {
+			fileSystemParam := &client.FileSystemParam{
+				ThroughputMiBpsPerFileSystem: int32(instance.ComputeSpecs.FileSystemParam.ThroughputMibpsPerFileSystem.ValueInt64()),
+				FileSystemCount:              int32(instance.ComputeSpecs.FileSystemParam.FileSystemCount.ValueInt64()),
+			}
+
+			// Security groups protection logic: only include if not empty
+			if !instance.ComputeSpecs.FileSystemParam.SecurityGroups.IsNull() &&
+				!instance.ComputeSpecs.FileSystemParam.SecurityGroups.IsUnknown() {
+				var securityGroups []string
+				diags := instance.ComputeSpecs.FileSystemParam.SecurityGroups.ElementsAs(ctx, &securityGroups, false)
+				if !diags.HasError() && len(securityGroups) > 0 {
+					fileSystemParam.SecurityGroups = securityGroups
+				}
+			}
+
+			request.Spec.FileSystem = fileSystemParam
 		}
 
 	}
@@ -580,7 +607,7 @@ func FlattenKafkaInstanceBasicModel(instance *client.InstanceSummaryVO, resource
 
 // FlattenKafkaInstanceModel converts a client.InstanceVO to a KafkaInstanceResourceModel.
 // It handles all fields including nested structures.
-func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInstanceResourceModel) diag.Diagnostics {
+func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO, resource *KafkaInstanceResourceModel) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	if instance == nil {
@@ -633,6 +660,7 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 				KubernetesNamespace:   types.StringNull(),
 				KubernetesServiceAcct: types.StringNull(),
 				InstanceRole:          types.StringNull(),
+				FileSystemParam:       nil,
 			}
 		}
 		// Reserved AKU
@@ -712,6 +740,47 @@ func FlattenKafkaInstanceModel(instance *client.InstanceVO, resource *KafkaInsta
 			resource.ComputeSpecs.DataBuckets = previousSpecs.DataBuckets
 		} else {
 			resource.ComputeSpecs.DataBuckets = types.ListNull(DataBucketObjectType)
+		}
+
+		// File System Parameters for FSWAL
+		var previousFileSystemParam *FileSystemParamModel
+		if previousSpecs != nil {
+			previousFileSystemParam = previousSpecs.FileSystemParam
+		}
+		if instance.Spec.FileSystem != nil {
+			fileSystemParam := &FileSystemParamModel{
+				ThroughputMibpsPerFileSystem: types.Int64Null(),
+				FileSystemCount:              types.Int64Null(),
+				SecurityGroups:               types.ListNull(types.StringType),
+			}
+
+			// Copy previous values if they exist
+			if previousFileSystemParam != nil {
+				fileSystemParam.ThroughputMibpsPerFileSystem = previousFileSystemParam.ThroughputMibpsPerFileSystem
+				fileSystemParam.FileSystemCount = previousFileSystemParam.FileSystemCount
+				fileSystemParam.SecurityGroups = previousFileSystemParam.SecurityGroups
+			}
+
+			// Update with API response values
+			if instance.Spec.FileSystem.ThroughputMiBpsPerFileSystem != nil {
+				fileSystemParam.ThroughputMibpsPerFileSystem = types.Int64Value(int64(*instance.Spec.FileSystem.ThroughputMiBpsPerFileSystem))
+			}
+			if instance.Spec.FileSystem.FileSystemCount != nil {
+				fileSystemParam.FileSystemCount = types.Int64Value(int64(*instance.Spec.FileSystem.FileSystemCount))
+			}
+			if len(instance.Spec.FileSystem.SecurityGroups) > 0 {
+				securityGroupsList, diags := types.ListValueFrom(ctx, types.StringType, instance.Spec.FileSystem.SecurityGroups)
+				if !diags.HasError() {
+					fileSystemParam.SecurityGroups = securityGroupsList
+				}
+			}
+
+			resource.ComputeSpecs.FileSystemParam = fileSystemParam
+		} else if previousFileSystemParam != nil {
+			// Preserve previous file system parameters if API doesn't return them
+			resource.ComputeSpecs.FileSystemParam = previousFileSystemParam
+		} else {
+			resource.ComputeSpecs.FileSystemParam = nil
 		}
 
 	}
