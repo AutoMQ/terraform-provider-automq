@@ -115,7 +115,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 					"security_groups": schema.ListAttribute{
 						ElementType: types.StringType,
 						Computed:    true,
-						Description: "Security groups for the instance",
+						Description: "Security groups for the instance. Only available when deploy_type is IAAS.",
 					},
 					"file_system_param": schema.SingleNestedAttribute{
 						Computed:    true,

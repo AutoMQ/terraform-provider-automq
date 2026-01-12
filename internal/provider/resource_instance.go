@@ -259,7 +259,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						ElementType: types.StringType,
 						Optional:    true,
 						Computed:    true,
-						Description: "Security groups for the instance. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group.",
+						Description: "Security groups for the instance. Only available when deploy_type is IAAS. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group.",
 						PlanModifiers: []planmodifier.List{
 							listplanmodifier.RequiresReplace(),
 							listplanmodifier.UseStateForUnknown(),

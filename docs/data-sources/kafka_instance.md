@@ -71,7 +71,7 @@ Read-Only:
 - `kubernetes_service_account` (String)
 - `networks` (Attributes List) To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones. (see [below for nested schema](#nestedatt--compute_specs--networks))
 - `reserved_aku` (Number) AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.
-- `security_groups` (List of String) Security groups for the instance
+- `security_groups` (List of String) Security groups for the instance. Only available when deploy_type is IAAS.
 
 <a id="nestedatt--compute_specs--data_buckets"></a>
 ### Nested Schema for `compute_specs.data_buckets`
