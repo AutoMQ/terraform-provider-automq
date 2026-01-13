@@ -757,3 +757,73 @@ func TestValidateKafkaInstanceConfiguration_FSWALWithUnknownSecurityGroups(t *te
 		t.Fatalf("unexpected diagnostics for FSWAL with unknown security_groups: %v", diags)
 	}
 }
+
+// TestComputeSpecsSecurityGroupsValidator tests the compute_specs.security_groups schema validator
+func TestComputeSpecsSecurityGroupsValidator(t *testing.T) {
+	s := getKafkaInstanceResourceSchema(t)
+	computeAttrRaw, ok := s.Attributes["compute_specs"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("compute_specs attribute has unexpected type %T", s.Attributes["compute_specs"])
+	}
+	computeAttr := computeAttrRaw
+
+	// Test security_groups attribute properties
+	securityGroupsAttrRaw, ok := computeAttr.Attributes["security_groups"].(schema.ListAttribute)
+	if !ok {
+		t.Fatalf("security_groups attribute has unexpected type %T", computeAttr.Attributes["security_groups"])
+	}
+	securityGroupsAttr := securityGroupsAttrRaw
+	if !securityGroupsAttr.Optional {
+		t.Fatalf("security_groups should be optional")
+	}
+	if !securityGroupsAttr.Computed {
+		t.Fatalf("security_groups should be computed")
+	}
+	if len(securityGroupsAttr.PlanModifiers) == 0 {
+		t.Fatalf("security_groups plan modifiers missing")
+	}
+	if !hasListRequiresReplace(securityGroupsAttr.PlanModifiers) {
+		t.Fatalf("expected security_groups to require replacement, modifiers: %v", securityGroupsAttr.PlanModifiers)
+	}
+	if len(securityGroupsAttr.Validators) == 0 {
+		t.Fatalf("security_groups validators missing")
+	}
+
+	// Test that empty list is rejected
+	req := validator.ListRequest{
+		ConfigValue: types.ListValueMust(types.StringType, []attr.Value{}),
+		Path:        path.Root("compute_specs").AtName("security_groups"),
+	}
+	resp := validator.ListResponse{}
+	securityGroupsAttr.Validators[0].ValidateList(context.Background(), req, &resp)
+	if !resp.Diagnostics.HasError() {
+		t.Fatalf("expected validator error for empty security_groups list")
+	}
+
+	// Test that list with one element is accepted
+	reqValid := validator.ListRequest{
+		ConfigValue: types.ListValueMust(types.StringType, []attr.Value{
+			types.StringValue("sg-12345"),
+		}),
+		Path: path.Root("compute_specs").AtName("security_groups"),
+	}
+	respValid := validator.ListResponse{}
+	securityGroupsAttr.Validators[0].ValidateList(context.Background(), reqValid, &respValid)
+	if respValid.Diagnostics.HasError() {
+		t.Fatalf("validator should accept non-empty security_groups list: %v", respValid.Diagnostics)
+	}
+
+	// Test that list with multiple elements is accepted
+	reqMultiple := validator.ListRequest{
+		ConfigValue: types.ListValueMust(types.StringType, []attr.Value{
+			types.StringValue("sg-12345"),
+			types.StringValue("sg-67890"),
+		}),
+		Path: path.Root("compute_specs").AtName("security_groups"),
+	}
+	respMultiple := validator.ListResponse{}
+	securityGroupsAttr.Validators[0].ValidateList(context.Background(), reqMultiple, &respMultiple)
+	if respMultiple.Diagnostics.HasError() {
+		t.Fatalf("validator should accept multiple security_groups: %v", respMultiple.Diagnostics)
+	}
+}

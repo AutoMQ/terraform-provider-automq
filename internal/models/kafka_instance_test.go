@@ -259,6 +259,58 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Configuration with compute_specs security_groups",
+			input: KafkaInstanceResourceModel{
+				Name:    types.StringValue("instance-with-sg"),
+				Version: types.StringValue("1.0.0"),
+				ComputeSpecs: &ComputeSpecsModel{
+					ReservedAku:    types.Int64Value(4),
+					SecurityGroups: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-abc123"), types.StringValue("sg-def456")}),
+				},
+				Features: &FeaturesModel{
+					WalMode: types.StringValue("EBSWAL"),
+				},
+			},
+			expected: client.InstanceCreateParam{
+				Name:    "instance-with-sg",
+				Version: "1.0.0",
+				Spec: client.SpecificationParam{
+					ReservedAku:    4,
+					NodeConfig:     &client.NodeConfigParam{},
+					SecurityGroups: []string{"sg-abc123", "sg-def456"},
+				},
+				Features: &client.InstanceFeatureParam{
+					WalMode: stringPtr("EBSWAL"),
+				},
+			},
+		},
+		{
+			name: "Configuration with null compute_specs security_groups",
+			input: KafkaInstanceResourceModel{
+				Name:    types.StringValue("instance-no-sg"),
+				Version: types.StringValue("1.0.0"),
+				ComputeSpecs: &ComputeSpecsModel{
+					ReservedAku:    types.Int64Value(4),
+					SecurityGroups: types.ListNull(types.StringType),
+				},
+				Features: &FeaturesModel{
+					WalMode: types.StringValue("EBSWAL"),
+				},
+			},
+			expected: client.InstanceCreateParam{
+				Name:    "instance-no-sg",
+				Version: "1.0.0",
+				Spec: client.SpecificationParam{
+					ReservedAku:    4,
+					NodeConfig:     &client.NodeConfigParam{},
+					SecurityGroups: nil, // Should not be included when null
+				},
+				Features: &client.InstanceFeatureParam{
+					WalMode: stringPtr("EBSWAL"),
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -634,4 +686,133 @@ func int32Ptr(i int32) *int32 {
 func timePtr(s string) *time.Time {
 	t, _ := time.Parse(time.RFC3339, s)
 	return &t
+}
+
+func TestFlattenKafkaInstanceModel_ComputeSpecsSecurityGroups(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    *client.InstanceVO
+		expected *KafkaInstanceResourceModel
+	}{
+		{
+			name: "Instance with compute_specs security_groups",
+			input: &client.InstanceVO{
+				InstanceId:  strPtr("instance-with-sg"),
+				Name:        strPtr("test-with-sg"),
+				Description: strPtr("Instance with security groups"),
+				Version:     strPtr("1.0.0"),
+				State:       strPtr("Running"),
+				Spec: &client.SpecificationVO{
+					ReservedAku:    int32Ptr(4),
+					SecurityGroups: []string{"sg-abc123", "sg-def456"},
+				},
+				Features: &client.InstanceFeatureVO{
+					WalMode: strPtr("EBSWAL"),
+				},
+			},
+			expected: &KafkaInstanceResourceModel{
+				InstanceID:     types.StringValue("instance-with-sg"),
+				Name:           types.StringValue("test-with-sg"),
+				Description:    types.StringValue("Instance with security groups"),
+				Version:        types.StringValue("1.0.0"),
+				InstanceStatus: types.StringValue("Running"),
+				ComputeSpecs: &ComputeSpecsModel{
+					ReservedAku:    types.Int64Value(4),
+					SecurityGroups: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-abc123"), types.StringValue("sg-def456")}),
+				},
+				Features: &FeaturesModel{
+					WalMode: types.StringValue("EBSWAL"),
+				},
+			},
+		},
+		{
+			name: "Instance without compute_specs security_groups",
+			input: &client.InstanceVO{
+				InstanceId:  strPtr("instance-no-sg"),
+				Name:        strPtr("test-no-sg"),
+				Description: strPtr("Instance without security groups"),
+				Version:     strPtr("1.0.0"),
+				State:       strPtr("Running"),
+				Spec: &client.SpecificationVO{
+					ReservedAku:    int32Ptr(4),
+					SecurityGroups: nil,
+				},
+				Features: &client.InstanceFeatureVO{
+					WalMode: strPtr("EBSWAL"),
+				},
+			},
+			expected: &KafkaInstanceResourceModel{
+				InstanceID:     types.StringValue("instance-no-sg"),
+				Name:           types.StringValue("test-no-sg"),
+				Description:    types.StringValue("Instance without security groups"),
+				Version:        types.StringValue("1.0.0"),
+				InstanceStatus: types.StringValue("Running"),
+				ComputeSpecs: &ComputeSpecsModel{
+					ReservedAku:    types.Int64Value(4),
+					SecurityGroups: types.ListNull(types.StringType),
+				},
+				Features: &FeaturesModel{
+					WalMode: types.StringValue("EBSWAL"),
+				},
+			},
+		},
+		{
+			name: "Instance with single security group",
+			input: &client.InstanceVO{
+				InstanceId:  strPtr("instance-single-sg"),
+				Name:        strPtr("test-single-sg"),
+				Description: strPtr("Instance with single security group"),
+				Version:     strPtr("1.0.0"),
+				State:       strPtr("Running"),
+				Spec: &client.SpecificationVO{
+					ReservedAku:    int32Ptr(6),
+					SecurityGroups: []string{"sg-only-one"},
+				},
+				Features: &client.InstanceFeatureVO{
+					WalMode: strPtr("S3WAL"),
+				},
+			},
+			expected: &KafkaInstanceResourceModel{
+				InstanceID:     types.StringValue("instance-single-sg"),
+				Name:           types.StringValue("test-single-sg"),
+				Description:    types.StringValue("Instance with single security group"),
+				Version:        types.StringValue("1.0.0"),
+				InstanceStatus: types.StringValue("Running"),
+				ComputeSpecs: &ComputeSpecsModel{
+					ReservedAku:    types.Int64Value(6),
+					SecurityGroups: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-only-one")}),
+				},
+				Features: &FeaturesModel{
+					WalMode: types.StringValue("S3WAL"),
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resource := &KafkaInstanceResourceModel{}
+			diags := FlattenKafkaInstanceModel(context.Background(), tt.input, resource)
+
+			assert.False(t, diags.HasError(), "FlattenKafkaInstanceModel should not return errors")
+
+			// Check basic fields
+			assert.Equal(t, tt.expected.InstanceID, resource.InstanceID)
+			assert.Equal(t, tt.expected.Name, resource.Name)
+			assert.Equal(t, tt.expected.Description, resource.Description)
+			assert.Equal(t, tt.expected.Version, resource.Version)
+			assert.Equal(t, tt.expected.InstanceStatus, resource.InstanceStatus)
+
+			// Check compute specs
+			assert.NotNil(t, resource.ComputeSpecs)
+			assert.Equal(t, tt.expected.ComputeSpecs.ReservedAku, resource.ComputeSpecs.ReservedAku)
+
+			// Check security groups
+			assert.Equal(t, tt.expected.ComputeSpecs.SecurityGroups, resource.ComputeSpecs.SecurityGroups)
+
+			// Check features
+			assert.NotNil(t, resource.Features)
+			assert.Equal(t, tt.expected.Features.WalMode, resource.Features.WalMode)
+		})
+	}
 }

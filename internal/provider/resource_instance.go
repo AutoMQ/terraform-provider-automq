@@ -255,6 +255,19 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							stringplanmodifier.UseStateForUnknown(),
 						},
 					},
+					"security_groups": schema.ListAttribute{
+						ElementType: types.StringType,
+						Optional:    true,
+						Computed:    true,
+						Description: "Security groups for the instance. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group.",
+						PlanModifiers: []planmodifier.List{
+							listplanmodifier.RequiresReplace(),
+							listplanmodifier.UseStateForUnknown(),
+						},
+						Validators: []validator.List{
+							listvalidator.SizeAtLeast(1),
+						},
+					},
 					"file_system_param": schema.SingleNestedAttribute{
 						Optional:    true,
 						Description: "File system configuration for FSWAL mode",
