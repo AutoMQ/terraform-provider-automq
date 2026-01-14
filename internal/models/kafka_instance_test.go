@@ -816,3 +816,42 @@ func TestFlattenKafkaInstanceModel_ComputeSpecsSecurityGroups(t *testing.T) {
 		})
 	}
 }
+
+// TestFlattenKafkaInstanceModel_SecurityGroupsUnknownToNull tests that
+// when previous state has unknown security_groups and API returns null,
+// the result should be ListNull (not unknown).
+func TestFlattenKafkaInstanceModel_SecurityGroupsUnknownToNull(t *testing.T) {
+	// Simulate a resource with unknown security_groups (like during plan/apply)
+	resource := &KafkaInstanceResourceModel{
+		ComputeSpecs: &ComputeSpecsModel{
+			ReservedAku:    types.Int64Value(4),
+			SecurityGroups: types.ListUnknown(types.StringType), // Unknown during planning
+		},
+	}
+
+	// API returns null security_groups
+	input := &client.InstanceVO{
+		InstanceId:  strPtr("test-instance"),
+		Name:        strPtr("test"),
+		Version:     strPtr("1.0.0"),
+		State:       strPtr("Running"),
+		Spec: &client.SpecificationVO{
+			ReservedAku:    int32Ptr(4),
+			SecurityGroups: nil, // API returns null
+		},
+		Features: &client.InstanceFeatureVO{
+			WalMode: strPtr("EBSWAL"),
+		},
+	}
+
+	diags := FlattenKafkaInstanceModel(context.Background(), input, resource)
+
+	assert.False(t, diags.HasError(), "FlattenKafkaInstanceModel should not return errors")
+	assert.NotNil(t, resource.ComputeSpecs)
+
+	// The key assertion: security_groups should be ListNull, not ListUnknown
+	assert.True(t, resource.ComputeSpecs.SecurityGroups.IsNull(),
+		"security_groups should be null when API returns null, got: %v", resource.ComputeSpecs.SecurityGroups)
+	assert.False(t, resource.ComputeSpecs.SecurityGroups.IsUnknown(),
+		"security_groups should not be unknown after flatten")
+}

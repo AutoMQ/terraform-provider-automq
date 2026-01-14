@@ -760,7 +760,7 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 			if !sgDiags.HasError() {
 				resource.ComputeSpecs.SecurityGroups = securityGroupsList
 			}
-		} else if previousSpecs != nil && !previousSpecs.SecurityGroups.IsNull() {
+		} else if previousSpecs != nil && !previousSpecs.SecurityGroups.IsNull() && !previousSpecs.SecurityGroups.IsUnknown() {
 			resource.ComputeSpecs.SecurityGroups = previousSpecs.SecurityGroups
 		} else {
 			resource.ComputeSpecs.SecurityGroups = types.ListNull(types.StringType)
