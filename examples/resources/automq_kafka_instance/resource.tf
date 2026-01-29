@@ -4,6 +4,11 @@ resource "automq_kafka_instance" "example" {
   description    = "example deployment using inline compute specs"
   version        = "5.3.5"
 
+  tags = {
+    environment = "production"
+    team        = "platform"
+  }
+
   compute_specs = {
     reserved_aku = 6
     deploy_type  = "IAAS"

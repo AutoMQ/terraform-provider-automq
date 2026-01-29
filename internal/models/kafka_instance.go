@@ -32,6 +32,7 @@ type KafkaInstanceResourceModel struct {
 	Version        types.String       `tfsdk:"version"`
 	ComputeSpecs   *ComputeSpecsModel `tfsdk:"compute_specs"`
 	Features       *FeaturesModel     `tfsdk:"features"`
+	Tags           types.Map          `tfsdk:"tags"`
 	Endpoints      types.List         `tfsdk:"endpoints"`
 	CreatedAt      timetypes.RFC3339  `tfsdk:"created_at"`
 	LastUpdated    timetypes.RFC3339  `tfsdk:"last_updated"`
@@ -47,6 +48,7 @@ type KafkaInstanceModel struct {
 	Version        types.String          `tfsdk:"version"`
 	ComputeSpecs   *ComputeSpecsModel    `tfsdk:"compute_specs"`
 	Features       *FeaturesSummaryModel `tfsdk:"features"`
+	Tags           types.Map             `tfsdk:"tags"`
 	Endpoints      types.List            `tfsdk:"endpoints"`
 	CreatedAt      timetypes.RFC3339     `tfsdk:"created_at"`
 	LastUpdated    timetypes.RFC3339     `tfsdk:"last_updated"`
@@ -349,6 +351,23 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 
 	}
 
+	// Tags - expand map to TagParam slice
+	if !instance.Tags.IsNull() && !instance.Tags.IsUnknown() {
+		tagsMap := make(map[string]string)
+		diags := instance.Tags.ElementsAs(context.TODO(), &tagsMap, false)
+		if diags.HasError() {
+			return fmt.Errorf("failed to parse tags: %v", diags)
+		}
+		tags := make([]client.TagParam, 0, len(tagsMap))
+		for name, value := range tagsMap {
+			tags = append(tags, client.TagParam{
+				Name:  name,
+				Value: value,
+			})
+		}
+		request.Tags = tags
+	}
+
 	// Features
 	if instance.Features != nil {
 		// WAL
@@ -563,6 +582,7 @@ func ConvertKafkaInstanceModel(resource *KafkaInstanceResourceModel, model *Kafk
 		model.Features = nil
 	}
 	model.Endpoints = resource.Endpoints
+	model.Tags = resource.Tags
 	model.CreatedAt = resource.CreatedAt
 	model.LastUpdated = resource.LastUpdated
 	model.InstanceStatus = resource.InstanceStatus
@@ -906,6 +926,24 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 	}
 	if instance.GmtModified != nil {
 		resource.LastUpdated = timetypes.NewRFC3339TimePointerValue(instance.GmtModified)
+	}
+
+	// Tags - flatten TagVO slice to map
+	if len(instance.Tags) > 0 {
+		tagsMap := make(map[string]string, len(instance.Tags))
+		for _, tag := range instance.Tags {
+			if tag.Name != nil && tag.Value != nil {
+				tagsMap[*tag.Name] = *tag.Value
+			}
+		}
+		tagsValue, tagsDiags := types.MapValueFrom(context.Background(), types.StringType, tagsMap)
+		if tagsDiags.HasError() {
+			diags.Append(tagsDiags...)
+		} else {
+			resource.Tags = tagsValue
+		}
+	} else if resource.Tags.IsUnknown() {
+		resource.Tags = types.MapNull(types.StringType)
 	}
 
 	return diags

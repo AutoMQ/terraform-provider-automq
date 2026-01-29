@@ -24,6 +24,11 @@ resource "automq_kafka_instance" "example" {
   description    = "example deployment using inline compute specs"
   version        = "5.3.5"
 
+  tags = {
+    environment = "production"
+    team        = "platform"
+  }
+
   compute_specs = {
     reserved_aku = 6
     deploy_type  = "IAAS"
@@ -72,6 +77,7 @@ variable "automq_environment_id" {
 ### Optional
 
 - `description` (String) The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.
+- `tags` (Map of String) A map of tags to assign to the Kafka instance. Tags are key-value pairs that help you identify and organize your resources. Once set, tags cannot be modified.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 
 ### Read-Only
