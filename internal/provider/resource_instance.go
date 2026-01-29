@@ -23,7 +23,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
@@ -141,9 +140,6 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				ElementType:         types.StringType,
 				Optional:            true,
 				MarkdownDescription: "A map of tags to assign to the Kafka instance. Tags are key-value pairs that help you identify and organize your resources. Once set, tags cannot be modified.",
-				PlanModifiers: []planmodifier.Map{
-					mapplanmodifier.RequiresReplace(),
-				},
 			},
 			"compute_specs": schema.SingleNestedAttribute{
 				Required:    true,
@@ -847,6 +843,15 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		desc := planDesc
 		updateParam.Description = &desc
 		hasUpdate = true
+	}
+
+	// Tags are immutable after creation - block any modification attempts
+	if !plan.Tags.Equal(state.Tags) {
+		resp.Diagnostics.AddError(
+			"Tags Cannot Be Modified",
+			fmt.Sprintf("Tags for Kafka instance %q cannot be modified after creation. To change tags, you must delete and recreate the instance.", instanceId),
+		)
+		return
 	}
 
 	if plan.Features != nil && state.Features != nil && !plan.Features.InstanceConfigs.IsUnknown() && !state.Features.InstanceConfigs.IsUnknown() {
