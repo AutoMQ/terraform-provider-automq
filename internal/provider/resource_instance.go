@@ -129,7 +129,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				},
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription: "The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 256 characters.",
+				MarkdownDescription: "The instance description is used to differentiate the purpose of the instance. It supports letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 256 characters.",
 				Optional:            true,
 			},
 			"version": schema.StringAttribute{
@@ -425,10 +425,12 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 									},
 									"password": schema.StringAttribute{
 										Optional:            true,
+										Sensitive:           true,
 										MarkdownDescription: "Password for HTTP Basic authentication. Required when `auth_type` is `basic`.",
 									},
 									"token": schema.StringAttribute{
 										Optional:            true,
+										Sensitive:           true,
 										MarkdownDescription: "Bearer token for authentication. Required when `auth_type` is `bearer`.",
 									},
 									"labels": schema.MapAttribute{
@@ -470,6 +472,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							},
 							"keytab_file": schema.StringAttribute{
 								Optional:            true,
+								Sensitive:           true,
 								MarkdownDescription: "Base64-encoded Kerberos keytab file content. Required when `hive_auth_mode` is `KERBEROS`.",
 							},
 							"krb5conf_file": schema.StringAttribute{

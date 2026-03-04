@@ -50,7 +50,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 				Optional:            true,
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription: "The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.",
+				MarkdownDescription: "The instance description is used to differentiate the purpose of the instance. It supports letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 256 characters.",
 				Computed:            true,
 			},
 			"version": schema.StringAttribute{

@@ -71,7 +71,7 @@ variable "automq_environment_id" {
 
 ### Optional
 
-- `description` (String) The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 256 characters.
+- `description` (String) The instance description is used to differentiate the purpose of the instance. It supports letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 256 characters.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 
 ### Read-Only
@@ -210,9 +210,9 @@ Required:
 Optional:
 
 - `labels` (Map of String) Custom labels to attach to exported metrics as key-value pairs.
-- `password` (String) Password for HTTP Basic authentication. Required when `auth_type` is `basic`.
+- `password` (String, Sensitive) Password for HTTP Basic authentication. Required when `auth_type` is `basic`.
 - `prometheus_arn` (String) AWS Managed Service for Prometheus workspace ARN. Required when `auth_type` is `sigv4`. Format: `arn:aws:aps:<region>:<account-id>:workspace/<workspace-id>`. Ensure the workspace region matches the instance deployment region.
-- `token` (String) Bearer token for authentication. Required when `auth_type` is `bearer`.
+- `token` (String, Sensitive) Bearer token for authentication. Required when `auth_type` is `bearer`.
 - `username` (String) Username for HTTP Basic authentication. Required when `auth_type` is `basic`.
 
 
@@ -229,7 +229,7 @@ Optional:
 
 - `hive_auth_mode` (String) Authentication mode for Hive Metastore. Supported values: `NONE` (no authentication), `KERBEROS` (Kerberos authentication).
 - `kerberos_principal` (String) Kerberos principal configured on the Hive Metastore server. Required when `hive_auth_mode` is `KERBEROS`.
-- `keytab_file` (String) Base64-encoded Kerberos keytab file content. Required when `hive_auth_mode` is `KERBEROS`.
+- `keytab_file` (String, Sensitive) Base64-encoded Kerberos keytab file content. Required when `hive_auth_mode` is `KERBEROS`.
 - `krb5conf_file` (String) Base64-encoded Kerberos krb5.conf file content. Required when `hive_auth_mode` is `KERBEROS`.
 - `metastore_uri` (String) Hive Metastore endpoint. Required when `catalog_type` is `hive`. Format: `thrift://<host>:<port>`.
 - `user_principal` (String) Kerberos user principal for authentication, e.g. `username@REALM`. Required when `hive_auth_mode` is `KERBEROS`.

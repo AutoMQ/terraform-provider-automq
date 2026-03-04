@@ -48,7 +48,7 @@ output "example-id" {
 
 - `compute_specs` (Attributes) The compute specs of the instance (see [below for nested schema](#nestedatt--compute_specs))
 - `created_at` (String) Timestamp when the instance was created (RFC3339 format).
-- `description` (String) The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.
+- `description` (String) The instance description is used to differentiate the purpose of the instance. It supports letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 256 characters.
 - `endpoints` (Attributes List) The bootstrap endpoints of instance. AutoMQ supports multiple access protocols; therefore, the Endpoint is a list. (see [below for nested schema](#nestedatt--endpoints))
 - `features` (Attributes) Feature configuration for the Kafka instance. (see [below for nested schema](#nestedatt--features))
 - `last_updated` (String) Timestamp when the instance was last updated (RFC3339 format).
