@@ -936,11 +936,13 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 				tagsMap[*tag.Name] = *tag.Value
 			}
 		}
-		tagsValue, tagsDiags := types.MapValueFrom(context.Background(), types.StringType, tagsMap)
-		if tagsDiags.HasError() {
-			diags.Append(tagsDiags...)
-		} else {
-			resource.Tags = tagsValue
+		if len(tagsMap) > 0 {
+			tagsValue, tagsDiags := types.MapValueFrom(context.Background(), types.StringType, tagsMap)
+			if tagsDiags.HasError() {
+				diags.Append(tagsDiags...)
+			} else {
+				resource.Tags = tagsValue
+			}
 		}
 	} else if resource.Tags.IsUnknown() {
 		resource.Tags = types.MapNull(types.StringType)
