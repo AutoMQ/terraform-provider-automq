@@ -847,8 +847,6 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		hasUpdate = true
 	}
 
-	// Tags are immutable - handled by RequiresReplace() plan modifier
-
 	if plan.Features != nil && state.Features != nil && !plan.Features.InstanceConfigs.IsUnknown() && !state.Features.InstanceConfigs.IsUnknown() {
 		planConfig := plan.Features.InstanceConfigs
 		stateConfig := state.Features.InstanceConfigs

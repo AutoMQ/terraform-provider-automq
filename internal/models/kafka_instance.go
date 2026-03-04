@@ -354,7 +354,7 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 	// Tags - expand map to TagParam slice
 	if !instance.Tags.IsNull() && !instance.Tags.IsUnknown() {
 		tagsMap := make(map[string]string)
-		diags := instance.Tags.ElementsAs(context.TODO(), &tagsMap, false)
+		diags := instance.Tags.ElementsAs(ctx, &tagsMap, false)
 		if diags.HasError() {
 			return fmt.Errorf("failed to parse tags: %v", diags)
 		}
@@ -937,7 +937,7 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 			}
 		}
 		if len(tagsMap) > 0 {
-			tagsValue, tagsDiags := types.MapValueFrom(context.Background(), types.StringType, tagsMap)
+			tagsValue, tagsDiags := types.MapValueFrom(ctx, types.StringType, tagsMap)
 			if tagsDiags.HasError() {
 				diags.Append(tagsDiags...)
 			} else {
