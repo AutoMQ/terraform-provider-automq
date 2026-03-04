@@ -312,7 +312,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				Attributes: map[string]schema.Attribute{
 					"wal_mode": schema.StringAttribute{
 						Required:            true,
-						MarkdownDescription: "Write-Ahead Log storage mode. `EBSWAL` (EBS-based, sub-millisecond latency, recommended for most workloads), `S3WAL` (S3-based, ~100ms latency, cost-effective for logging/monitoring), `FSWAL` (FSx-based, millisecond latency, requires `file_system_param`). Note: `FSWAL` is not supported with `K8S` deploy type.",
+						MarkdownDescription: "Write-Ahead Log storage mode: `EBSWAL`, `S3WAL`, or `FSWAL`. `FSWAL` requires `file_system_param` and is not supported with `K8S` deploy type. See [WAL mode documentation](https://docs.automq.com/automq-cloud/manage-instances/create-instance/choose-wal-mode) for details.",
 						Validators: []validator.String{
 							stringvalidator.OneOf("EBSWAL", "S3WAL", "FSWAL"),
 						},
