@@ -39,16 +39,16 @@ variable "link_id" {
 
 ### Required
 
-- `environment_id` (String)
-- `instance_id` (String)
-- `link_id` (String)
+- `environment_id` (String) Target AutoMQ BYOC environment identifier (e.g. `env-xxxxx`). Find this on the AutoMQ console System Settings page.
+- `instance_id` (String) Kafka instance identifier that owns the link.
+- `link_id` (String) Kafka link identifier. Must reference an existing `automq_kafka_link` resource.
 - `source_group_id` (String) Consumer group identifier in the source Kafka cluster.
 
 ### Read-Only
 
-- `error_code` (String)
-- `mirror_group_id` (String)
-- `state` (String)
+- `error_code` (String) Error code if the mirroring operation failed.
+- `mirror_group_id` (String) Unique identifier for the mirrored consumer group.
+- `state` (String) Current state of the mirrored consumer group.
 
 ## Import
 

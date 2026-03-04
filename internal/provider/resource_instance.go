@@ -110,7 +110,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
-				MarkdownDescription: "Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.",
+				MarkdownDescription: "Target AutoMQ BYOC environment identifier (e.g. `env-xxxxx`). Find this on the AutoMQ console System Settings page.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
@@ -129,20 +129,20 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				},
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription: "The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.",
+				MarkdownDescription: "The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 256 characters.",
 				Optional:            true,
 			},
 			"version": schema.StringAttribute{
-				Required:    true,
-				Description: "The software version of AutoMQ instance. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.",
+				Required:            true,
+				MarkdownDescription: "The software version of AutoMQ instance. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.",
 			},
 			"compute_specs": schema.SingleNestedAttribute{
-				Required:    true,
-				Description: "The compute specs of the instance",
+				Required:            true,
+				MarkdownDescription: "The compute specs of the instance",
 				Attributes: map[string]schema.Attribute{
 					"reserved_aku": schema.Int64Attribute{
-						Required:    true,
-						Description: "AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.",
+						Required:            true,
+						MarkdownDescription: "AKU (AutoMQ Kafka Unit) defines the cluster scale. Each AKU provides up to 30 MiB/s write or 60 MiB/s read throughput. Valid range: 3–500. For sizing guidance, refer to the [billing documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints).",
 						Validators: []validator.Int64{
 							int64validator.Between(3, 500),
 						},
@@ -150,7 +150,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					"deploy_type": schema.StringAttribute{
 						Optional:            true,
 						Computed:            true,
-						MarkdownDescription: "Deployment platform for the instance. Supported values: `IAAS`, `K8S`.",
+						MarkdownDescription: "Deployment platform for the instance. `IAAS` deploys on EC2/VM instances; `K8S` deploys on a managed Kubernetes cluster (EKS/GKE/AKS). Supported values: `IAAS`, `K8S`.",
 						Validators: []validator.String{
 							stringvalidator.OneOf("IAAS", "K8S"),
 						},
@@ -165,8 +165,8 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						},
 					},
 					"networks": schema.ListNestedAttribute{
-						Required:    true,
-						Description: "To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones.",
+						Required:            true,
+						MarkdownDescription: "To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones.",
 						Validators: []validator.List{
 							listvalidator.UniqueValues(),
 							listvalidator.SizeAtMost(3),
@@ -175,14 +175,14 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"zone": schema.StringAttribute{
-									Required:      true,
-									Description:   "The availability zone ID of the cloud provider.",
-									PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+									Required:            true,
+									MarkdownDescription: "Cloud provider availability zone ID (e.g. `us-east-1a` for AWS). Must match the zone of the specified subnet.",
+									PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 								},
 								"subnets": schema.ListAttribute{
-									Optional:    true,
-									Description: "Specify the subnet under the corresponding availability zone for deploying the instance. Currently, only one subnet can be set for each availability zone.",
-									ElementType: types.StringType,
+									Optional:            true,
+									MarkdownDescription: "Specify the subnet under the corresponding availability zone for deploying the instance. Currently, only one subnet can be set for each availability zone.",
+									ElementType:         types.StringType,
 									Validators: []validator.List{
 										listvalidator.UniqueValues(),
 										listvalidator.SizeAtMost(1),
@@ -193,29 +193,29 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						},
 					},
 					"kubernetes_node_groups": schema.ListNestedAttribute{
-						Optional:    true,
-						Description: "Node groups (or node pools) are units for unified configuration management of physical nodes in Kubernetes. Different Kubernetes providers may use different terms for node groups. Select target node groups that must be created in advance and configured for either single-AZ or three-AZ deployment. The instance node type must meet the requirements specified in the documentation. If you select a single-AZ node group, the AutoMQ instance will be deployed in a single availability zone; if you select a three-AZ node group, the instance will be deployed across three availability zones.",
+						Optional:            true,
+						MarkdownDescription: "Node groups (or node pools) are units for unified configuration management of physical nodes in Kubernetes. Different Kubernetes providers may use different terms for node groups. Select target node groups that must be created in advance and configured for either single-AZ or three-AZ deployment. The instance node type must meet the requirements specified in the documentation. If you select a single-AZ node group, the AutoMQ instance will be deployed in a single availability zone; if you select a three-AZ node group, the instance will be deployed across three availability zones.",
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id": schema.StringAttribute{
-									Required:    true,
-									Description: "Node group identifier",
+									Required:            true,
+									MarkdownDescription: "Node group identifier",
 								},
 							},
 						},
 						PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplace()},
 					},
 					"data_buckets": schema.ListNestedAttribute{
-						Optional:    true,
-						Computed:    true,
-						Description: "Inline bucket configuration replacing legacy bucket profiles.",
-						CustomType:  types.ListType{ElemType: models.DataBucketObjectType},
+						Optional:            true,
+						Computed:            true,
+						MarkdownDescription: "Inline bucket configuration replacing legacy bucket profiles.",
+						CustomType:          types.ListType{ElemType: models.DataBucketObjectType},
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"bucket_name": schema.StringAttribute{
-									Optional:    true,
-									Computed:    true,
-									Description: "Object storage bucket name used for data.",
+									Optional:            true,
+									Computed:            true,
+									MarkdownDescription: "Object storage bucket name used for data.",
 									PlanModifiers: []planmodifier.String{
 										stringplanmodifier.UseStateForUnknown(),
 									},
@@ -231,35 +231,38 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					},
 					"kubernetes_cluster_id": schema.StringAttribute{
 						Optional:            true,
-						MarkdownDescription: "Identifier for the target Kubernetes cluster when deploy_type is KUBERNETES.",
+						MarkdownDescription: "Identifier for the target Kubernetes cluster when `deploy_type` is `K8S`.",
 					},
 					"kubernetes_namespace": schema.StringAttribute{
-						Computed: true,
-						Optional: true,
+						Computed:            true,
+						Optional:            true,
+						MarkdownDescription: "Kubernetes namespace for the instance deployment. If not specified, the backend will auto-assign one.",
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.UseStateForUnknown(),
 						},
 					},
 					"kubernetes_service_account": schema.StringAttribute{
-						Computed: true,
-						Optional: true,
+						Computed:            true,
+						Optional:            true,
+						MarkdownDescription: "Kubernetes service account for the instance pods. If not specified, the backend will auto-assign one.",
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.UseStateForUnknown(),
 						},
 					},
 					"instance_role": schema.StringAttribute{
-						Computed: true,
-						Optional: true,
+						Computed:            true,
+						Optional:            true,
+						MarkdownDescription: "IAM role ARN for the Kafka instance. If not specified, the backend will auto-generate an appropriate role. Format: `arn:aws:iam::<account-id>:role/<role-name>`.",
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.RequiresReplace(),
 							stringplanmodifier.UseStateForUnknown(),
 						},
 					},
 					"security_groups": schema.ListAttribute{
-						ElementType: types.StringType,
-						Optional:    true,
-						Computed:    true,
-						Description: "Security groups for the instance. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group.",
+						ElementType:         types.StringType,
+						Optional:            true,
+						Computed:            true,
+						MarkdownDescription: "Security groups for the instance. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group.",
 						PlanModifiers: []planmodifier.List{
 							listplanmodifier.RequiresReplace(),
 							listplanmodifier.UseStateForUnknown(),
@@ -269,28 +272,28 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						},
 					},
 					"file_system_param": schema.SingleNestedAttribute{
-						Optional:    true,
-						Description: "File system configuration for FSWAL mode",
+						Optional:            true,
+						MarkdownDescription: "File system configuration for FSWAL mode",
 						Attributes: map[string]schema.Attribute{
 							"throughput_mibps_per_file_system": schema.Int64Attribute{
-								Required:    true,
-								Description: "Throughput in MiBps per file system",
+								Required:            true,
+								MarkdownDescription: "Throughput in MiBps per file system",
 								Validators: []validator.Int64{
 									int64validator.AtLeast(1),
 								},
 							},
 							"file_system_count": schema.Int64Attribute{
-								Required:    true,
-								Description: "Number of file systems",
+								Required:            true,
+								MarkdownDescription: "Number of file systems",
 								Validators: []validator.Int64{
 									int64validator.AtLeast(1),
 								},
 							},
 							"security_groups": schema.ListAttribute{
-								ElementType: types.StringType,
-								Optional:    true,
-								Computed:    true,
-								Description: "Security groups for file systems. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group.",
+								ElementType:         types.StringType,
+								Optional:            true,
+								Computed:            true,
+								MarkdownDescription: "Security groups for file systems. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group.",
 								PlanModifiers: []planmodifier.List{
 									listplanmodifier.RequiresReplace(),
 									listplanmodifier.UseStateForUnknown(),
@@ -304,11 +307,12 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				},
 			},
 			"features": schema.SingleNestedAttribute{
-				Required: true,
+				Required:            true,
+				MarkdownDescription: "Feature configuration for the Kafka instance including WAL mode, security, metrics, and table topics.",
 				Attributes: map[string]schema.Attribute{
 					"wal_mode": schema.StringAttribute{
-						Required:    true,
-						Description: "Write-Ahead Logging mode: EBSWAL (using EBS as write buffer), S3WAL (using object storage as write buffer), or FSWAL (using file system as write buffer). Defaults to EBSWAL.",
+						Required:            true,
+						MarkdownDescription: "Write-Ahead Log storage mode. `EBSWAL` (EBS-based, sub-millisecond latency, recommended for most workloads), `S3WAL` (S3-based, ~100ms latency, cost-effective for logging/monitoring), `FSWAL` (FSx-based, millisecond latency, requires `file_system_param`). Note: `FSWAL` is not supported with `K8S` deploy type.",
 						Validators: []validator.String{
 							stringvalidator.OneOf("EBSWAL", "S3WAL", "FSWAL"),
 						},
@@ -394,25 +398,43 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					},
 					"metrics_exporter": schema.SingleNestedAttribute{
 						Optional:            true,
-						MarkdownDescription: "Configure Prometheus metrics scraping.",
+						MarkdownDescription: "Configure Prometheus Remote Write metrics exporter.",
 						Attributes: map[string]schema.Attribute{
 							"prometheus": schema.SingleNestedAttribute{
-								Optional: true,
+								Optional:            true,
+								MarkdownDescription: "Prometheus Remote Write configuration for exporting metrics.",
 								Attributes: map[string]schema.Attribute{
 									"auth_type": schema.StringAttribute{
-										Required: true,
+										Required:            true,
+										MarkdownDescription: "Authentication type for Prometheus Remote Write. Supported values: `noauth` (no authentication), `basic` (HTTP Basic authentication), `bearer` (Bearer token authentication), `sigv4` (AWS Signature Version 4 for AWS Managed Service for Prometheus).",
 										Validators: []validator.String{
 											stringvalidator.OneOf(allowedPrometheusAuthTypes...),
 										},
 									},
-									"endpoint":       schema.StringAttribute{Required: true},
-									"prometheus_arn": schema.StringAttribute{Optional: true},
-									"username":       schema.StringAttribute{Optional: true},
-									"password":       schema.StringAttribute{Optional: true},
-									"token":          schema.StringAttribute{Optional: true},
+									"endpoint": schema.StringAttribute{
+										Required:            true,
+										MarkdownDescription: "Prometheus Remote Write endpoint URL. Must be a valid HTTP/HTTPS URL.",
+									},
+									"prometheus_arn": schema.StringAttribute{
+										Optional:            true,
+										MarkdownDescription: "AWS Managed Service for Prometheus workspace ARN. Required when `auth_type` is `sigv4`. Format: `arn:aws:aps:<region>:<account-id>:workspace/<workspace-id>`. Ensure the workspace region matches the instance deployment region.",
+									},
+									"username": schema.StringAttribute{
+										Optional:            true,
+										MarkdownDescription: "Username for HTTP Basic authentication. Required when `auth_type` is `basic`.",
+									},
+									"password": schema.StringAttribute{
+										Optional:            true,
+										MarkdownDescription: "Password for HTTP Basic authentication. Required when `auth_type` is `basic`.",
+									},
+									"token": schema.StringAttribute{
+										Optional:            true,
+										MarkdownDescription: "Bearer token for authentication. Required when `auth_type` is `bearer`.",
+									},
 									"labels": schema.MapAttribute{
-										Optional:    true,
-										ElementType: types.StringType,
+										Optional:            true,
+										MarkdownDescription: "Custom labels to attach to exported metrics as key-value pairs.",
+										ElementType:         types.StringType,
 									},
 								},
 							},
@@ -423,17 +445,37 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						MarkdownDescription: "Inline table topic (Iceberg/Hive) configuration replacing legacy integration references.",
 						Attributes: map[string]schema.Attribute{
 							"warehouse": schema.StringAttribute{
-								Required: true,
+								Required:            true,
+								MarkdownDescription: "Warehouse location for table data. For S3 Table catalog, provide the S3 Table Bucket ARN.",
 							},
 							"catalog_type": schema.StringAttribute{
-								Required: true,
+								Required:            true,
+								MarkdownDescription: "Catalog type for managing Iceberg tables. Supported values: `s3Table` (S3 Table Catalog), `glue` (Glue Catalog), `hive` (Hive Catalog).",
 							},
-							"metastore_uri":      schema.StringAttribute{Optional: true},
-							"hive_auth_mode":     schema.StringAttribute{Optional: true},
-							"kerberos_principal": schema.StringAttribute{Optional: true},
-							"user_principal":     schema.StringAttribute{Optional: true},
-							"keytab_file":        schema.StringAttribute{Optional: true},
-							"krb5conf_file":      schema.StringAttribute{Optional: true},
+							"metastore_uri": schema.StringAttribute{
+								Optional:            true,
+								MarkdownDescription: "Hive Metastore endpoint. Required when `catalog_type` is `hive`. Format: `thrift://<host>:<port>`.",
+							},
+							"hive_auth_mode": schema.StringAttribute{
+								Optional:            true,
+								MarkdownDescription: "Authentication mode for Hive Metastore. Supported values: `NONE` (no authentication), `KERBEROS` (Kerberos authentication).",
+							},
+							"kerberos_principal": schema.StringAttribute{
+								Optional:            true,
+								MarkdownDescription: "Kerberos principal configured on the Hive Metastore server. Required when `hive_auth_mode` is `KERBEROS`.",
+							},
+							"user_principal": schema.StringAttribute{
+								Optional:            true,
+								MarkdownDescription: "Kerberos user principal for authentication, e.g. `username@REALM`. Required when `hive_auth_mode` is `KERBEROS`.",
+							},
+							"keytab_file": schema.StringAttribute{
+								Optional:            true,
+								MarkdownDescription: "Base64-encoded Kerberos keytab file content. Required when `hive_auth_mode` is `KERBEROS`.",
+							},
+							"krb5conf_file": schema.StringAttribute{
+								Optional:            true,
+								MarkdownDescription: "Base64-encoded Kerberos krb5.conf file content. Required when `hive_auth_mode` is `KERBEROS`.",
+							},
 						},
 						PlanModifiers: []planmodifier.Object{
 							objectplanmodifier.RequiresReplace(),
@@ -442,12 +484,14 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				},
 			},
 			"created_at": schema.StringAttribute{
-				CustomType: timetypes.RFC3339Type{},
-				Computed:   true,
+				CustomType:          timetypes.RFC3339Type{},
+				Computed:            true,
+				MarkdownDescription: "Timestamp when the instance was created (RFC3339 format).",
 			},
 			"last_updated": schema.StringAttribute{
-				CustomType: timetypes.RFC3339Type{},
-				Computed:   true,
+				CustomType:          timetypes.RFC3339Type{},
+				Computed:            true,
+				MarkdownDescription: "Timestamp when the instance was last updated (RFC3339 format).",
 			},
 			"status": schema.StringAttribute{
 				Computed:            true,
@@ -457,32 +501,32 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				},
 			},
 			"endpoints": schema.ListNestedAttribute{
-				Computed:    true,
-				Description: "The bootstrap endpoints of instance. AutoMQ supports multiple access protocols; therefore, the Endpoint is a list.",
+				Computed:            true,
+				MarkdownDescription: "The bootstrap endpoints of instance. AutoMQ supports multiple access protocols; therefore, the Endpoint is a list.",
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.UseStateForUnknown(),
 				},
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"display_name": schema.StringAttribute{
-							Computed:    true,
-							Description: "The name of endpoint",
+							Computed:            true,
+							MarkdownDescription: "The name of endpoint",
 						},
 						"network_type": schema.StringAttribute{
-							Computed:    true,
-							Description: "The network type of endpoint. Currently support `VPC` and `INTERNET`. `VPC` type is generally used for internal network access, while `INTERNET` type is used for accessing the AutoMQ cluster from the internet.",
+							Computed:            true,
+							MarkdownDescription: "The network type of endpoint. Currently support `VPC` and `INTERNET`. `VPC` type is generally used for internal network access, while `INTERNET` type is used for accessing the AutoMQ cluster from the internet.",
 						},
 						"protocol": schema.StringAttribute{
-							Computed:    true,
-							Description: "The protocol of endpoint. Currently support `PLAINTEXT` and `SASL_PLAINTEXT`.",
+							Computed:            true,
+							MarkdownDescription: "The protocol of endpoint. Currently support `PLAINTEXT` and `SASL_PLAINTEXT`.",
 						},
 						"mechanisms": schema.StringAttribute{
-							Computed:    true,
-							Description: "The supported mechanisms of endpoint. Currently support `PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512`.",
+							Computed:            true,
+							MarkdownDescription: "The supported mechanisms of endpoint. Currently support `PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512`.",
 						},
 						"bootstrap_servers": schema.StringAttribute{
-							Computed:    true,
-							Description: "The bootstrap servers of endpoint.",
+							Computed:            true,
+							MarkdownDescription: "The bootstrap servers of endpoint.",
 						},
 					},
 				},

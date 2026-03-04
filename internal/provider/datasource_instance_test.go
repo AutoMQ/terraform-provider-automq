@@ -62,7 +62,7 @@ func TestKafkaInstanceDataSourceSchema(t *testing.T) {
 	if !ok {
 		t.Fatalf("wal_mode has unexpected type %T", walMode)
 	}
-	assert.Contains(t, walModeAttr.Description, "FSWAL", "wal_mode description should mention FSWAL")
+	assert.Contains(t, walModeAttr.MarkdownDescription, "FSWAL", "wal_mode description should mention FSWAL")
 }
 
 func TestAccKafkaInstanceDataSource(t *testing.T) {

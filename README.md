@@ -65,9 +65,33 @@ go mod tidy
 
 Then commit the changes to `go.mod` and `go.sum`.
 
-## Using the provider
+## Using the Provider
 
-Fill this in for each provider
+The AutoMQ Terraform Provider manages resources within your AutoMQ BYOC (Bring Your Own Cloud) environment.
+
+### Available Resources
+
+- **`automq_kafka_instance`** – Provision and manage Kafka instances (clusters) with compute specs, security, and feature configurations
+- **`automq_kafka_topic`** – Create and configure Kafka topics with partitions and custom settings
+- **`automq_kafka_user`** – Manage Kafka users for authentication
+- **`automq_kafka_acl`** – Define access control rules for topics, consumer groups, and clusters
+- **`automq_kafka_link`** – Set up mirroring links between AutoMQ instances and external Kafka clusters
+- **`automq_kafka_mirror_group`** – Mirror consumer groups across Kafka clusters
+- **`automq_kafka_mirror_topic`** – Mirror topics across Kafka clusters
+
+### Available Data Sources
+
+- **`automq_kafka_instance`** – Query existing Kafka instance details
+
+### Key Features
+
+- **Full Lifecycle Management** – Create, read, update, and delete Kafka resources declaratively
+- **Security & Compliance** – Configure TLS encryption, authentication methods, and ACL-based authorization
+- **Metrics Integration** – Export metrics to Prometheus or AWS Managed Service for Prometheus
+- **Cross-Cluster Mirroring** – Replicate topics and consumer groups between clusters
+- **AWS BYOC Support** – Deploy on AWS with EKS or EC2, leveraging your own cloud infrastructure
+
+For detailed usage examples and configuration options, refer to the [Terraform Registry documentation](https://registry.terraform.io/providers/automq/automq/latest/docs).
 
 ## Developing the Provider
 

@@ -9,15 +9,48 @@ description: |-
 
 > **Note**: This provider release currently targets AutoMQ Control Plane **8.0 or later on AWS** only. It introduces **breaking changes** compared to version v0.2.3 and earlier. If your control plane runs on other clouds or on a version older than 8.0, do not use this build. After upgrading the AWS control plane to 8.0+, update the provider, align your Terraform configuration to the new schema, and re-import managed resources.
 
+## Overview
+
+The AutoMQ Terraform Provider enables Infrastructure as Code (IaC) management of AutoMQ BYOC (Bring Your Own Cloud) environments. Manage Kafka instances, topics, users, ACLs, and cross-cluster mirroring declaratively with Terraform.
+
+### Key Features
+
+- **Kafka Instance Management** – Provision and configure Kafka clusters with custom compute specs, networking, and storage
+- **Security & Compliance** – Configure TLS encryption, SASL authentication, and fine-grained ACL authorization
+- **Metrics Integration** – Export metrics to Prometheus Remote Write or AWS Managed Service for Prometheus
+- **Cross-Cluster Mirroring** – Replicate topics and consumer groups between AutoMQ and external Kafka clusters
+- **Full Resource Lifecycle** – Create, update, import, and destroy resources with Terraform state management
+- **AWS BYOC Support** – Deploy on AWS EKS or EC2 within your own VPC for data privacy and security
+
+### Supported Resources
+
+| Resource | Description |
+|----------|-------------|
+| `automq_kafka_instance` | Kafka cluster with compute, networking, and feature configuration |
+| `automq_kafka_topic` | Kafka topics with partition and configuration management |
+| `automq_kafka_user` | Kafka users for SASL authentication |
+| `automq_kafka_acl` | Access control rules for topics, groups, and clusters |
+| `automq_kafka_link` | Mirroring links to external Kafka clusters |
+| `automq_kafka_mirror_topic` | Topic mirroring configuration |
+| `automq_kafka_mirror_group` | Consumer group mirroring configuration |
+
+### Supported Data Sources
+
+| Data Source | Description |
+|-------------|-------------|
+| `automq_kafka_instance` | Query existing Kafka instance details |
+
 ## Prerequisites
 
-The AutoMQ environment represents a namespace, with each environment containing a complete set of AutoMQ control plane and data plane. All control and data planes of the AutoMQ BYOC environment are deployed within the user's VPC to ensure data privacy and security.
+The AutoMQ Provider manages an already installed AutoMQ BYOC environment. Before using this provider, you need to:
 
-The AutoMQ Provider is used to manage an already installed AutoMQ environment. Therefore, before using the AutoMQ Provider, you need to complete the environment installation and obtain the access point and initial account information.
-
-Refer to the following for specific operations:
-- Install the AutoMQ environment by following the [documentation](https://registry.terraform.io/providers/AutoMQ/automq/latest/docs).
-- Create a ServiceAccount and obtain an AccessKey: After the environment is installed, users need to access the AutoMQ environment console through web browser, create a Service Account, and use the Access Key of the Service Account. Please refer to [document](https://docs.automq.com/automq-cloud/manage-identities-and-access/service-accounts).
+1. **Install an AutoMQ BYOC environment** on your cloud account. Follow the [AWS installation guide](https://docs.automq.com/automq-cloud/getting-started/install-byoc-environment/aws/install-env-from-marketplace) or the guide for your cloud provider.
+2. **Create a Service Account** and download the Access Key. Navigate to **Service Accounts** in the AutoMQ console left navigation, click **Create Service Account**, and download the credentials. See [Service Accounts documentation](https://docs.automq.com/automq-cloud/manage-identities-and-access/service-accounts).
+3. **Collect the following values**:
+   - `automq_byoc_endpoint` – The control plane endpoint shown after installation, e.g. `http://<hostname>:8080`
+   - `automq_byoc_access_key_id` – From the Service Account Access Key
+   - `automq_byoc_secret_key` – From the Service Account Access Key
+   - `environment_id` – Found on the AutoMQ console **System Settings** page, e.g. `env-xxxxx`
 
 
 ## Example Usage

@@ -40,3 +40,6 @@ dist/
 
 # Local configuration files
 acc.config
+
+# Temporary files
+tmp/
