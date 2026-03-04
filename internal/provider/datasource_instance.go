@@ -192,20 +192,6 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 									},
 								},
 							},
-							"kafka": schema.SingleNestedAttribute{
-								Computed:            true,
-								MarkdownDescription: "Kafka metrics exporter configuration.",
-								Attributes: map[string]schema.Attribute{
-									"enabled":           schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether the Kafka metrics exporter is enabled."},
-									"bootstrap_servers": schema.StringAttribute{Computed: true, MarkdownDescription: "Bootstrap servers for the metrics Kafka cluster."},
-									"topic":             schema.StringAttribute{Computed: true, MarkdownDescription: "Kafka topic for metrics data."},
-									"collection_period": schema.Int64Attribute{Computed: true, MarkdownDescription: "Metrics collection period in seconds."},
-									"security_protocol": schema.StringAttribute{Computed: true, MarkdownDescription: "Security protocol for the metrics Kafka cluster."},
-									"sasl_mechanism":    schema.StringAttribute{Computed: true, MarkdownDescription: "SASL mechanism for the metrics Kafka cluster."},
-									"sasl_username":     schema.StringAttribute{Computed: true, MarkdownDescription: "SASL username for the metrics Kafka cluster."},
-									"sasl_password":     schema.StringAttribute{Computed: true, Sensitive: true, MarkdownDescription: "SASL password for the metrics Kafka cluster."},
-								},
-							},
 						},
 					},
 					"table_topic": schema.SingleNestedAttribute{

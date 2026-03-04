@@ -137,23 +137,7 @@ Read-Only:
 
 Read-Only:
 
-- `kafka` (Attributes) Kafka metrics exporter configuration. (see [below for nested schema](#nestedatt--features--metrics_exporter--kafka))
 - `prometheus` (Attributes) Prometheus Remote Write configuration for exporting metrics. (see [below for nested schema](#nestedatt--features--metrics_exporter--prometheus))
-
-<a id="nestedatt--features--metrics_exporter--kafka"></a>
-### Nested Schema for `features.metrics_exporter.kafka`
-
-Read-Only:
-
-- `bootstrap_servers` (String) Bootstrap servers for the metrics Kafka cluster.
-- `collection_period` (Number) Metrics collection period in seconds.
-- `enabled` (Boolean) Whether the Kafka metrics exporter is enabled.
-- `sasl_mechanism` (String) SASL mechanism for the metrics Kafka cluster.
-- `sasl_password` (String, Sensitive) SASL password for the metrics Kafka cluster.
-- `sasl_username` (String) SASL username for the metrics Kafka cluster.
-- `security_protocol` (String) Security protocol for the metrics Kafka cluster.
-- `topic` (String) Kafka topic for metrics data.
-
 
 <a id="nestedatt--features--metrics_exporter--prometheus"></a>
 ### Nested Schema for `features.metrics_exporter.prometheus`
