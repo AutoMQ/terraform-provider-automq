@@ -69,23 +69,23 @@ variable "automq_environment_id" {
 ### Required
 
 - `compute_specs` (Attributes) The compute specs of the instance (see [below for nested schema](#nestedatt--compute_specs))
-- `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
-- `features` (Attributes) (see [below for nested schema](#nestedatt--features))
+- `environment_id` (String) Target AutoMQ BYOC environment identifier (e.g. `env-xxxxx`). Find this on the AutoMQ console System Settings page.
+- `features` (Attributes) Feature configuration for the Kafka instance including WAL mode, security, metrics, and table topics. (see [below for nested schema](#nestedatt--features))
 - `name` (String) The name of the Kafka instance. It can contain letters (a-z or A-Z), numbers (0-9), underscores (_), and hyphens (-), with a length limit of 3 to 64 characters.
 - `version` (String) The software version of AutoMQ instance. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.
 
 ### Optional
 
-- `description` (String) The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.
+- `description` (String) The instance description is used to differentiate the purpose of the instance. It supports letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 256 characters.
 - `tags` (Map of String) A map of tags to assign to the Kafka instance. Tags are key-value pairs that help you identify and organize your resources. Once set, tags cannot be modified.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 
 ### Read-Only
 
-- `created_at` (String)
+- `created_at` (String) Timestamp when the instance was created (RFC3339 format).
 - `endpoints` (Attributes List) The bootstrap endpoints of instance. AutoMQ supports multiple access protocols; therefore, the Endpoint is a list. (see [below for nested schema](#nestedatt--endpoints))
 - `id` (String) The ID of the Kafka instance.
-- `last_updated` (String)
+- `last_updated` (String) Timestamp when the instance was last updated (RFC3339 format).
 - `status` (String) The status of instance. Currently supports statuses: `Creating`, `Running`, `Deleting`, `Changing` and `Abnormal`. For definitions and limitations of each status, please refer to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/manage-instances#lifecycle).
 
 <a id="nestedatt--compute_specs"></a>
@@ -94,19 +94,19 @@ variable "automq_environment_id" {
 Required:
 
 - `networks` (Attributes List) To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones. (see [below for nested schema](#nestedatt--compute_specs--networks))
-- `reserved_aku` (Number) AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.
+- `reserved_aku` (Number) AKU (AutoMQ Kafka Unit) defines the cluster scale. Each AKU provides up to 30 MiB/s write or 60 MiB/s read throughput. Minimum value is 3; maximum depends on your license quota. For sizing guidance, refer to the [billing documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints).
 
 Optional:
 
 - `data_buckets` (Attributes List) Inline bucket configuration replacing legacy bucket profiles. (see [below for nested schema](#nestedatt--compute_specs--data_buckets))
-- `deploy_type` (String) Deployment platform for the instance. Supported values: `IAAS`, `K8S`.
+- `deploy_type` (String) Deployment platform for the instance. `IAAS` deploys on EC2/VM instances; `K8S` deploys on a managed Kubernetes cluster (EKS/GKE/AKS). Supported values: `IAAS`, `K8S`.
 - `dns_zone` (String) DNS zone used when creating custom records.
 - `file_system_param` (Attributes) File system configuration for FSWAL mode (see [below for nested schema](#nestedatt--compute_specs--file_system_param))
-- `instance_role` (String)
-- `kubernetes_cluster_id` (String) Identifier for the target Kubernetes cluster when deploy_type is KUBERNETES.
-- `kubernetes_namespace` (String)
+- `instance_role` (String) IAM role ARN for the Kafka instance. If not specified, the backend will auto-generate an appropriate role. Format: `arn:aws:iam::<account-id>:role/<role-name>`.
+- `kubernetes_cluster_id` (String) Identifier for the target Kubernetes cluster when `deploy_type` is `K8S`.
+- `kubernetes_namespace` (String) Kubernetes namespace for the instance deployment. If not specified, the backend will auto-assign one.
 - `kubernetes_node_groups` (Attributes List) Node groups (or node pools) are units for unified configuration management of physical nodes in Kubernetes. Different Kubernetes providers may use different terms for node groups. Select target node groups that must be created in advance and configured for either single-AZ or three-AZ deployment. The instance node type must meet the requirements specified in the documentation. If you select a single-AZ node group, the AutoMQ instance will be deployed in a single availability zone; if you select a three-AZ node group, the instance will be deployed across three availability zones. (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
-- `kubernetes_service_account` (String)
+- `kubernetes_service_account` (String) Kubernetes service account for the instance pods. If not specified, the backend will auto-assign one.
 - `security_groups` (List of String) Security groups for the instance. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group.
 
 <a id="nestedatt--compute_specs--networks"></a>
@@ -114,7 +114,7 @@ Optional:
 
 Required:
 
-- `zone` (String) The availability zone ID of the cloud provider.
+- `zone` (String) Cloud provider availability zone ID (e.g. `us-east-1a` for AWS). Must match the zone of the specified subnet.
 
 Optional:
 
@@ -157,12 +157,12 @@ Required:
 Required:
 
 - `security` (Attributes) (see [below for nested schema](#nestedatt--features--security))
-- `wal_mode` (String) Write-Ahead Logging mode: EBSWAL (using EBS as write buffer), S3WAL (using object storage as write buffer), or FSWAL (using file system as write buffer). Defaults to EBSWAL.
+- `wal_mode` (String) Write-Ahead Log storage mode: `EBSWAL`, `S3WAL`, or `FSWAL`. `FSWAL` requires `file_system_param` and is not supported with `K8S` deploy type. See [WAL mode documentation](https://docs.automq.com/automq-cloud/manage-instances/create-instance/choose-wal-mode) for details.
 
 Optional:
 
 - `instance_configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
-- `metrics_exporter` (Attributes) Configure Prometheus metrics scraping. (see [below for nested schema](#nestedatt--features--metrics_exporter))
+- `metrics_exporter` (Attributes) Configure Prometheus Remote Write metrics exporter. (see [below for nested schema](#nestedatt--features--metrics_exporter))
 - `table_topic` (Attributes) Inline table topic (Iceberg/Hive) configuration replacing legacy integration references. (see [below for nested schema](#nestedatt--features--table_topic))
 
 <a id="nestedatt--features--security"></a>
@@ -203,23 +203,23 @@ Changes to encryption mode require instance replacement.
 
 Optional:
 
-- `prometheus` (Attributes) (see [below for nested schema](#nestedatt--features--metrics_exporter--prometheus))
+- `prometheus` (Attributes) Prometheus Remote Write configuration for exporting metrics. (see [below for nested schema](#nestedatt--features--metrics_exporter--prometheus))
 
 <a id="nestedatt--features--metrics_exporter--prometheus"></a>
 ### Nested Schema for `features.metrics_exporter.prometheus`
 
 Required:
 
-- `auth_type` (String)
-- `endpoint` (String)
+- `auth_type` (String) Authentication type for Prometheus Remote Write. Supported values: `noauth` (no authentication), `basic` (HTTP Basic authentication), `bearer` (Bearer token authentication), `sigv4` (AWS Signature Version 4 for AWS Managed Service for Prometheus).
+- `endpoint` (String) Prometheus Remote Write endpoint URL. Must be a valid HTTP/HTTPS URL.
 
 Optional:
 
-- `labels` (Map of String)
-- `password` (String)
-- `prometheus_arn` (String)
-- `token` (String)
-- `username` (String)
+- `labels` (Map of String) Custom labels to attach to exported metrics as key-value pairs.
+- `password` (String, Sensitive) Password for HTTP Basic authentication. Required when `auth_type` is `basic`.
+- `prometheus_arn` (String) AWS Managed Service for Prometheus workspace ARN. Required when `auth_type` is `sigv4`. Format: `arn:aws:aps:<region>:<account-id>:workspace/<workspace-id>`. Ensure the workspace region matches the instance deployment region.
+- `token` (String, Sensitive) Bearer token for authentication. Required when `auth_type` is `bearer`.
+- `username` (String) Username for HTTP Basic authentication. Required when `auth_type` is `basic`.
 
 
 
@@ -228,17 +228,17 @@ Optional:
 
 Required:
 
-- `catalog_type` (String)
-- `warehouse` (String)
+- `catalog_type` (String) Catalog type for managing Iceberg tables. Supported values: `s3Table` (S3 Table Catalog), `glue` (Glue Catalog), `hive` (Hive Catalog).
+- `warehouse` (String) Warehouse location for table data. For S3 Table catalog, provide the S3 Table Bucket ARN.
 
 Optional:
 
-- `hive_auth_mode` (String)
-- `kerberos_principal` (String)
-- `keytab_file` (String)
-- `krb5conf_file` (String)
-- `metastore_uri` (String)
-- `user_principal` (String)
+- `hive_auth_mode` (String) Authentication mode for Hive Metastore. Supported values: `NONE` (no authentication), `KERBEROS` (Kerberos authentication).
+- `kerberos_principal` (String) Kerberos principal configured on the Hive Metastore server. Required when `hive_auth_mode` is `KERBEROS`.
+- `keytab_file` (String, Sensitive) Base64-encoded Kerberos keytab file content. Required when `hive_auth_mode` is `KERBEROS`.
+- `krb5conf_file` (String) Base64-encoded Kerberos krb5.conf file content. Required when `hive_auth_mode` is `KERBEROS`.
+- `metastore_uri` (String) Hive Metastore endpoint. Required when `catalog_type` is `hive`. Format: `thrift://<host>:<port>`.
+- `user_principal` (String) Kerberos user principal for authentication, e.g. `username@REALM`. Required when `hive_auth_mode` is `KERBEROS`.
 
 
 

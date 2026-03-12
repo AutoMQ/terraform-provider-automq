@@ -42,16 +42,19 @@ func (r *KafkaMirrorTopicResource) Schema(ctx context.Context, req resource.Sche
 		MarkdownDescription: "Manage mirrored topics within a Kafka link.",
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:            true,
+				MarkdownDescription: "Target AutoMQ BYOC environment identifier (e.g. `env-xxxxx`). Find this on the AutoMQ console System Settings page.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"instance_id": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:            true,
+				MarkdownDescription: "Kafka instance identifier that owns the link.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"link_id": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:            true,
+				MarkdownDescription: "Kafka link identifier. Must reference an existing `automq_kafka_link` resource.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"source_topic_name": schema.StringAttribute{
 				MarkdownDescription: "Topic name in the source Kafka cluster.",
@@ -59,21 +62,24 @@ func (r *KafkaMirrorTopicResource) Schema(ctx context.Context, req resource.Sche
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"state": schema.StringAttribute{
-				MarkdownDescription: "Desired mirror topic state (`LINKING`, `PAUSED`, or `PROMOTED`).",
+				MarkdownDescription: "Desired mirror topic state. Supported values: `LINKING` (actively mirroring), `PAUSED` (mirroring paused), `PROMOTED` (promoted to independent topic).",
 				Optional:            true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("LINKING", "PAUSED", "PROMOTED"),
 				},
 			},
 			"mirror_topic_id": schema.StringAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Computed:            true,
+				MarkdownDescription: "Unique identifier for the mirrored topic.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"mirror_topic_name": schema.StringAttribute{
-				Computed: true,
+				Computed:            true,
+				MarkdownDescription: "Topic name in the target AutoMQ cluster.",
 			},
 			"error_code": schema.StringAttribute{
-				Computed: true,
+				Computed:            true,
+				MarkdownDescription: "Error code if the mirroring operation failed.",
 			},
 		},
 	}

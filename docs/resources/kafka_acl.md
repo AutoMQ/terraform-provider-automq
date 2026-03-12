@@ -80,11 +80,11 @@ resource "automq_kafka_acl" "transaction" {
 
 ### Required
 
-- `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
-- `kafka_instance_id` (String) Target Kafka instance ID, each instance represents a kafka cluster. The instance id looks like kf-xxxxxxx.
+- `environment_id` (String) Target AutoMQ BYOC environment identifier (e.g. `env-xxxxx`). Find this on the AutoMQ console System Settings page.
+- `kafka_instance_id` (String) Target Kafka instance ID (e.g. `kf-xxxxx`). Each instance represents a Kafka cluster. Find this on the AutoMQ console instance list or detail page.
 - `operation_group` (String) Set the authorized operation group. For the Topic resource type, the supported operations are `ALL` (all permissions), `PRODUCE` (produce messages only), and `CONSUME` (consume messages only). For other resource types, only `ALL` (all permissions) is supported.
 - `pattern_type` (String) Set the resource name matching pattern, supporting `LITERAL` and `PREFIXED`. `LITERAL` represents exact matching, while `PREFIXED` represents prefix matching.
-- `principal` (String) Set the authorized target principal, which currently supports Kafka User type principals, i.e., `User:xxxx`. Specify the Kafka user name. Principal must start with `User:` and contact with `kafka_user`.
+- `principal` (String) Set the authorized target principal, which currently supports Kafka User type principals, i.e., `User:xxxx`. Specify the Kafka user name. Principal must start with `User:` and correspond to an `automq_kafka_user` resource.
 - `resource_name` (String) The target resource name for Kafka ACL authorization, can be a specific resource name or a resource name prefix (when using prefix matching, only the prefix needs to be provided without ending with `*`). If only `*` is specified, it represents all resources.
 - `resource_type` (String) The Kafka ACL authorized resource types, currently support `CLUSTER`, `TOPIC`, `GROUP` and `TRANSACTIONAL_ID`.
 

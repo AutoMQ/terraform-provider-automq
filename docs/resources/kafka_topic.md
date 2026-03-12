@@ -34,8 +34,8 @@ resource "automq_kafka_topic" "example" {
 
 ### Required
 
-- `environment_id` (String) Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.
-- `kafka_instance_id` (String) Target Kafka instance ID, each instance represents a kafka cluster. The instance id looks like kf-xxxxxxx.
+- `environment_id` (String) Target AutoMQ BYOC environment identifier (e.g. `env-xxxxx`). Find this on the AutoMQ console System Settings page.
+- `kafka_instance_id` (String) Target Kafka instance ID (e.g. `kf-xxxxx`). Each instance represents a Kafka cluster. Find this on the AutoMQ console instance list or detail page.
 - `name` (String) Name is the unique identifier of a topic. It can only contain letters a to z or A to z, digits 0 to 9, underscores (_), hyphens (-), and dots (.). The value contains 1 to 249 characters.
 
 ### Optional

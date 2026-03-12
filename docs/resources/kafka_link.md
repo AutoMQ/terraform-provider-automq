@@ -67,7 +67,7 @@ variable "source_password" {
 
 ### Required
 
-- `environment_id` (String) Target AutoMQ BYOC environment identifier.
+- `environment_id` (String) Target AutoMQ BYOC environment identifier (e.g. `env-xxxxx`). Find this on the AutoMQ console System Settings page.
 - `instance_id` (String) Kafka instance identifier that owns the link.
 - `link_id` (String) Unique identifier for the Kafka link.
 - `source_cluster` (Attributes) Inline configuration for the source Kafka cluster. (see [below for nested schema](#nestedatt--source_cluster))

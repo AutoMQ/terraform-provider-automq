@@ -45,12 +45,12 @@ func (r *KafkaAclResource) Schema(ctx context.Context, req resource.SchemaReques
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
-				MarkdownDescription: "Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.",
+				MarkdownDescription: "Target AutoMQ BYOC environment identifier (e.g. `env-xxxxx`). Find this on the AutoMQ console System Settings page.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"kafka_instance_id": schema.StringAttribute{
-				MarkdownDescription: "Target Kafka instance ID, each instance represents a kafka cluster. The instance id looks like kf-xxxxxxx.",
+				MarkdownDescription: "Target Kafka instance ID (e.g. `kf-xxxxx`). Each instance represents a Kafka cluster. Find this on the AutoMQ console instance list or detail page.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
@@ -83,7 +83,7 @@ func (r *KafkaAclResource) Schema(ctx context.Context, req resource.SchemaReques
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"principal": schema.StringAttribute{
-				MarkdownDescription: "Set the authorized target principal, which currently supports Kafka User type principals, i.e., `User:xxxx`. Specify the Kafka user name. Principal must start with `User:` and contact with `kafka_user`.",
+				MarkdownDescription: "Set the authorized target principal, which currently supports Kafka User type principals, i.e., `User:xxxx`. Specify the Kafka user name. Principal must start with `User:` and correspond to an `automq_kafka_user` resource.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},

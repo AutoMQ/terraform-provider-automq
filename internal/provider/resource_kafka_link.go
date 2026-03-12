@@ -45,7 +45,7 @@ func (r *KafkaLinkResource) Schema(ctx context.Context, req resource.SchemaReque
 		MarkdownDescription: "Manage Kafka links for mirroring topics and consumer groups between AutoMQ instances and external Kafka clusters.",
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
-				MarkdownDescription: "Target AutoMQ BYOC environment identifier.",
+				MarkdownDescription: "Target AutoMQ BYOC environment identifier (e.g. `env-xxxxx`). Find this on the AutoMQ console System Settings page.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},

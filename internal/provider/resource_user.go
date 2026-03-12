@@ -46,12 +46,12 @@ func (r *KafkaUserResource) Schema(ctx context.Context, req resource.SchemaReque
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
-				MarkdownDescription: "Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.",
+				MarkdownDescription: "Target AutoMQ BYOC environment identifier (e.g. `env-xxxxx`). Find this on the AutoMQ console System Settings page.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"kafka_instance_id": schema.StringAttribute{
-				MarkdownDescription: "Target Kafka instance ID, each instance represents a kafka cluster. The instance id looks like kf-xxxxxxx.",
+				MarkdownDescription: "Target Kafka instance ID (e.g. `kf-xxxxx`). Each instance represents a Kafka cluster. Find this on the AutoMQ console instance list or detail page.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},

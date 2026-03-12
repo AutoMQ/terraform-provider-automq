@@ -40,16 +40,19 @@ func (r *KafkaMirrorGroupResource) Schema(ctx context.Context, req resource.Sche
 		MarkdownDescription: "Manage mirrored consumer groups within a Kafka link.",
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:            true,
+				MarkdownDescription: "Target AutoMQ BYOC environment identifier (e.g. `env-xxxxx`). Find this on the AutoMQ console System Settings page.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"instance_id": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:            true,
+				MarkdownDescription: "Kafka instance identifier that owns the link.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"link_id": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:            true,
+				MarkdownDescription: "Kafka link identifier. Must reference an existing `automq_kafka_link` resource.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"source_group_id": schema.StringAttribute{
 				MarkdownDescription: "Consumer group identifier in the source Kafka cluster.",
@@ -57,14 +60,17 @@ func (r *KafkaMirrorGroupResource) Schema(ctx context.Context, req resource.Sche
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"mirror_group_id": schema.StringAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Computed:            true,
+				MarkdownDescription: "Unique identifier for the mirrored consumer group.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"state": schema.StringAttribute{
-				Computed: true,
+				Computed:            true,
+				MarkdownDescription: "Current state of the mirrored consumer group.",
 			},
 			"error_code": schema.StringAttribute{
-				Computed: true,
+				Computed:            true,
+				MarkdownDescription: "Error code if the mirroring operation failed.",
 			},
 		},
 	}
