@@ -38,7 +38,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
-				MarkdownDescription: "Target AutoMQ BYOC environment, this attribute is specified during the deployment and installation process.",
+				MarkdownDescription: "Target AutoMQ BYOC environment identifier (e.g. `env-xxxxx`). Find this on the AutoMQ console System Settings page.",
 				Required:            true,
 			},
 			"id": schema.StringAttribute{
@@ -50,100 +50,101 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 				Optional:            true,
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription: "The instance description are used to differentiate the purpose of the instance. They support letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 128 characters.",
+				MarkdownDescription: "The instance description is used to differentiate the purpose of the instance. It supports letters (a-z or A-Z), numbers (0-9), underscores (_), spaces( ) and hyphens (-), with a length limit of 3 to 256 characters.",
 				Computed:            true,
 			},
 			"version": schema.StringAttribute{
-				Computed:    true,
-				Description: "The software version of AutoMQ instance. By default, there is no need to set version; the latest version will be used. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.",
+				Computed:            true,
+				MarkdownDescription: "The software version of AutoMQ instance. By default, there is no need to set version; the latest version will be used. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.",
 			},
 			"compute_specs": schema.SingleNestedAttribute{
-				Computed:    true,
-				Description: "The compute specs of the instance",
+				Computed:            true,
+				MarkdownDescription: "The compute specs of the instance",
 				Attributes: map[string]schema.Attribute{
 					"reserved_aku": schema.Int64Attribute{
-						Computed:    true,
-						Description: "AutoMQ defines AKU (AutoMQ Kafka Unit) to measure the scale of the cluster. Each AKU provides 20 MiB/s of read/write throughput. For more details on AKU, please refer to the [documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints). The currently supported AKU specifications are 6, 8, 10, 12, 14, 16, 18, 20, 22, and 24. If an invalid AKU value is set, the instance cannot be created.",
+						Computed:            true,
+						MarkdownDescription: "AKU (AutoMQ Kafka Unit) defines the cluster scale. Each AKU provides up to 30 MiB/s write or 60 MiB/s read throughput. For sizing guidance, refer to the [billing documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints).",
 					},
 					"deploy_type": schema.StringAttribute{
 						Computed:            true,
 						MarkdownDescription: "Deployment platform for the instance.",
 					},
-					"dns_zone":                   schema.StringAttribute{Computed: true},
-					"kubernetes_cluster_id":      schema.StringAttribute{Computed: true},
-					"kubernetes_namespace":       schema.StringAttribute{Computed: true},
-					"kubernetes_service_account": schema.StringAttribute{Computed: true},
-					"instance_role":              schema.StringAttribute{Computed: true},
+					"dns_zone":                   schema.StringAttribute{Computed: true, MarkdownDescription: "DNS zone used when creating custom records."},
+					"kubernetes_cluster_id":      schema.StringAttribute{Computed: true, MarkdownDescription: "Identifier for the target Kubernetes cluster."},
+					"kubernetes_namespace":       schema.StringAttribute{Computed: true, MarkdownDescription: "Kubernetes namespace for the instance deployment."},
+					"kubernetes_service_account": schema.StringAttribute{Computed: true, MarkdownDescription: "Kubernetes service account for the instance pods."},
+					"instance_role":              schema.StringAttribute{Computed: true, MarkdownDescription: "IAM role ARN for the Kafka instance."},
 					"networks": schema.ListNestedAttribute{
-						Computed:    true,
-						Description: "To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones.",
+						Computed:            true,
+						MarkdownDescription: "To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones.",
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"zone": schema.StringAttribute{
-									Computed:    true,
-									Description: "The availability zone ID of the cloud provider.",
+									Computed:            true,
+									MarkdownDescription: "Cloud provider availability zone ID (e.g. `us-east-1a` for AWS).",
 								},
 								"subnets": schema.ListAttribute{
-									Computed:    true,
-									Description: "Specify the subnet under the corresponding availability zone for deploying the instance. Currently, only one subnet can be set for each availability zone.",
-									ElementType: types.StringType,
+									Computed:            true,
+									MarkdownDescription: "Specify the subnet under the corresponding availability zone for deploying the instance. Currently, only one subnet can be set for each availability zone.",
+									ElementType:         types.StringType,
 								},
 							},
 						},
 					},
 					"kubernetes_node_groups": schema.ListNestedAttribute{
-						Computed:    true,
-						Description: "Kubernetes node groups configuration",
+						Computed:            true,
+						MarkdownDescription: "Kubernetes node groups configuration",
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id": schema.StringAttribute{
-									Computed:    true,
-									Description: "Node group ID",
+									Computed:            true,
+									MarkdownDescription: "Node group ID",
 								},
 							},
 						},
 					},
 					"data_buckets": schema.ListNestedAttribute{
-						Computed:    true,
-						Description: "Inline bucket configuration replacing legacy bucket profiles.",
+						Computed:            true,
+						MarkdownDescription: "Inline bucket configuration replacing legacy bucket profiles.",
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
-								"bucket_name": schema.StringAttribute{Computed: true},
+								"bucket_name": schema.StringAttribute{Computed: true, MarkdownDescription: "Object storage bucket name used for data."},
 							},
 						},
 					},
 					"security_groups": schema.ListAttribute{
-						ElementType: types.StringType,
-						Computed:    true,
-						Description: "Security groups for the instance",
+						ElementType:         types.StringType,
+						Computed:            true,
+						MarkdownDescription: "Security groups for the instance",
 					},
 					"file_system_param": schema.SingleNestedAttribute{
-						Computed:    true,
-						Description: "File system configuration for FSWAL mode",
+						Computed:            true,
+						MarkdownDescription: "File system configuration for FSWAL mode",
 						Attributes: map[string]schema.Attribute{
 							"throughput_mibps_per_file_system": schema.Int64Attribute{
-								Computed:    true,
-								Description: "Throughput in MiBps per file system",
+								Computed:            true,
+								MarkdownDescription: "Throughput in MiBps per file system",
 							},
 							"file_system_count": schema.Int64Attribute{
-								Computed:    true,
-								Description: "Number of file systems",
+								Computed:            true,
+								MarkdownDescription: "Number of file systems",
 							},
 							"security_groups": schema.ListAttribute{
-								ElementType: types.StringType,
-								Computed:    true,
-								Description: "Security groups for file systems",
+								ElementType:         types.StringType,
+								Computed:            true,
+								MarkdownDescription: "Security groups for file systems",
 							},
 						},
 					},
 				},
 			},
 			"features": schema.SingleNestedAttribute{
-				Computed: true,
+				Computed:            true,
+				MarkdownDescription: "Feature configuration for the Kafka instance.",
 				Attributes: map[string]schema.Attribute{
 					"wal_mode": schema.StringAttribute{
-						Computed:    true,
-						Description: "Write-Ahead Logging mode: EBSWAL (using EBS as write buffer), S3WAL (using object storage as write buffer), or FSWAL (using file system as write buffer). Defaults to EBSWAL.",
+						Computed:            true,
+						MarkdownDescription: "Write-Ahead Logging mode: EBSWAL (using EBS as write buffer), S3WAL (using object storage as write buffer), or FSWAL (using file system as write buffer). Defaults to EBSWAL.",
 					},
 					"instance_configs": schema.MapAttribute{
 						ElementType:         types.StringType,
@@ -152,34 +153,43 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 					},
 					"metrics_exporter": schema.SingleNestedAttribute{
 						Computed:            true,
-						MarkdownDescription: "Metrics exporter configuration for Prometheus or Kafka sinks.",
+						MarkdownDescription: "Prometheus Remote Write metrics exporter configuration.",
 						Attributes: map[string]schema.Attribute{
 							"prometheus": schema.SingleNestedAttribute{
-								Computed: true,
+								Computed:            true,
+								MarkdownDescription: "Prometheus Remote Write configuration for exporting metrics.",
 								Attributes: map[string]schema.Attribute{
-									"auth_type":      schema.StringAttribute{Computed: true},
-									"endpoint":       schema.StringAttribute{Computed: true},
-									"prometheus_arn": schema.StringAttribute{Computed: true},
-									"username":       schema.StringAttribute{Computed: true},
-									"password":       schema.StringAttribute{Computed: true, Sensitive: true},
-									"token":          schema.StringAttribute{Computed: true, Sensitive: true},
-									"labels": schema.MapAttribute{
-										Computed:    true,
-										ElementType: types.StringType,
+									"auth_type": schema.StringAttribute{
+										Computed:            true,
+										MarkdownDescription: "Authentication type. Values: `noauth`, `basic`, `bearer`, or `sigv4`.",
 									},
-								},
-							},
-							"kafka": schema.SingleNestedAttribute{
-								Computed: true,
-								Attributes: map[string]schema.Attribute{
-									"enabled":           schema.BoolAttribute{Computed: true},
-									"bootstrap_servers": schema.StringAttribute{Computed: true},
-									"topic":             schema.StringAttribute{Computed: true},
-									"collection_period": schema.Int64Attribute{Computed: true},
-									"security_protocol": schema.StringAttribute{Computed: true},
-									"sasl_mechanism":    schema.StringAttribute{Computed: true},
-									"sasl_username":     schema.StringAttribute{Computed: true},
-									"sasl_password":     schema.StringAttribute{Computed: true, Sensitive: true},
+									"endpoint": schema.StringAttribute{
+										Computed:            true,
+										MarkdownDescription: "Prometheus Remote Write endpoint URL.",
+									},
+									"prometheus_arn": schema.StringAttribute{
+										Computed:            true,
+										MarkdownDescription: "AWS Managed Service for Prometheus workspace ARN (required for `sigv4` auth).",
+									},
+									"username": schema.StringAttribute{
+										Computed:            true,
+										MarkdownDescription: "Username for HTTP Basic authentication.",
+									},
+									"password": schema.StringAttribute{
+										Computed:            true,
+										Sensitive:           true,
+										MarkdownDescription: "Password for HTTP Basic authentication.",
+									},
+									"token": schema.StringAttribute{
+										Computed:            true,
+										Sensitive:           true,
+										MarkdownDescription: "Bearer token for authentication.",
+									},
+									"labels": schema.MapAttribute{
+										Computed:            true,
+										MarkdownDescription: "Custom labels attached to exported metrics.",
+										ElementType:         types.StringType,
+									},
 								},
 							},
 						},
@@ -188,77 +198,80 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 						Computed:            true,
 						MarkdownDescription: "Table topic configuration (warehouse/catalog settings).",
 						Attributes: map[string]schema.Attribute{
-							"warehouse":          schema.StringAttribute{Computed: true},
-							"catalog_type":       schema.StringAttribute{Computed: true},
-							"metastore_uri":      schema.StringAttribute{Computed: true},
-							"hive_auth_mode":     schema.StringAttribute{Computed: true},
-							"kerberos_principal": schema.StringAttribute{Computed: true},
-							"user_principal":     schema.StringAttribute{Computed: true},
-							"keytab_file":        schema.StringAttribute{Computed: true, Sensitive: true},
-							"krb5conf_file":      schema.StringAttribute{Computed: true, Sensitive: true},
+							"warehouse":          schema.StringAttribute{Computed: true, MarkdownDescription: "Warehouse location for table data."},
+							"catalog_type":       schema.StringAttribute{Computed: true, MarkdownDescription: "Catalog type: `s3Table`, `glue`, or `hive`."},
+							"metastore_uri":      schema.StringAttribute{Computed: true, MarkdownDescription: "Hive Metastore endpoint (for `hive` catalog)."},
+							"hive_auth_mode":     schema.StringAttribute{Computed: true, MarkdownDescription: "Authentication mode for Hive Metastore."},
+							"kerberos_principal": schema.StringAttribute{Computed: true, MarkdownDescription: "Kerberos principal for Hive Metastore server."},
+							"user_principal":     schema.StringAttribute{Computed: true, MarkdownDescription: "Kerberos user principal for authentication."},
+							"keytab_file":        schema.StringAttribute{Computed: true, Sensitive: true, MarkdownDescription: "Kerberos keytab file content."},
+							"krb5conf_file":      schema.StringAttribute{Computed: true, Sensitive: true, MarkdownDescription: "Kerberos krb5.conf file content."},
 						},
 					},
 					"security": schema.SingleNestedAttribute{
-						Computed: true,
+						Computed:            true,
+						MarkdownDescription: "Security configuration for the Kafka instance.",
 						Attributes: map[string]schema.Attribute{
 							"authentication_methods": schema.SetAttribute{
-								Computed:    true,
-								ElementType: types.StringType,
-								Description: "Authentication methods: anonymous (anonymous access), sasl (SASL user auth), mtls (TLS cert auth). Defaults to anonymous.",
+								Computed:            true,
+								ElementType:         types.StringType,
+								MarkdownDescription: "Authentication methods: anonymous (anonymous access), sasl (SASL user auth), mtls (TLS cert auth). Defaults to anonymous.",
 							},
 							"transit_encryption_modes": schema.SetAttribute{
-								Computed:    true,
-								ElementType: types.StringType,
-								Description: "Transit encryption modes: plaintext (unencrypted) or tls (TLS encrypted). Defaults to plaintext.",
+								Computed:            true,
+								ElementType:         types.StringType,
+								MarkdownDescription: "Transit encryption modes: plaintext (unencrypted) or tls (TLS encrypted). Defaults to plaintext.",
 							},
 							"data_encryption_mode": schema.StringAttribute{
-								Computed:    true,
-								Description: "Data encryption mode: NONE (no encryption), CPMK (cloud-managed KMS), BYOK (custom KMS key)",
+								Computed:            true,
+								MarkdownDescription: "Data encryption mode: NONE (no encryption), CPMK (cloud-managed KMS), BYOK (custom KMS key)",
 							},
 							"tls_hostname_validation_enabled": schema.BoolAttribute{
-								Computed:    true,
-								Description: "Whether TLS hostname validation is enabled for broker certificates.",
+								Computed:            true,
+								MarkdownDescription: "Whether TLS hostname validation is enabled for broker certificates.",
 							},
 						},
 					},
 				},
 			},
 			"created_at": schema.StringAttribute{
-				CustomType: timetypes.RFC3339Type{},
-				Computed:   true,
+				CustomType:          timetypes.RFC3339Type{},
+				Computed:            true,
+				MarkdownDescription: "Timestamp when the instance was created (RFC3339 format).",
 			},
 			"last_updated": schema.StringAttribute{
-				CustomType: timetypes.RFC3339Type{},
-				Computed:   true,
+				CustomType:          timetypes.RFC3339Type{},
+				Computed:            true,
+				MarkdownDescription: "Timestamp when the instance was last updated (RFC3339 format).",
 			},
 			"status": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "The status of instance. Currently supports statuses: `Creating`, `Running`, `Deleting`, `Changing` and `Abnormal`. For definitions and limitations of each status, please refer to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/manage-instances#lifecycle).",
 			},
 			"endpoints": schema.ListNestedAttribute{
-				Computed:    true,
-				Description: "The bootstrap endpoints of instance. AutoMQ supports multiple access protocols; therefore, the Endpoint is a list.",
+				Computed:            true,
+				MarkdownDescription: "The bootstrap endpoints of instance. AutoMQ supports multiple access protocols; therefore, the Endpoint is a list.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"display_name": schema.StringAttribute{
-							Computed:    true,
-							Description: "The name of endpoint",
+							Computed:            true,
+							MarkdownDescription: "The name of endpoint",
 						},
 						"network_type": schema.StringAttribute{
-							Computed:    true,
-							Description: "The network type of endpoint. Currently support `VPC` and `INTERNET`. `VPC` type is generally used for internal network access, while `INTERNET` type is used for accessing the AutoMQ cluster from the internet.",
+							Computed:            true,
+							MarkdownDescription: "The network type of endpoint. Currently support `VPC` and `INTERNET`. `VPC` type is generally used for internal network access, while `INTERNET` type is used for accessing the AutoMQ cluster from the internet.",
 						},
 						"protocol": schema.StringAttribute{
-							Computed:    true,
-							Description: "The protocol of endpoint. Currently support `PLAINTEXT` and `SASL_PLAINTEXT`.",
+							Computed:            true,
+							MarkdownDescription: "The protocol of endpoint. Currently support `PLAINTEXT` and `SASL_PLAINTEXT`.",
 						},
 						"mechanisms": schema.StringAttribute{
-							Computed:    true,
-							Description: "The supported mechanisms of endpoint. Currently support `PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512`.",
+							Computed:            true,
+							MarkdownDescription: "The supported mechanisms of endpoint. Currently support `PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512`.",
 						},
 						"bootstrap_servers": schema.StringAttribute{
-							Computed:    true,
-							Description: "The bootstrap servers of endpoint.",
+							Computed:            true,
+							MarkdownDescription: "The bootstrap servers of endpoint.",
 						},
 					},
 				},

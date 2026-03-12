@@ -42,20 +42,20 @@ variable "link_id" {
 
 ### Required
 
-- `environment_id` (String)
-- `instance_id` (String)
-- `link_id` (String)
+- `environment_id` (String) Target AutoMQ BYOC environment identifier (e.g. `env-xxxxx`). Find this on the AutoMQ console System Settings page.
+- `instance_id` (String) Kafka instance identifier that owns the link.
+- `link_id` (String) Kafka link identifier. Must reference an existing `automq_kafka_link` resource.
 - `source_topic_name` (String) Topic name in the source Kafka cluster.
 
 ### Optional
 
-- `state` (String) Desired mirror topic state (`LINKING`, `PAUSED`, or `PROMOTED`).
+- `state` (String) Desired mirror topic state. Supported values: `LINKING` (actively mirroring), `PAUSED` (mirroring paused), `PROMOTED` (promoted to independent topic).
 
 ### Read-Only
 
-- `error_code` (String)
-- `mirror_topic_id` (String)
-- `mirror_topic_name` (String)
+- `error_code` (String) Error code if the mirroring operation failed.
+- `mirror_topic_id` (String) Unique identifier for the mirrored topic.
+- `mirror_topic_name` (String) Topic name in the target AutoMQ cluster.
 
 ## Import
 
