@@ -53,6 +53,7 @@ output "example-id" {
 - `features` (Attributes) Feature configuration for the Kafka instance. (see [below for nested schema](#nestedatt--features))
 - `last_updated` (String) Timestamp when the instance was last updated (RFC3339 format).
 - `status` (String) The status of instance. Currently supports statuses: `Creating`, `Running`, `Deleting`, `Changing` and `Abnormal`. For definitions and limitations of each status, please refer to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/manage-instances#lifecycle).
+- `tags` (Map of String) A map of tags assigned to the Kafka instance.
 - `version` (String) The software version of AutoMQ instance. By default, there is no need to set version; the latest version will be used. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.
 
 <a id="nestedatt--compute_specs"></a>

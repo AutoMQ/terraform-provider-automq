@@ -816,3 +816,105 @@ func TestFlattenKafkaInstanceModel_ComputeSpecsSecurityGroups(t *testing.T) {
 		})
 	}
 }
+
+func TestExpandKafkaInstanceResource_Tags(t *testing.T) {
+	tests := []struct {
+		name     string
+		tags     types.Map
+		expected []client.TagParam
+	}{
+		{
+			name: "non-null tags",
+			tags: types.MapValueMust(types.StringType, map[string]attr.Value{
+				"env":  types.StringValue("prod"),
+				"team": types.StringValue("infra"),
+			}),
+			expected: []client.TagParam{
+				{Name: "env", Value: "prod"},
+				{Name: "team", Value: "infra"},
+			},
+		},
+		{
+			name:     "null tags",
+			tags:     types.MapNull(types.StringType),
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := KafkaInstanceResourceModel{
+				Name:        types.StringValue("test"),
+				Description: types.StringValue("test"),
+				Version:     types.StringValue("1.0.0"),
+				Tags:        tt.tags,
+			}
+			request := &client.InstanceCreateParam{}
+			_ = ExpandKafkaInstanceResource(context.Background(), model, request)
+			if tt.expected == nil {
+				assert.Empty(t, request.Tags)
+			} else {
+				assert.ElementsMatch(t, tt.expected, request.Tags)
+			}
+		})
+	}
+}
+
+func TestFlattenKafkaInstanceModel_Tags(t *testing.T) {
+	tests := []struct {
+		name         string
+		apiTags      []client.TagVO
+		initialTags  types.Map
+		expectChange bool
+		expectedTags types.Map
+	}{
+		{
+			name: "non-empty tags from API",
+			apiTags: []client.TagVO{
+				{Name: strPtr("env"), Value: strPtr("prod")},
+				{Name: strPtr("team"), Value: strPtr("infra")},
+			},
+			initialTags:  types.MapNull(types.StringType),
+			expectChange: true,
+			expectedTags: types.MapValueMust(types.StringType, map[string]attr.Value{
+				"env":  types.StringValue("prod"),
+				"team": types.StringValue("infra"),
+			}),
+		},
+		{
+			name:         "empty tags from API preserves state",
+			apiTags:      []client.TagVO{},
+			initialTags:  types.MapNull(types.StringType),
+			expectChange: false,
+		},
+		{
+			name: "all nil name/value tags preserves state",
+			apiTags: []client.TagVO{
+				{Name: nil, Value: nil},
+			},
+			initialTags:  types.MapNull(types.StringType),
+			expectChange: false,
+		},
+		{
+			name:         "unknown tags becomes null",
+			apiTags:      []client.TagVO{},
+			initialTags:  types.MapUnknown(types.StringType),
+			expectChange: true,
+			expectedTags: types.MapNull(types.StringType),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resource := &KafkaInstanceResourceModel{Tags: tt.initialTags}
+			instance := &client.InstanceVO{Tags: tt.apiTags}
+			diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+			assert.False(t, diags.HasError())
+			if tt.expectChange {
+				assert.Equal(t, tt.expectedTags, resource.Tags)
+			} else {
+				assert.Equal(t, tt.initialTags, resource.Tags)
+			}
+		})
+	}
+}

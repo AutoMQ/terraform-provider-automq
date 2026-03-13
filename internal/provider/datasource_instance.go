@@ -57,6 +57,11 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 				Computed:            true,
 				MarkdownDescription: "The software version of AutoMQ instance. By default, there is no need to set version; the latest version will be used. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.",
 			},
+			"tags": schema.MapAttribute{
+				ElementType:         types.StringType,
+				Computed:            true,
+				MarkdownDescription: "A map of tags assigned to the Kafka instance.",
+			},
 			"compute_specs": schema.SingleNestedAttribute{
 				Computed:            true,
 				MarkdownDescription: "The compute specs of the instance",

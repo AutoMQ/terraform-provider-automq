@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
@@ -135,6 +136,12 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 			"version": schema.StringAttribute{
 				Required:            true,
 				MarkdownDescription: "The software version of AutoMQ instance. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.",
+			},
+			"tags": schema.MapAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				MarkdownDescription: "A map of tags to assign to the Kafka instance. Tags are key-value pairs that help you identify and organize your resources. Once set, tags cannot be modified.",
+				PlanModifiers:       []planmodifier.Map{mapplanmodifier.RequiresReplace()},
 			},
 			"compute_specs": schema.SingleNestedAttribute{
 				Required:            true,
