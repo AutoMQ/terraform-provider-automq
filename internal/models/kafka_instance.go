@@ -590,7 +590,14 @@ func ConvertKafkaInstanceModel(resource *KafkaInstanceResourceModel, model *Kafk
 		model.Features = nil
 	}
 	model.Endpoints = resource.Endpoints
-	model.Tags = resource.Tags
+	// Ensure Tags has proper type information
+	if resource.Tags.IsNull() {
+		model.Tags = types.MapNull(types.StringType)
+	} else if resource.Tags.IsUnknown() {
+		model.Tags = types.MapUnknown(types.StringType)
+	} else {
+		model.Tags = resource.Tags
+	}
 	model.CreatedAt = resource.CreatedAt
 	model.LastUpdated = resource.LastUpdated
 	model.InstanceStatus = resource.InstanceStatus
