@@ -717,11 +717,7 @@ func validateKafkaInstanceConfiguration(ctx context.Context, plan *models.KafkaI
 				}
 			}
 
-			// Check if K8S deployment is trying to use FSWAL
-			var stateDeploy *types.String
-			if stateSpecs != nil {
-				stateDeploy = &stateSpecs.DeployType
-			}
+			//// Check if K8S deployment is trying to use FSWAL
 			if deployType, ok := resolvePlannedStringValue(plan.ComputeSpecs.DeployType, stateDeploy); ok && strings.EqualFold(deployType, "K8S") {
 				diagnostics.AddError(
 					"Invalid Configuration",
