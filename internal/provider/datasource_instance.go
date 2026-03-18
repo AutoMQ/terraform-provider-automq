@@ -126,6 +126,10 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 						Computed:            true,
 						MarkdownDescription: "File system configuration for FSWAL mode",
 						Attributes: map[string]schema.Attribute{
+							"file_system_type": schema.StringAttribute{
+								Computed:            true,
+								MarkdownDescription: "File system type. Supported values: EFS_PROVISIONED (Amazon Elastic File System), ONTAP_V2 (Amazon FSx for NetApp ONTAP)",
+							},
 							"throughput_mibps_per_file_system": schema.Int64Attribute{
 								Computed:            true,
 								MarkdownDescription: "Throughput in MiBps per file system",
