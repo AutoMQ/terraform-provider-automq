@@ -1059,9 +1059,9 @@ func TestFlattenKafkaInstanceModel_FileSystemTypeStatePreservation(t *testing.T)
 // TestExpandKafkaInstanceResource_FileSystemTypeVariations tests different file_system_type values
 func TestExpandKafkaInstanceResource_FileSystemTypeVariations(t *testing.T) {
 	tests := []struct {
-		name              string
-		fileSystemType    types.String
-		expectedAPIValue  *string
+		name             string
+		fileSystemType   types.String
+		expectedAPIValue *string
 	}{
 		{
 			name:             "EFS_PROVISIONED",
@@ -1104,7 +1104,7 @@ func TestExpandKafkaInstanceResource_FileSystemTypeVariations(t *testing.T) {
 			err := ExpandKafkaInstanceResource(context.Background(), input, request)
 			assert.NoError(t, err)
 			assert.NotNil(t, request.Spec.FileSystem)
-			
+
 			if tt.expectedAPIValue == nil {
 				assert.Nil(t, request.Spec.FileSystem.FileSystemType)
 			} else {
