@@ -135,6 +135,12 @@ Optional:
 Required:
 
 - `file_system_count` (Number) Number of file systems
+- `file_system_type` (String) File system type. Supported values:
+
+  * `EFS_PROVISIONED` - Amazon Elastic File System (EFS)
+  * `ONTAP_V2` - Amazon FSx for NetApp ONTAP
+
+  Changing this field requires resource replacement.
 - `throughput_mibps_per_file_system` (Number) Throughput in MiBps per file system
 
 Optional:

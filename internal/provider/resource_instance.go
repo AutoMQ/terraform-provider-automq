@@ -282,6 +282,16 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						Optional:            true,
 						MarkdownDescription: "File system configuration for FSWAL mode",
 						Attributes: map[string]schema.Attribute{
+							"file_system_type": schema.StringAttribute{
+								Required:            true,
+								MarkdownDescription: "File system type. Supported values:\n\n* `EFS_PROVISIONED` - Amazon Elastic File System (EFS)\n* `ONTAP_V2` - Amazon FSx for NetApp ONTAP\n\nChanging this field requires resource replacement.",
+								Validators: []validator.String{
+									stringvalidator.OneOf("EFS_PROVISIONED", "ONTAP_V2"),
+								},
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.RequiresReplace(),
+								},
+							},
 							"throughput_mibps_per_file_system": schema.Int64Attribute{
 								Required:            true,
 								MarkdownDescription: "Throughput in MiBps per file system",
@@ -684,6 +694,13 @@ func validateKafkaInstanceConfiguration(ctx context.Context, plan *models.KafkaI
 				)
 			} else {
 				// Validate required fields in file_system_param
+				if plan.ComputeSpecs.FileSystemParam.FileSystemType.IsNull() ||
+					plan.ComputeSpecs.FileSystemParam.FileSystemType.IsUnknown() {
+					diagnostics.AddError(
+						"Invalid Configuration",
+						"file_system_type is required when wal_mode is FSWAL",
+					)
+				}
 				if plan.ComputeSpecs.FileSystemParam.ThroughputMibpsPerFileSystem.IsNull() ||
 					plan.ComputeSpecs.FileSystemParam.ThroughputMibpsPerFileSystem.IsUnknown() {
 					diagnostics.AddError(
@@ -698,6 +715,18 @@ func validateKafkaInstanceConfiguration(ctx context.Context, plan *models.KafkaI
 						"file_system_count is required when wal_mode is FSWAL",
 					)
 				}
+			}
+
+			// Check if K8S deployment is trying to use FSWAL
+			var stateDeploy *types.String
+			if stateSpecs != nil {
+				stateDeploy = &stateSpecs.DeployType
+			}
+			if deployType, ok := resolvePlannedStringValue(plan.ComputeSpecs.DeployType, stateDeploy); ok && strings.EqualFold(deployType, "K8S") {
+				diagnostics.AddError(
+					"Invalid Configuration",
+					"FSWAL is not supported with K8S deployment type",
+				)
 			}
 		} else if hasFileSystemParam {
 			// When file_system_param is provided, wal_mode must be FSWAL
@@ -1009,6 +1038,13 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 				fileSystemParam := &client.FileSystemParam{
 					ThroughputMiBpsPerFileSystem: int32(planFileSystemParam.ThroughputMibpsPerFileSystem.ValueInt64()),
 					FileSystemCount:              int32(planFileSystemParam.FileSystemCount.ValueInt64()),
+				}
+
+				// File system type
+				if !planFileSystemParam.FileSystemType.IsNull() &&
+					!planFileSystemParam.FileSystemType.IsUnknown() {
+					fsType := planFileSystemParam.FileSystemType.ValueString()
+					fileSystemParam.FileSystemType = &fsType
 				}
 
 				// Security groups protection logic: only include if not empty and not changing from existing value
@@ -1346,6 +1382,11 @@ func fileSystemParamChanged(plan, state *models.FileSystemParamModel) bool {
 	}
 	if state == nil {
 		return plan != nil
+	}
+
+	// Compare file system type
+	if !stringAttrEqual(plan.FileSystemType, state.FileSystemType) {
+		return true
 	}
 
 	// Compare throughput

@@ -199,6 +199,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku: types.Int64Value(4),
 					FileSystemParam: &FileSystemParamModel{
+						FileSystemType:               types.StringValue("EFS_PROVISIONED"),
 						ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 						FileSystemCount:              types.Int64Value(2),
 						SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-12345")}),
@@ -215,6 +216,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 					ReservedAku: 4,
 					NodeConfig:  &client.NodeConfigParam{},
 					FileSystem: &client.FileSystemParam{
+						FileSystemType:               stringPtr("EFS_PROVISIONED"),
 						ThroughputMiBpsPerFileSystem: 1000,
 						FileSystemCount:              2,
 						SecurityGroups:               []string{"sg-12345"},
@@ -233,6 +235,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku: types.Int64Value(4),
 					FileSystemParam: &FileSystemParamModel{
+						FileSystemType:               types.StringValue("ONTAP_V2"),
 						ThroughputMibpsPerFileSystem: types.Int64Value(500),
 						FileSystemCount:              types.Int64Value(1),
 						SecurityGroups:               types.ListNull(types.StringType),
@@ -249,6 +252,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 					ReservedAku: 4,
 					NodeConfig:  &client.NodeConfigParam{},
 					FileSystem: &client.FileSystemParam{
+						FileSystemType:               stringPtr("ONTAP_V2"),
 						ThroughputMiBpsPerFileSystem: 500,
 						FileSystemCount:              1,
 						SecurityGroups:               nil, // Should not be included when null/empty
@@ -528,6 +532,7 @@ func TestFlattenKafkaInstanceModel_FSWAL(t *testing.T) {
 				Spec: &client.SpecificationVO{
 					ReservedAku: int32Ptr(4),
 					FileSystem: &client.FileSystemVO{
+						FileSystemType:               strPtr("EFS_PROVISIONED"),
 						ThroughputMiBpsPerFileSystem: int32Ptr(1000),
 						FileSystemCount:              int32Ptr(2),
 						SecurityGroups:               []string{"sg-12345"},
@@ -546,6 +551,7 @@ func TestFlattenKafkaInstanceModel_FSWAL(t *testing.T) {
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku: types.Int64Value(4),
 					FileSystemParam: &FileSystemParamModel{
+						FileSystemType:               types.StringValue("EFS_PROVISIONED"),
 						ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 						FileSystemCount:              types.Int64Value(2),
 						SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-12345")}),
@@ -567,6 +573,7 @@ func TestFlattenKafkaInstanceModel_FSWAL(t *testing.T) {
 				Spec: &client.SpecificationVO{
 					ReservedAku: int32Ptr(2),
 					FileSystem: &client.FileSystemVO{
+						FileSystemType:               strPtr("ONTAP_V2"),
 						ThroughputMiBpsPerFileSystem: int32Ptr(500),
 						FileSystemCount:              int32Ptr(1),
 						SecurityGroups:               nil,
@@ -585,6 +592,7 @@ func TestFlattenKafkaInstanceModel_FSWAL(t *testing.T) {
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku: types.Int64Value(2),
 					FileSystemParam: &FileSystemParamModel{
+						FileSystemType:               types.StringValue("ONTAP_V2"),
 						ThroughputMibpsPerFileSystem: types.Int64Value(500),
 						FileSystemCount:              types.Int64Value(1),
 						SecurityGroups:               types.ListNull(types.StringType),

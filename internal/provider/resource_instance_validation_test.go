@@ -349,6 +349,7 @@ func TestValidateKafkaInstanceConfiguration_FSWALValid(t *testing.T) {
 				}),
 			}},
 			FileSystemParam: &models.FileSystemParamModel{
+				FileSystemType:               types.StringValue("EFS_PROVISIONED"),
 				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 				FileSystemCount:              types.Int64Value(2),
 				SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-test")}),
@@ -712,6 +713,7 @@ func TestValidateKafkaInstanceConfiguration_FSWALWithNullSecurityGroups(t *testi
 				}),
 			}},
 			FileSystemParam: &models.FileSystemParamModel{
+				FileSystemType:               types.StringValue("ONTAP_V2"),
 				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 				FileSystemCount:              types.Int64Value(2),
 				SecurityGroups:               types.ListNull(types.StringType), // Null - backend will auto-generate
@@ -742,6 +744,7 @@ func TestValidateKafkaInstanceConfiguration_FSWALWithUnknownSecurityGroups(t *te
 				}),
 			}},
 			FileSystemParam: &models.FileSystemParamModel{
+				FileSystemType:               types.StringValue("EFS_PROVISIONED"),
 				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 				FileSystemCount:              types.Int64Value(2),
 				SecurityGroups:               types.ListUnknown(types.StringType), // Unknown during planning
