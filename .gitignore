@@ -43,3 +43,6 @@ acc.config
 
 # Temporary files
 tmp/
+
+# Manual test directory
+test-connector/
