@@ -40,16 +40,17 @@ import (
 var accConfigPath = flag.String("acc.config", "", "path to JSON file containing acceptance test configuration")
 
 type accConfig struct {
-	Endpoint       string             `json:"endpoint"`
-	AccessKeyID    string             `json:"access_key_id"`
-	SecretKey      string             `json:"secret_key"`
-	EnvironmentID  string             `json:"environment_id"`
-	Region         string             `json:"region"`
-	Networks       []accNetwork       `json:"networks"`
-	K8S            accK8SConfig       `json:"k8s"`
-	Connector      accConnectorConfig `json:"connector"`
-	Version        string             `json:"version"`
-	UpgradeVersion string             `json:"upgrade_version"`
+	Endpoint        string                   `json:"endpoint"`
+	AccessKeyID     string                   `json:"access_key_id"`
+	SecretKey       string                   `json:"secret_key"`
+	EnvironmentID   string                   `json:"environment_id"`
+	Region          string                   `json:"region"`
+	Networks        []accNetwork             `json:"networks"`
+	K8S             accK8SConfig             `json:"k8s"`
+	Connector       accConnectorConfig       `json:"connector"`
+	ConnectorPlugin accConnectorPluginConfig `json:"connector_plugin"`
+	Version         string                   `json:"version"`
+	UpgradeVersion  string                   `json:"upgrade_version"`
 }
 
 type accK8SConfig struct {
@@ -70,6 +71,15 @@ type accConnectorConfig struct {
 	ConnCfgTopics        string `json:"connector_config_topics"`
 	ConnCfgS3Region      string `json:"connector_config_s3_region"`
 	ConnCfgS3Bucket      string `json:"connector_config_s3_bucket"`
+}
+
+type accConnectorPluginConfig struct {
+	StorageUrl        string   `json:"storage_url"`
+	Types             []string `json:"types"`
+	ConnectorClass    string   `json:"connector_class"`
+	Version           string   `json:"version"`
+	Description       string   `json:"description"`
+	DocumentationLink string   `json:"documentation_link"`
 }
 
 var (
@@ -165,16 +175,17 @@ func parseAccConfigFromFile(path string) (accConfig, error) {
 		return accConfig{}, fmt.Errorf("read acc.config file: %w", err)
 	}
 	var raw struct {
-		Endpoint       string             `json:"endpoint"`
-		AccessKeyID    string             `json:"access_key_id"`
-		SecretKey      string             `json:"secret_key"`
-		EnvironmentID  string             `json:"environment_id"`
-		Region         string             `json:"region"`
-		Version        string             `json:"version"`
-		UpgradeVersion string             `json:"upgrade_version"`
-		Networks       []accNetwork       `json:"networks"`
-		K8S            accK8SConfig       `json:"k8s"`
-		Connector      accConnectorConfig `json:"connector"`
+		Endpoint        string                   `json:"endpoint"`
+		AccessKeyID     string                   `json:"access_key_id"`
+		SecretKey       string                   `json:"secret_key"`
+		EnvironmentID   string                   `json:"environment_id"`
+		Region          string                   `json:"region"`
+		Version         string                   `json:"version"`
+		UpgradeVersion  string                   `json:"upgrade_version"`
+		Networks        []accNetwork             `json:"networks"`
+		K8S             accK8SConfig             `json:"k8s"`
+		Connector       accConnectorConfig       `json:"connector"`
+		ConnectorPlugin accConnectorPluginConfig `json:"connector_plugin"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return accConfig{}, fmt.Errorf("parse acc.config JSON: %w", err)
@@ -205,6 +216,14 @@ func parseAccConfigFromFile(path string) (accConfig, error) {
 			ConnCfgTopics:        strings.TrimSpace(raw.Connector.ConnCfgTopics),
 			ConnCfgS3Region:      strings.TrimSpace(raw.Connector.ConnCfgS3Region),
 			ConnCfgS3Bucket:      strings.TrimSpace(raw.Connector.ConnCfgS3Bucket),
+		},
+		ConnectorPlugin: accConnectorPluginConfig{
+			StorageUrl:        strings.TrimSpace(raw.ConnectorPlugin.StorageUrl),
+			Types:             append([]string{}, raw.ConnectorPlugin.Types...),
+			ConnectorClass:    strings.TrimSpace(raw.ConnectorPlugin.ConnectorClass),
+			Version:           strings.TrimSpace(raw.ConnectorPlugin.Version),
+			Description:       strings.TrimSpace(raw.ConnectorPlugin.Description),
+			DocumentationLink: strings.TrimSpace(raw.ConnectorPlugin.DocumentationLink),
 		},
 	}
 	return cfg.normalise(), nil
@@ -271,6 +290,10 @@ func (c accConfig) hasK8S() bool {
 
 func (c accConfig) hasConnector() bool {
 	return c.Connector.PluginID != ""
+}
+
+func (c accConfig) hasConnectorPlugin() bool {
+	return c.ConnectorPlugin.StorageUrl != "" && c.ConnectorPlugin.ConnectorClass != ""
 }
 
 func TestAccKafkaInstance_VM_Scenario(t *testing.T) {
