@@ -71,6 +71,7 @@ variable "connect_password" {
 ### Required
 
 - `capacity` (Attributes) Worker capacity configuration that determines the compute resources allocated to the connector cluster. (see [below for nested schema](#nestedatt--capacity))
+- `connector_class` (String) Fully-qualified Java class name of the connector, e.g. `io.confluent.connect.s3.S3SinkConnector`. Changing this forces a new resource.
 - `environment_id` (String) Target AutoMQ environment identifier.
 - `kafka_cluster` (Attributes) Kafka cluster binding. Specifies which AutoMQ Kafka instance the connector connects to and how it authenticates. (see [below for nested schema](#nestedatt--kafka_cluster))
 - `kubernetes_cluster_id` (String) Target Kubernetes cluster ID where connector pods will be deployed. Changing this forces a new resource.
@@ -82,7 +83,6 @@ variable "connect_password" {
 
 ### Optional
 
-- `connector_class` (String) Fully-qualified Java class name of the connector, e.g. `io.confluent.connect.s3.S3SinkConnector`. Changing this forces a new resource.
 - `connector_config` (Map of String) Connector-level configuration pushed via the Connect REST API. Contains plugin-specific settings such as `topics`, `s3.bucket.name`, `flush.size`, etc.
 - `description` (String) Free-form text description of the connector cluster.
 - `iam_role` (String) AWS IAM Role ARN for the connector pods (IRSA). Grants the connector access to AWS resources such as S3 buckets. Changing this forces a new resource.

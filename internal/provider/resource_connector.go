@@ -135,7 +135,7 @@ func (r *ConnectorResource) Schema(ctx context.Context, _ resource.SchemaRequest
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"connector_class": schema.StringAttribute{
-				Optional:      true,
+				Required:      true,
 				Description:   "Fully-qualified Java class name of the connector, e.g. `io.confluent.connect.s3.S3SinkConnector`. Changing this forces a new resource.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},

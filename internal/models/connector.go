@@ -109,9 +109,8 @@ func ExpandConnectorCreate(plan ConnectorResourceModel) (*client.ConnectorCreate
 	if s := cOptStr(plan.PluginType); s != nil {
 		request.Type = s
 	}
-	if s := cOptStr(plan.ConnectorClass); s != nil {
-		request.ConnectorClass = s
-	}
+	connClass := plan.ConnectorClass.ValueString()
+	request.ConnectorClass = &connClass
 	if s := cOptStr(plan.IamRole); s != nil {
 		request.IamRole = s
 	}
