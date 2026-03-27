@@ -55,7 +55,6 @@ type SecurityProtocolConfigModel struct {
 	Password         types.String `tfsdk:"password"`
 	SaslMechanism    types.String `tfsdk:"sasl_mechanism"`
 	TruststoreCerts  types.String `tfsdk:"truststore_certs"`
-	KeyPassword      types.String `tfsdk:"key_password"`
 	ClientCert       types.String `tfsdk:"client_cert"`
 	PrivateKey       types.String `tfsdk:"private_key"`
 }
@@ -237,7 +236,6 @@ func cExpandSecurityProtocol(m *SecurityProtocolConfigModel) *client.SecurityPro
 		Password:         cOptStr(m.Password),
 		SaslMechanism:    cOptStr(m.SaslMechanism),
 		TruststoreCerts:  cOptStr(m.TruststoreCerts),
-		KeyPassword:      cOptStr(m.KeyPassword),
 		ClientCert:       cOptStr(m.ClientCert),
 		PrivateKey:       cOptStr(m.PrivateKey),
 	}
@@ -315,7 +313,6 @@ func cFlattenSecurityProtocol(cfg *client.SecurityProtocolConfig, prev *Security
 		Password:         types.StringNull(),
 		SaslMechanism:    types.StringNull(),
 		TruststoreCerts:  types.StringNull(),
-		KeyPassword:      types.StringNull(),
 		ClientCert:       types.StringNull(),
 		PrivateKey:       types.StringNull(),
 	}
@@ -330,7 +327,6 @@ func cFlattenSecurityProtocol(cfg *client.SecurityProtocolConfig, prev *Security
 	m.Password = cRetainStr(cfg.Password, m.Password)
 	m.SaslMechanism = cRetainStr(cfg.SaslMechanism, m.SaslMechanism)
 	m.TruststoreCerts = cRetainStr(cfg.TruststoreCerts, m.TruststoreCerts)
-	m.KeyPassword = cRetainStr(cfg.KeyPassword, m.KeyPassword)
 	m.ClientCert = cRetainStr(cfg.ClientCert, m.ClientCert)
 	m.PrivateKey = cRetainStr(cfg.PrivateKey, m.PrivateKey)
 	return m

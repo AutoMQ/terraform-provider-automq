@@ -252,11 +252,6 @@ func (r *ConnectorResource) Schema(ctx context.Context, _ resource.SchemaRequest
 								Description:   "Custom CA certificate (PEM format) for TLS verification. Applicable to `SSL` and `SASL_SSL`. If omitted, the CA certificate from the Kafka instance is used automatically.",
 								PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 							},
-							"key_password": schema.StringAttribute{
-								Optional:    true,
-								Sensitive:   true,
-								Description: "Passphrase for the encrypted private key. Only required if `private_key` is password-protected.",
-							},
 							"client_cert": schema.StringAttribute{
 								Optional:    true,
 								Description: "Client certificate in PEM format for mTLS authentication. Required when security_protocol is `SSL`.",

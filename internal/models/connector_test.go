@@ -41,7 +41,6 @@ func TestExpandConnectorCreate(t *testing.T) {
 				Password:         types.StringValue("pass1"),
 				SaslMechanism:    types.StringNull(),
 				TruststoreCerts:  types.StringNull(),
-				KeyPassword:      types.StringNull(),
 				ClientCert:       types.StringNull(),
 				PrivateKey:       types.StringNull(),
 			},

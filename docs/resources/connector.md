@@ -129,7 +129,6 @@ Required:
 Optional:
 
 - `client_cert` (String) Client certificate in PEM format for mTLS authentication. Required when security_protocol is `SSL`.
-- `key_password` (String, Sensitive) Passphrase for the encrypted private key. Only required if `private_key` is password-protected.
 - `password` (String, Sensitive) SASL password. Required when security_protocol is `SASL_PLAINTEXT` or `SASL_SSL`.
 - `private_key` (String, Sensitive) Client private key in PEM format for mTLS authentication. Required when security_protocol is `SSL`.
 - `sasl_mechanism` (String) SASL mechanism, e.g. `PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512`. Defaults to `SCRAM-SHA-512` on the server side if omitted.
