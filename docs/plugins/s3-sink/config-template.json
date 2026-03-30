@@ -1,0 +1,161 @@
+{
+  "plugin": {
+    "name": "s3-sink",
+    "connector_class": "io.confluent.connect.s3.S3SinkConnector",
+    "type": "SINK",
+    "version": "11.1.0",
+    "storage_url": "http://download.automq.com/resource/connector/automq-kafka-connect-s3-11.1.0.zip"
+  },
+  "worker_config": {
+    "recommended": {
+      "key.converter": {
+        "value": "org.apache.kafka.connect.storage.StringConverter",
+        "description": "Key converter. Use StringConverter for plain string keys, JsonConverter for JSON keys.",
+        "importance": "HIGH",
+        "note": "Default JsonConverter will fail if message keys are not valid JSON"
+      },
+      "value.converter": {
+        "value": "org.apache.kafka.connect.json.JsonConverter",
+        "description": "Value converter. JsonConverter for JSON messages, AvroConverter for Avro, StringConverter for plain text.",
+        "importance": "HIGH"
+      },
+      "value.converter.schemas.enable": {
+        "value": "false",
+        "description": "Set to false if JSON messages don't include schema wrapper. Set to true if messages follow {schema:{}, payload:{}} format.",
+        "importance": "MEDIUM"
+      }
+    }
+  },
+  "connector_config": {
+    "required": {
+      "topics": {
+        "description": "Comma-separated list of Kafka topics to consume from.",
+        "type": "LIST",
+        "importance": "HIGH",
+        "example": "order-events,user-events"
+      },
+      "s3.bucket.name": {
+        "description": "S3 bucket name where data will be written.",
+        "type": "STRING",
+        "importance": "HIGH",
+        "example": "my-data-lake"
+      },
+      "s3.region": {
+        "description": "AWS region of the S3 bucket.",
+        "type": "STRING",
+        "importance": "HIGH",
+        "example": "us-east-1"
+      },
+      "storage.class": {
+        "value": "io.confluent.connect.s3.storage.S3Storage",
+        "description": "Storage implementation class. Always use S3Storage for S3 Sink.",
+        "type": "STRING",
+        "importance": "HIGH"
+      },
+      "format.class": {
+        "value": "io.confluent.connect.s3.format.json.JsonFormat",
+        "description": "Output format class. Options: JsonFormat, AvroFormat, ParquetFormat, ByteArrayFormat.",
+        "type": "CLASS",
+        "importance": "HIGH"
+      }
+    },
+    "recommended": {
+      "flush.size": {
+        "value": "1000",
+        "description": "Number of records per partition before flushing to S3. Lower values = more files, higher values = larger files.",
+        "type": "INT",
+        "importance": "HIGH",
+        "performance_impact": "Directly affects file size and S3 PUT frequency. flush.size=1000 with 1KB records ≈ 1MB files."
+      },
+      "rotate.interval.ms": {
+        "value": "600000",
+        "description": "Time-based rotation interval in milliseconds. Files are flushed after this interval even if flush.size is not reached. Default 10 minutes.",
+        "type": "LONG",
+        "importance": "HIGH",
+        "performance_impact": "Ensures data freshness. Lower values = more frequent S3 writes."
+      },
+      "partitioner.class": {
+        "value": "io.confluent.connect.storage.partitioner.DefaultPartitioner",
+        "description": "Partitioner class. DefaultPartitioner uses Kafka partition. TimeBasedPartitioner for time-based directory structure.",
+        "type": "CLASS",
+        "importance": "MEDIUM"
+      },
+      "topics.dir": {
+        "value": "topics",
+        "description": "Top-level directory in S3 bucket. Files are written to {topics.dir}/{topic}/{partition}/.",
+        "type": "STRING",
+        "importance": "MEDIUM"
+      }
+    },
+    "optional": {
+      "s3.compression.type": {
+        "value": "none",
+        "description": "Compression type: none or gzip. Gzip reduces storage cost but increases CPU usage.",
+        "type": "STRING",
+        "importance": "LOW"
+      },
+      "s3.part.size": {
+        "value": "26214400",
+        "description": "S3 multipart upload part size in bytes. Default 25MB. Minimum 5MB.",
+        "type": "INT",
+        "importance": "LOW"
+      },
+      "s3.wan.mode": {
+        "value": "false",
+        "description": "Use S3 Transfer Acceleration endpoint for cross-region writes.",
+        "type": "BOOLEAN",
+        "importance": "MEDIUM"
+      },
+      "store.kafka.keys": {
+        "value": "false",
+        "description": "Include Kafka message keys in the output files.",
+        "type": "BOOLEAN",
+        "importance": "LOW"
+      },
+      "store.kafka.headers": {
+        "value": "false",
+        "description": "Include Kafka message headers in the output files.",
+        "type": "BOOLEAN",
+        "importance": "LOW"
+      },
+      "behavior.on.null.values": {
+        "value": "fail",
+        "description": "How to handle null values: fail, ignore, or write (as tombstone).",
+        "type": "STRING",
+        "importance": "MEDIUM"
+      },
+      "s3.ssea.name": {
+        "description": "S3 server-side encryption algorithm: AES256 or aws:kms.",
+        "type": "STRING",
+        "importance": "LOW"
+      },
+      "s3.sse.kms.key.id": {
+        "description": "KMS key ID for aws:kms encryption.",
+        "type": "STRING",
+        "importance": "LOW"
+      }
+    },
+    "sensitive": [
+      "aws.access.key.id",
+      "aws.secret.access.key",
+      "s3.proxy.password",
+      "s3.sse.customer.key"
+    ]
+  },
+  "confluent_parameter_mapping": {
+    "notes": "Confluent Cloud S3 Sink uses simplified parameter names. The open-source version parameters listed above are compatible.",
+    "confluent_only_params": [
+      "output.data.format",
+      "kafka.auth.mode",
+      "kafka.api.key",
+      "kafka.api.secret",
+      "kafka.service.account.id",
+      "input.data.format"
+    ],
+    "mapping": {
+      "output.data.format=JSON": "format.class=io.confluent.connect.s3.format.json.JsonFormat",
+      "output.data.format=AVRO": "format.class=io.confluent.connect.s3.format.avro.AvroFormat",
+      "output.data.format=PARQUET": "format.class=io.confluent.connect.s3.format.parquet.ParquetFormat"
+    }
+  }
+}
