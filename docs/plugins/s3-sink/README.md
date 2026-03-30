@@ -76,11 +76,14 @@
 
 - [x] 完整的 ConfigDef 参数表（含类型、默认值、是否必填、是否敏感）
 - [x] 配置模板生成（config-template.json）
-- [x] 文档产出（Quick Start）
-- [ ] 性能基准测试（更大规模 + 不同配置组合）
-- [ ] 可视化素材（CMP 指标截图）
-- [ ] 完整文档集（Config Reference, Performance Tuning, Migration Guide, Troubleshooting）
-- [ ] PR 提交
+- [x] Quick Start 文档
+- [x] Configuration Reference 文档
+- [x] Performance Tuning 文档（含基准测试数据）
+- [x] Migration Guide 文档（Confluent + MSK）
+- [x] Troubleshooting 文档
+- [x] PR 提交
+- [ ] 更大规模性能测试（不同 Tier 对比）
+- [ ] CMP 指标面板截图
 
 ## 性能基准（初步）
 
