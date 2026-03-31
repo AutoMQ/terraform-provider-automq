@@ -27,6 +27,12 @@ Worker specs tested:
 
 ## Benchmark Results
 
+### Throughput Comparison
+
+![Throughput by flush.size and Worker Tier](benchmark-throughput-comparison.png)
+
+![All Benchmark Results](benchmark-all-results.png)
+
 ### Understanding the Numbers
 
 > **Important:** The throughput numbers below represent CMP Produce API throughput (messages produced via HTTP with request signing), NOT native Kafka producer throughput or connector processing throughput.
