@@ -1,25 +1,25 @@
 # S3 Sink Connector — Troubleshooting
 
-## Task 启动后立即 FAILED
+## Scenario 1: Task FAILED Due to Converter Mismatch
 
-### 症状
+### Symptoms
 
-Connector 创建后 task 状态变为 FAILED，日志中出现：
+Connector creates successfully but task immediately enters FAILED state. Logs show:
 
 ```
 ERROR WorkerSinkTask Task threw an uncaught and unrecoverable exception
-Caused by: org.apache.kafka.connect.errors.DataException: Converting byte[] to Kafka Connect data failed due to serialization error
+Caused by: org.apache.kafka.connect.errors.DataException:
+  Converting byte[] to Kafka Connect data failed due to serialization error
 ```
 
-### 原因
+### Root Cause
 
-Message key 或 value 的格式与 Worker 的 converter 配置不匹配。
+The message key or value format does not match the Worker's converter configuration. Most commonly: the default `JsonConverter` cannot deserialize a plain string key.
 
-最常见的情况：Worker 默认使用 `JsonConverter`，但 message key 是普通字符串（不是 JSON），导致反序列化失败。
+### Resolution
 
-### 解决
-
-在 `worker_config` 中配置正确的 converter：
+1. Identify your message format (check how producers write to the topic)
+2. Update `worker_config` to match:
 
 ```hcl
 worker_config = {
@@ -29,40 +29,76 @@ worker_config = {
 }
 ```
 
-| 消息格式 | key.converter | value.converter |
-|---------|--------------|-----------------|
-| Key=字符串, Value=JSON（无 schema） | StringConverter | JsonConverter + schemas.enable=false |
-| Key=JSON, Value=JSON（无 schema） | JsonConverter + schemas.enable=false | JsonConverter + schemas.enable=false |
-| Key=字符串, Value=JSON（有 schema） | StringConverter | JsonConverter + schemas.enable=true |
-| Key=字符串, Value=Avro | StringConverter | AvroConverter |
-| Key=字符串, Value=纯文本 | StringConverter | StringConverter |
+3. Delete and recreate the connector with the corrected config
 
-## 数据没有写入 S3
+### Converter Selection Matrix
 
-### 症状
+| Key Format | Value Format | key.converter | value.converter | schemas.enable |
+| --- | --- | --- | --- | --- |
+| String | JSON (no schema) | StringConverter | JsonConverter | false |
+| JSON | JSON (no schema) | JsonConverter + schemas.enable=false | JsonConverter | false |
+| String | JSON (with schema) | StringConverter | JsonConverter | true |
+| String | Avro | StringConverter | AvroConverter | N/A |
+| String | Plain text | StringConverter | StringConverter | N/A |
+| Bytes | Bytes | ByteArrayConverter | ByteArrayConverter | N/A |
 
-Connector 状态 RUNNING，但 S3 bucket 中没有新文件。
+Full class names:
 
-### 排查步骤
+- `org.apache.kafka.connect.storage.StringConverter`
+- `org.apache.kafka.connect.json.JsonConverter`
+- `io.confluent.connect.avro.AvroConverter`
+- `org.apache.kafka.connect.converters.ByteArrayConverter`
 
-1. **检查 topic 中是否有数据**：通过 CMP 的消息查看功能确认 topic 中有消息
+## Scenario 2: Data Not Appearing in S3
 
-2. **检查 flush.size 配置**：如果 `flush.size=1000` 但 topic 中只有 100 条消息，需要等待 `rotate.interval.ms` 触发时间 flush
+### Symptoms
 
-3. **检查 rotate.interval.ms**：如果没有配置 `rotate.interval.ms`，数据只会在达到 `flush.size` 时写入
+Connector state is RUNNING with zero failed tasks, but no new files appear in the S3 bucket.
 
-4. **检查 IAM 权限**：IAM Role 需要以下 S3 权限：
-   - `s3:PutObject`
-   - `s3:GetBucketLocation`
-   - `s3:ListBucket`
-   - `s3:AbortMultipartUpload`（分片上传）
-   - `s3:ListMultipartUploadParts`（分片上传）
+### Root Cause
 
-5. **检查 S3 bucket 和 region**：确认 `s3.bucket.name` 和 `s3.region` 配置正确
+Usually one of: no data in topic, flush.size not reached, missing time-based rotation, or IAM permission issues.
 
-## Connector 创建失败：KubernetesValidationFailed
+### Resolution
 
-### 症状
+Check in this order:
+
+1. **Verify topic has data** — Use CMP console or Produce API to confirm messages exist in the topic
+
+2. **Check flush.size** — If `flush.size=5000` but only 100 messages exist, data won't flush until the count is reached per partition
+
+3. **Check rotate.interval.ms** — If not configured, data only flushes when `flush.size` is reached. Add `rotate.interval.ms=600000` (10 min) to ensure time-based flushing
+
+4. **Check IAM permissions** — The IAM Role needs these S3 permissions:
+
+   ```json
+   {
+     "Effect": "Allow",
+     "Action": [
+       "s3:PutObject",
+       "s3:GetBucketLocation",
+       "s3:ListBucket",
+       "s3:AbortMultipartUpload",
+       "s3:ListMultipartUploadParts"
+     ],
+     "Resource": [
+       "arn:aws:s3:::your-bucket",
+       "arn:aws:s3:::your-bucket/*"
+     ]
+   }
+   ```
+
+5. **Verify bucket and region** — Confirm `s3.bucket.name` and `s3.region` match your actual S3 bucket
+
+6. **Check connector logs** for S3 access errors:
+
+   ```
+   GET /api/v1/connectors/{connectorId}/logs?tailLines=100
+   ```
+
+## Scenario 3: KubernetesValidationFailed on Connector Creation
+
+### Symptoms
 
 ```
 Error: Create Connector Error
@@ -70,56 +106,148 @@ API Error: Connector.KubernetesValidationFailed
 Message: Failed to validate Kubernetes prerequisites
 ```
 
-### 排查步骤
+### Root Cause
 
-1. **检查 K8s 集群可访问性**：
+CMP cannot access the specified Kubernetes cluster, or the namespace/service account does not exist.
+
+### Resolution
+
+1. **Verify K8s cluster accessibility:**
+
    ```
    GET /api/v1/providers/k8s-clusters/{clusterId}
    ```
-   确认 `accessible: true`
 
-2. **检查 EKS 访问条目**：CMP 需要在 EKS 中有访问权限。联系管理员在 EKS 的 aws-auth ConfigMap 或 Access Entries 中添加 CMP 的 IAM Role
+   Confirm `accessible: true` in the response.
 
-3. **检查安全组**：确认 EKS 节点的安全组允许 CMP 的入站连接
+2. **Check EKS access entries** — CMP needs IAM access to the EKS cluster. Ensure CMP's IAM Role is added to the EKS `aws-auth` ConfigMap or Access Entries.
 
-4. **检查 namespace 和 service account**：确认指定的 K8s namespace 和 service account 存在
+3. **Check security groups** — EKS node security groups must allow inbound connections from CMP.
 
-## S3 写入延迟高
+4. **Verify namespace exists** — The specified `kubernetes_namespace` must exist in the cluster.
 
-### 症状
+5. **Verify service account exists** — The specified `kubernetes_service_account` must exist in the namespace.
 
-数据从 produce 到出现在 S3 的延迟超过预期。
+## Scenario 4: High S3 Write Latency
 
-### 优化
+### Symptoms
 
-1. **减小 flush.size**：更小的 flush.size 意味着更频繁的 S3 写入
-2. **配置 rotate.interval.ms**：确保有时间触发 flush
-3. **增加 task_count**：更多 task 并行消费
-4. **升级 Worker 规格**：CPU 不足会导致处理延迟
-5. **启用 S3 Transfer Acceleration**：跨 region 写入时设置 `s3.wan.mode=true`
+Data appears in S3 but with much higher delay than expected (e.g., minutes instead of seconds).
 
-## Connector 状态 FAILED 但无明显错误
+### Root Cause
 
-### 排查
+Combination of large flush.size, missing time-based rotation, insufficient worker resources, or cross-region S3 writes.
 
-1. 通过 CMP 日志 API 查看 connector 日志：
+### Resolution
+
+1. **Reduce flush.size** — Smaller values trigger more frequent S3 writes:
+
    ```
-   GET /api/v1/connectors/{connectorId}/logs?tailLines=100
+   flush.size = 100    # for low-latency
+   flush.size = 1000   # for balanced (default)
    ```
 
-2. 检查 Worker pod 的资源使用（CPU/内存是否达到限制）
+2. **Add rotate.interval.ms** — Ensures data is written even at low message rates:
 
-3. 检查 Kafka 连接是否正常（ACL 是否完整）
+   ```
+   rotate.interval.ms = 60000   # 1 minute max delay
+   ```
 
-### 必需的 ACL
+3. **Increase task_count** — More tasks = more parallel consumers:
 
-S3 Sink Connector 需要以下 Kafka ACL：
+   ```
+   task_count = <number_of_partitions>
+   ```
 
-| 资源类型 | 资源名 | 模式 | 操作 |
-|---------|--------|------|------|
-| TOPIC | * 或具体 topic 名 | LITERAL | ALL |
-| GROUP | connect（前缀） | PREFIXED | ALL |
-| CLUSTER | kafka-cluster | LITERAL | ALL |
-| TRANSACTIONAL_ID | connect（前缀） | PREFIXED | ALL |
+4. **Upgrade worker tier** — CPU-constrained workers process records slower:
 
-缺少任何一个都可能导致 connector 无法正常工作。
+   ```
+   worker_resource_spec = "TIER2"   # or TIER3 for high volume
+   ```
+
+5. **Enable S3 Transfer Acceleration** — For cross-region writes:
+
+   ```
+   s3.wan.mode = true
+   ```
+
+6. **Check consumer lag** — High lag indicates the connector is falling behind. View lag on the CMP Connect detail page.
+
+## Scenario 5: Connector FAILED with No Obvious Error
+
+### Symptoms
+
+Connector state changes to FAILED but the error message is generic or missing.
+
+### Resolution
+
+1. **Check connector logs via CMP API:**
+
+   ```
+   GET /api/v1/connectors/{connectorId}/logs?tailLines=200
+   ```
+
+   Look for `ERROR` or `WARN` entries, especially around task startup and S3 operations.
+
+2. **Check worker resource usage** — If the worker pod is OOMKilled or CPU-throttled, tasks may fail silently. Upgrade to a higher tier:
+
+   | Current Tier | Upgrade To | When |
+   | --- | --- | --- |
+   | TIER1 | TIER2 | OOMKilled or high CPU throttling |
+   | TIER2 | TIER3 | Processing large messages or high volume |
+
+3. **Verify Kafka ACLs are complete** — Missing ACLs can cause silent failures. Required ACLs:
+
+   | Resource Type | Resource Name | Pattern Type | Operation |
+   | --- | --- | --- | --- |
+   | TOPIC | `*` or specific topic name | LITERAL | ALL |
+   | GROUP | `connect` (prefix) | PREFIXED | ALL |
+   | CLUSTER | `kafka-cluster` | LITERAL | ALL |
+   | TRANSACTIONAL_ID | `connect` (prefix) | PREFIXED | ALL |
+
+   Missing any of these can cause the connector to fail during startup or message consumption.
+
+4. **Check Kafka connectivity** — Verify the Kafka instance is running and the SASL credentials are correct.
+
+5. **Restart the connector** — Delete and recreate via Terraform if the issue is transient.
+
+## Checking Connector Logs via CMP API
+
+For any troubleshooting scenario, connector logs are your primary diagnostic tool:
+
+```
+GET /api/v1/connectors/{connectorId}/logs?tailLines=100
+```
+
+Response contains the most recent log lines from the connector worker pod. Look for:
+
+- `ERROR` — Critical failures (converter errors, S3 access denied, OOM)
+- `WARN` — Potential issues (retries, slow S3 responses)
+- `DataException` — Converter mismatch (see Scenario 1)
+- `AmazonS3Exception` — S3 permission or configuration errors
+- `ConnectException` — Kafka connectivity or ACL issues
+
+You can also check connector status programmatically:
+
+```
+GET /api/v1/connectors/{connectorId}
+```
+
+Key fields in the response:
+
+- `state` — Should be `RUNNING`
+- `failedTaskCount` — Should be `0`
+- `runningTaskCount` — Should match your `task_count`
+
+## Required Kafka ACLs (Complete List)
+
+The S3 Sink Connector requires these Kafka ACLs to function correctly:
+
+| Resource Type | Resource Name | Pattern Type | Operation | Purpose |
+| --- | --- | --- | --- | --- |
+| TOPIC | `*` or specific topic names | LITERAL | ALL | Read messages from source topics |
+| GROUP | `connect` | PREFIXED | ALL | Consumer group for offset management |
+| CLUSTER | `kafka-cluster` | LITERAL | ALL | Cluster-level operations (metadata, offsets) |
+| TRANSACTIONAL_ID | `connect` | PREFIXED | ALL | Exactly-once delivery support |
+
+Missing any ACL will cause connector failures. The GROUP and TRANSACTIONAL_ID resources use PREFIXED pattern type because Kafka Connect generates group and transaction IDs with the `connect` prefix.

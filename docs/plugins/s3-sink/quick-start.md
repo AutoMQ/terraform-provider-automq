@@ -1,20 +1,36 @@
 # S3 Sink Connector — Quick Start
 
-## 概述
+## Overview
 
-S3 Sink Connector 将 Kafka topic 中的数据持续写入 Amazon S3 bucket，支持 JSON、Avro、Parquet 等格式。
+The S3 Sink Connector continuously exports data from Kafka topics to Amazon S3, supporting JSON, Avro, Parquet, and raw byte formats. This guide walks you through creating your first S3 Sink Connector on AutoMQ Connect using Terraform.
 
-## 前置条件
+## Prerequisites
 
-1. 一个运行中的 AutoMQ Kafka 实例
-2. 一个 S3 bucket（与 Kafka 实例同 region）
-3. IAM Role 具有 S3 写入权限（`s3:PutObject`, `s3:GetBucketLocation`, `s3:ListBucket`）
-4. Kafka 用户和 ACL 配置完成
+Before creating an S3 Sink Connector, ensure you have:
 
-## Terraform 配置示例
+1. **Running AutoMQ Kafka Instance** — An active Kafka instance in your AutoMQ environment
+2. **S3 Bucket** — An Amazon S3 bucket in the same region as your Kafka instance (cross-region is supported but adds latency)
+3. **IAM Role** with S3 write permissions:
+   - `s3:PutObject`
+   - `s3:GetBucketLocation`
+   - `s3:ListBucket`
+   - `s3:AbortMultipartUpload`
+   - `s3:ListMultipartUploadParts`
+4. **Kafka User and ACL** — A SASL user with the following ACLs configured:
+
+   | Resource Type | Resource Name | Pattern Type | Operation |
+   | --- | --- | --- | --- |
+   | TOPIC | your-topic-name (or `*`) | LITERAL | ALL |
+   | GROUP | connect (prefix) | PREFIXED | ALL |
+   | CLUSTER | kafka-cluster | LITERAL | ALL |
+   | TRANSACTIONAL_ID | connect (prefix) | PREFIXED | ALL |
+
+5. **Kubernetes Cluster** — An accessible EKS/K8s cluster registered with CMP for running connector workers
+
+## Terraform Configuration Example
 
 ```hcl
-# 1. 上传 S3 Sink 插件（如果使用内置插件可跳过）
+# 1. Upload S3 Sink plugin (skip if using a built-in plugin)
 resource "automq_connector_plugin" "s3_sink" {
   environment_id  = "env-xxxxx"
   name            = "s3-sink"
@@ -24,7 +40,7 @@ resource "automq_connector_plugin" "s3_sink" {
   connector_class = "io.confluent.connect.s3.S3SinkConnector"
 }
 
-# 2. 创建 S3 Sink Connector
+# 2. Create S3 Sink Connector
 resource "automq_connector" "s3_sink" {
   environment_id             = "env-xxxxx"
   name                       = "my-s3-sink"
@@ -51,24 +67,24 @@ resource "automq_connector" "s3_sink" {
     }
   }
 
-  # Worker 配置 — converter 设置
+  # Worker config — converter settings (critical!)
   worker_config = {
-    "key.converter"                     = "org.apache.kafka.connect.storage.StringConverter"
-    "value.converter"                   = "org.apache.kafka.connect.json.JsonConverter"
-    "value.converter.schemas.enable"    = "false"
+    "key.converter"                  = "org.apache.kafka.connect.storage.StringConverter"
+    "value.converter"                = "org.apache.kafka.connect.json.JsonConverter"
+    "value.converter.schemas.enable" = "false"
   }
 
-  # Connector 配置 — S3 Sink 参数
+  # Connector config — S3 Sink parameters
   connector_config = {
-    "topics"           = "order-events,user-events"
-    "s3.bucket.name"   = "my-data-lake"
-    "s3.region"        = "us-east-1"
-    "flush.size"       = "1000"
+    "topics"            = "order-events,user-events"
+    "s3.bucket.name"    = "my-data-lake"
+    "s3.region"         = "us-east-1"
+    "flush.size"        = "1000"
     "rotate.interval.ms" = "600000"
-    "storage.class"    = "io.confluent.connect.s3.storage.S3Storage"
-    "format.class"     = "io.confluent.connect.s3.format.json.JsonFormat"
-    "partitioner.class" = "io.confluent.connect.storage.partitioner.DefaultPartitioner"
-    "topics.dir"       = "kafka-data"
+    "storage.class"     = "io.confluent.connect.s3.storage.S3Storage"
+    "format.class"      = "io.confluent.connect.s3.format.json.JsonFormat"
+    "partitioner.class"  = "io.confluent.connect.storage.partitioner.DefaultPartitioner"
+    "topics.dir"        = "kafka-data"
   }
 
   timeouts = {
@@ -78,61 +94,116 @@ resource "automq_connector" "s3_sink" {
 }
 ```
 
-## 关键配置说明
+## Worker Config (Critical)
 
-### Worker 配置（重要）
+The Worker config controls how Kafka Connect serializes/deserializes message keys and values. Incorrect converter settings are the #1 cause of task failures.
 
-| 参数 | 推荐值 | 说明 |
-|------|--------|------|
-| `key.converter` | `StringConverter` | 如果 message key 是普通字符串，必须用 StringConverter。默认的 JsonConverter 会在 key 不是 JSON 时导致 task 失败 |
-| `value.converter` | `JsonConverter` | JSON 格式消息用 JsonConverter，Avro 用 AvroConverter |
-| `value.converter.schemas.enable` | `false` | 如果 JSON 消息不包含 schema wrapper，设为 false |
+| Parameter | Recommended Value | Why |
+| --- | --- | --- |
+| `key.converter` | `org.apache.kafka.connect.storage.StringConverter` | Most Kafka producers use plain string keys. The default `JsonConverter` will throw `DataException` if the key is not valid JSON. |
+| `value.converter` | `org.apache.kafka.connect.json.JsonConverter` | For JSON-formatted message values. Use `AvroConverter` for Avro, `StringConverter` for plain text. |
+| `value.converter.schemas.enable` | `false` | Set to `false` if your JSON messages are plain JSON objects. Set to `true` only if messages use the `{schema:{}, payload:{}}` envelope format. |
 
-### Connector 配置
+### Converter Selection Guide
 
-| 参数 | 必填 | 说明 |
-|------|------|------|
-| `topics` | 是 | 要消费的 topic 列表 |
-| `s3.bucket.name` | 是 | S3 bucket 名称 |
-| `s3.region` | 是 | S3 bucket 所在 region |
-| `storage.class` | 是 | 固定值 `io.confluent.connect.s3.storage.S3Storage` |
-| `format.class` | 是 | 输出格式：JsonFormat / AvroFormat / ParquetFormat |
-| `flush.size` | 推荐 | 每个 partition 累积多少条记录后 flush 到 S3 |
-| `rotate.interval.ms` | 推荐 | 时间触发 flush（毫秒），确保数据及时写入 |
+| Key Format | Value Format | key.converter | value.converter | schemas.enable |
+| --- | --- | --- | --- | --- |
+| String | JSON (no schema) | StringConverter | JsonConverter | false |
+| JSON | JSON (no schema) | JsonConverter (schemas.enable=false) | JsonConverter | false |
+| String | JSON (with schema) | StringConverter | JsonConverter | true |
+| String | Avro | StringConverter | AvroConverter | N/A |
+| String | Plain text | StringConverter | StringConverter | N/A |
 
-### S3 目录结构
+## Connector Config
 
-数据写入路径：`s3://{bucket}/{topics.dir}/{topic}/{partition}/`
+### Required Parameters
 
-例如：`s3://my-data-lake/kafka-data/order-events/0/order-events+0+0000000000.json`
+| Parameter | Description |
+| --- | --- |
+| `topics` | Comma-separated list of Kafka topics to consume |
+| `s3.bucket.name` | Target S3 bucket name |
+| `s3.region` | AWS region of the S3 bucket |
+| `storage.class` | Fixed: `io.confluent.connect.s3.storage.S3Storage` |
+| `format.class` | Output format: `JsonFormat`, `AvroFormat`, `ParquetFormat`, or `ByteArrayFormat` |
 
-## 常见问题
+### Recommended Parameters
 
-### Task 启动后立即 FAILED
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `flush.size` | (none) | Records per partition before flushing to S3. Recommended: `1000` |
+| `rotate.interval.ms` | (none) | Time-based flush interval in ms. Recommended: `600000` (10 min) |
+| `partitioner.class` | DefaultPartitioner | S3 directory partitioning strategy |
+| `topics.dir` | `topics` | Top-level S3 directory prefix |
+| `s3.compression.type` | `none` | Compression: `none` or `gzip` |
 
-错误日志：`DataException: Converting byte[] to Kafka Connect data failed due to serialization error`
+## S3 Directory Structure
 
-原因：message key 或 value 的格式与 converter 配置不匹配。
+The connector writes data to S3 using this path pattern:
 
-解决：检查 `key.converter` 和 `value.converter` 配置是否与实际消息格式一致。
+```
+s3://{bucket}/{topics.dir}/{topic}/{partition}/{topic}+{partition}+{startOffset}.{format}
+```
 
-### 数据没有写入 S3
+Example with `topics.dir=kafka-data`, topic `order-events`, partition 0:
 
-检查：
-1. IAM Role 是否有 S3 写入权限
-2. `flush.size` 是否设置过大（需要累积足够多的记录才会 flush）
-3. `rotate.interval.ms` 是否设置（时间触发 flush）
-4. Topic 中是否有数据
+```
+s3://my-data-lake/kafka-data/order-events/0/order-events+0+0000000000.json
+s3://my-data-lake/kafka-data/order-events/0/order-events+0+0000001000.json
+s3://my-data-lake/kafka-data/order-events/1/order-events+1+0000000000.json
+```
 
-## 从 Confluent Cloud 迁移
+## Verifying the Connector
 
-如果你之前在 Confluent Cloud 上使用 S3 Sink Connector，需要注意：
+After `terraform apply`, verify the connector is running:
 
-1. Confluent 的 `output.data.format` 参数需要映射为 `format.class`：
-   - `JSON` → `io.confluent.connect.s3.format.json.JsonFormat`
-   - `AVRO` → `io.confluent.connect.s3.format.avro.AvroFormat`
-   - `PARQUET` → `io.confluent.connect.s3.format.parquet.ParquetFormat`
+1. Check connector state via CMP API:
 
-2. Confluent 专有参数（`kafka.auth.mode`, `kafka.api.key` 等）不需要，认证通过 `kafka_cluster.security_protocol` 配置
+   ```
+   GET /api/v1/connectors/{connectorId}
+   ```
 
-3. Confluent 不需要指定 `storage.class`，AutoMQ 需要显式指定
+   Expect: `state: RUNNING`, `failedTaskCount: 0`
+
+2. Check S3 bucket for output files after the flush interval or flush.size is reached
+
+3. If issues arise, check connector logs:
+
+   ```
+   GET /api/v1/connectors/{connectorId}/logs?tailLines=100
+   ```
+
+## Troubleshooting
+
+### Task Immediately FAILED After Start
+
+Error log:
+
+```
+ERROR WorkerSinkTask Task threw an uncaught and unrecoverable exception
+Caused by: org.apache.kafka.connect.errors.DataException:
+  Converting byte[] to Kafka Connect data failed due to serialization error
+```
+
+**Cause:** The message key or value format does not match the converter configuration.
+
+**Fix:** Update `worker_config` to match your actual message format. Most commonly, change `key.converter` to `StringConverter` (see converter selection guide above).
+
+### No Data Appearing in S3
+
+Check in this order:
+
+1. **Topic has data?** — Verify messages exist in the topic via CMP console
+2. **flush.size too large?** — If `flush.size=5000` but only 100 messages exist, data won't flush until the count is reached
+3. **rotate.interval.ms set?** — Without time-based rotation, data only flushes when `flush.size` is reached
+4. **IAM permissions?** — Ensure the IAM Role has `s3:PutObject` and `s3:ListBucket`
+5. **S3 bucket and region correct?** — Verify `s3.bucket.name` and `s3.region` match your actual bucket
+
+### Migrating from Confluent Cloud?
+
+See the [Migration Guide](migration-guide.md) for parameter mapping from Confluent Cloud and MSK Connect.
+
+## Next Steps
+
+- [Configuration Reference](configuration-reference.md) — Full parameter documentation
+- [Performance Tuning](performance-tuning.md) — Benchmark data and optimization guidance
+- [Troubleshooting](troubleshooting.md) — Comprehensive failure scenario guide
