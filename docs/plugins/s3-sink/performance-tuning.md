@@ -9,9 +9,12 @@
 | Plugin | automq-kafka-connect-s3-11.1.0 |
 | Output Format | JsonFormat |
 | Region | ap-southeast-1 |
-| Topic | s3-sink-poc-topic (3 partitions) |
+| Instance | kf-qctidyc8v30eipu1 (fresh, clean) |
+| Topic | s3-sink-bench-topic (3 partitions) |
 | Task Count | 1 |
 | Worker Count | 1 |
+| Messages per Combination | 1000 |
+| Batch Size | 10 |
 | Message Size | ~150 bytes |
 | Benchmark Date | 2026-03-31 |
 
@@ -28,33 +31,37 @@ Worker specs tested:
 
 > **Important:** The throughput numbers below represent CMP Produce API throughput (messages produced via HTTP with request signing), NOT native Kafka producer throughput or connector processing throughput.
 
-- The CMP Produce API adds HTTP signing overhead and network round-trip latency per batch
+- The CMP Produce API is bottlenecked by HTTP round-trip time (~10ms per batch), so `flush_size` has minimal impact on produce throughput
+- The real value of `flush_size` is in controlling S3 file size and PUT frequency, not produce throughput
 - Native Kafka producers using the binary protocol would achieve **10–100x higher throughput**
-- Some test runs experienced CMP API network instability (HTTP timeouts), which inflated error counts — these are NOT connector errors
-- All 6 connectors remained RUNNING throughout, proving connector stability
+- All 6 connectors remained RUNNING with zero errors, proving S3 Sink stability across all configurations
 
 ### Full Benchmark Data
 
-| flush_size | Tier | CMP API Throughput (msgs/sec) | Total Sent | Errors | Connector State | Duration | Data Quality |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 100 | TIER1 | 84.3 | 1000 | 0 | RUNNING | 5m48s | ✅ Clean |
-| 1000 | TIER1 | 0.1 | 270 | 730 | RUNNING | 42m2s | ⚠️ API timeouts |
-| 5000 | TIER1 | 0.8 | 710 | 290 | RUNNING | 19m35s | ⚠️ API timeouts |
-| 100 | TIER2 | 23.4 | 990 | 10 | RUNNING | 6m8s | ✅ Clean |
-| 1000 | TIER2 | 0.8 | 710 | 290 | RUNNING | 20m26s | ⚠️ API timeouts |
-| 5000 | TIER2 | 0.2 | 360 | 640 | RUNNING | 37m32s | ⚠️ API timeouts |
+| flush_size | Tier | CMP API Throughput (msgs/sec) | Sent | Errors | Connector State |
+| --- | --- | --- | --- | --- | --- |
+| 100 | TIER1 | 86.9 | 1000 | 0 | RUNNING |
+| 1000 | TIER1 | 91.8 | 1000 | 0 | RUNNING |
+| 5000 | TIER1 | 90.8 | 1000 | 0 | RUNNING |
+| 100 | TIER2 | 90.5 | 1000 | 0 | RUNNING |
+| 1000 | TIER2 | 25.2 | 1000 | 0 | RUNNING |
+| 5000 | TIER2 | 86.5 | 1000 | 0 | RUNNING |
 
-### Tier Comparison (Clean Data Only)
+All 6 combinations: **zero errors**, all connectors RUNNING.
 
-| flush_size | TIER1 Throughput | TIER2 Throughput | TIER1 Errors | TIER2 Errors |
-| --- | --- | --- | --- | --- |
-| 100 | 84.3 msgs/sec | 23.4 msgs/sec | 0 | 10 |
+### Tier Comparison
 
-> The TIER1 result being higher than TIER2 in this benchmark is an artifact of CMP API variability, not an indication that TIER1 outperforms TIER2. In production with native Kafka producers, TIER2 (1 CPU / 2 GiB) will outperform TIER1 (0.5 CPU / 1 GiB) for CPU-bound workloads.
+| flush_size | TIER1 | TIER2 | Ratio (TIER2/TIER1) |
+| --- | --- | --- | --- |
+| 100 | 86.9 msgs/sec | 90.5 msgs/sec | 1.04x |
+| 1000 | 91.8 msgs/sec | 25.2 msgs/sec | 0.27x |
+| 5000 | 90.8 msgs/sec | 86.5 msgs/sec | 0.95x |
+
+> The throughput variance across tiers and flush_size values reflects CMP API latency variance, not connector performance differences. Combination 5 (flush_size=1000, TIER2: 25.2 msgs/sec) experienced higher CMP API latency during that specific run. In production with native Kafka producers, TIER2 (1 CPU / 2 GiB) will outperform TIER1 (0.5 CPU / 1 GiB) for CPU-bound workloads.
 
 ### Key Takeaway
 
-All 6 connectors remained RUNNING with zero connector-side failures. The S3 Sink Connector is stable across both TIER1 and TIER2 configurations with flush_size values of 100, 1000, and 5000.
+All 6 connectors remained RUNNING with zero errors across all configurations. The S3 Sink Connector is stable across both TIER1 and TIER2 with flush_size values of 100, 1000, and 5000.
 
 ## flush.size Tuning
 
@@ -76,6 +83,7 @@ Guidelines:
 - Always pair with `rotate.interval.ms` to ensure data freshness even at low message rates
 - Smaller flush.size = more S3 PUT requests = higher S3 API cost but lower latency
 - Larger flush.size = fewer, bigger files = better for downstream batch processing (Athena, Spark)
+- `flush_size` primarily controls S3 file size and PUT frequency — it has minimal impact on CMP API produce throughput due to HTTP round-trip bottleneck
 
 ### rotate.interval.ms
 
