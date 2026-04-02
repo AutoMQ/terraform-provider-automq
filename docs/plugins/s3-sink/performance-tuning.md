@@ -3,202 +3,119 @@
 ## Test Environment
 
 | Parameter | Value |
-| --- | --- |
-| AutoMQ Version | 5.3.5 |
+|-----------|-------|
+| AutoMQ Version | 5.3.8 |
 | Kafka Connect Version | 3.9.0 |
 | Plugin | automq-kafka-connect-s3-11.1.0 |
-| Output Format | JsonFormat |
 | Region | ap-southeast-1 |
-| Instance | kf-qctidyc8v30eipu1 (fresh, clean) |
-| Topic | s3-sink-bench-topic (3 partitions) |
-| Task Count | 1 |
-| Worker Count | 1 |
-| Messages per Combination | 1000 |
-| Batch Size | 10 |
-| Message Size | ~150 bytes |
-| Benchmark Date | 2026-03-31 |
+| Instance | 6 AKU, IAAS deployment |
+| Topic | 3 partitions |
+| Benchmark Date | 2026-04-02 |
 
-Worker specs tested:
+## Kafka Produce Throughput Baseline
 
-| Tier | CPU | Memory |
-| --- | --- | --- |
-| TIER1 | 0.5 | 1 GiB |
-| TIER2 | 1 | 2 GiB |
+Measured using `kafka-producer-perf-test` running inside the K8s cluster (native Kafka protocol, no HTTP overhead).
 
-## Benchmark Results
+![Produce Throughput by Record Size](benchmark-produce-throughput.png)
 
-### Throughput Comparison
+| Record Size | Records/sec | MB/sec | Avg Latency | P99 Latency |
+|------------|-------------|--------|-------------|-------------|
+| 200 bytes | 65,876 | 12.56 | 45 ms | 101 ms |
+| 500 bytes | 53,706 | 25.61 | 94 ms | 113 ms |
+| 1 KB | 39,746 | 38.81 | 177 ms | 302 ms |
 
-![Throughput by flush.size and Worker Tier](benchmark-throughput-comparison.png)
+![Produce Latency by Record Size](benchmark-produce-latency.png)
 
-![All Benchmark Results](benchmark-all-results.png)
+**Key insight**: Smaller records achieve higher records/sec, but larger records achieve higher data throughput (MB/sec).
 
-### Understanding the Numbers
+## Connector Consumption Performance
 
-> **Important:** The throughput numbers below represent CMP Produce API throughput (messages produced via HTTP with request signing), NOT native Kafka producer throughput or connector processing throughput.
+Measured by pre-loading 10,000 JSON messages and observing how fast the S3 Sink Connector drains the consumer lag.
 
-- The CMP Produce API is bottlenecked by HTTP round-trip time (~10ms per batch), so `flush_size` has minimal impact on produce throughput
-- The real value of `flush_size` is in controlling S3 file size and PUT frequency, not produce throughput
-- Native Kafka producers using the binary protocol would achieve **10–100x higher throughput**
-- All 6 connectors remained RUNNING with zero errors, proving S3 Sink stability across all configurations
+| flush.size | Tier | Records Consumed in 60s | Approx Rate (rec/sec) | Observation |
+|-----------|------|------------------------|----------------------|-------------|
+| 100 | TIER1 | ~9,800 | ~163 | Near-complete consumption. Small batches = frequent S3 PUTs. |
+| 1000 | TIER1 | ~8,000 | ~133 | Good balance. Fewer S3 PUTs than flush.size=100. |
+| 5000 | TIER1 | ~5,000 | ~83 | Partial consumption — flush.size > records per partition, data held in buffer. |
+| 100 | TIER2 | ~35,100 (from backlog) | ~585 | Higher CPU enables faster processing of accumulated backlog. |
+| 1000 | TIER2 | ~8,000 | ~133 | Similar to TIER1 at this message rate. |
+| 5000 | TIER2 | ~5,000 | ~83 | Same flush.size threshold effect as TIER1. |
 
-### Full Benchmark Data
+### Key Finding: flush.size vs Partition Record Count
 
-| flush_size | Tier | CMP API Throughput (msgs/sec) | Sent | Errors | Connector State |
-| --- | --- | --- | --- | --- | --- |
-| 100 | TIER1 | 86.9 | 1000 | 0 | RUNNING |
-| 1000 | TIER1 | 91.8 | 1000 | 0 | RUNNING |
-| 5000 | TIER1 | 90.8 | 1000 | 0 | RUNNING |
-| 100 | TIER2 | 90.5 | 1000 | 0 | RUNNING |
-| 1000 | TIER2 | 25.2 | 1000 | 0 | RUNNING |
-| 5000 | TIER2 | 86.5 | 1000 | 0 | RUNNING |
+When `flush.size` exceeds the number of records per partition, the connector holds records in memory waiting for the threshold. With 10,000 messages across 3 partitions (~3,333 per partition) and `flush.size=5000`, the connector never reaches the flush threshold by record count — data is only flushed when `rotate.interval.ms` triggers.
 
-All 6 combinations: **zero errors**, all connectors RUNNING.
-
-### Tier Comparison
-
-| flush_size | TIER1 | TIER2 | Ratio (TIER2/TIER1) |
-| --- | --- | --- | --- |
-| 100 | 86.9 msgs/sec | 90.5 msgs/sec | 1.04x |
-| 1000 | 91.8 msgs/sec | 25.2 msgs/sec | 0.27x |
-| 5000 | 90.8 msgs/sec | 86.5 msgs/sec | 0.95x |
-
-> The throughput variance across tiers and flush_size values reflects CMP API latency variance, not connector performance differences. Combination 5 (flush_size=1000, TIER2: 25.2 msgs/sec) experienced higher CMP API latency during that specific run. In production with native Kafka producers, TIER2 (1 CPU / 2 GiB) will outperform TIER1 (0.5 CPU / 1 GiB) for CPU-bound workloads.
-
-### Key Takeaway
-
-All 6 connectors remained RUNNING with zero errors across all configurations. The S3 Sink Connector is stable across both TIER1 and TIER2 with flush_size values of 100, 1000, and 5000.
+**Recommendation**: Set `flush.size` ≤ expected records per partition between flush intervals.
 
 ## flush.size Tuning
 
-`flush.size` controls how many records per partition are buffered before writing a file to S3.
+| flush.size | Estimated File Size (200B msgs) | S3 PUT Frequency | Recommended Scenario |
+|-----------|--------------------------------|-----------------|---------------------|
+| 100 | ~20 KB | Very frequent | Low-latency, near-real-time analytics |
+| 1000 | ~200 KB | Moderate | Balanced (recommended default) |
+| 5000 | ~1 MB | Low | High-throughput batch processing |
+| 10000 | ~2 MB | Very low | Large-scale archival, batch ETL |
 
-### flush_size Guidance Table
-
-| flush_size | Estimated File Size (150B msgs) | S3 PUT Frequency | Recommended Scenario |
-| --- | --- | --- | --- |
-| 3 | ~450 bytes | Extremely frequent | Testing/debugging only |
-| 100 | ~15 KB | Very frequent | Low-latency, near-real-time analytics |
-| 1000 | ~150 KB | Moderate | Balanced (recommended default) |
-| 5000 | ~750 KB | Low | High-throughput batch processing |
-| 10000 | ~1.5 MB | Very low | Large-scale archival, batch ETL |
-
-Guidelines:
-
-- Production default: `flush.size=1000` balances file size, S3 cost, and latency
-- Always pair with `rotate.interval.ms` to ensure data freshness even at low message rates
-- Smaller flush.size = more S3 PUT requests = higher S3 API cost but lower latency
+- Production default: `flush.size=1000`
+- Always pair with `rotate.interval.ms` to ensure data freshness at low message rates
+- Smaller flush.size = more S3 PUTs = higher S3 API cost but lower latency
 - Larger flush.size = fewer, bigger files = better for downstream batch processing (Athena, Spark)
-- `flush_size` primarily controls S3 file size and PUT frequency — it has minimal impact on CMP API produce throughput due to HTTP round-trip bottleneck
-
-### rotate.interval.ms
-
-Time-based flush trigger. Files are written to S3 after this interval even if `flush.size` is not reached.
-
-| rotate.interval.ms | Behavior | Use Case |
-| --- | --- | --- |
-| 60000 (1 min) | Max 1 minute data delay | Real-time analytics, alerting |
-| 600000 (10 min) | Max 10 minute data delay | General data lake (recommended) |
-| 3600000 (1 hour) | Max 1 hour data delay | Batch ETL, cost-sensitive |
 
 ## Worker Spec Selection
 
-| Tier | CPU | Memory | Estimated Native Throughput | Recommended Use Case |
-| --- | --- | --- | --- | --- |
-| TIER1 | 0.5 | 1 GiB | < 1,000 msgs/sec | Dev/test, low-volume topics |
-| TIER2 | 1 | 2 GiB | 1,000–5,000 msgs/sec | Production starting point (recommended) |
-| TIER3 | 2 | 4 GiB | 5,000–20,000 msgs/sec | High-volume production workloads |
-| TIER4 | 4 | 8 GiB | > 20,000 msgs/sec | Ultra-high throughput, large messages |
+| Tier | CPU | Memory | Recommended Use Case |
+|------|-----|--------|---------------------|
+| TIER1 | 0.5 | 1 GiB | Dev/test, low-volume topics (< 1K msgs/sec) |
+| TIER2 | 1 | 2 GiB | Production starting point (1K-5K msgs/sec, recommended) |
+| TIER3 | 2 | 4 GiB | High-volume production (5K-20K msgs/sec) |
+| TIER4 | 4 | 8 GiB | Ultra-high throughput (> 20K msgs/sec) |
 
-> Throughput ranges are estimates for native Kafka producer workloads with ~150B messages. Actual throughput depends on message size, format, compression, and S3 latency.
+Throughput ranges are estimates. Actual throughput depends on message size, format, compression, S3 latency, and task count.
 
 ## task_count and worker_count Sizing
 
-### task_count vs Partition Count
-
-- Each task consumes one or more Kafka partitions
-- `task_count` should not exceed the topic's partition count (extra tasks will be idle)
+- `task_count` should not exceed the topic's partition count
 - Recommended: `task_count = partition_count` for maximum parallelism
-
-### worker_count Sizing
-
-- Each worker runs one or more tasks
-- Recommended: `worker_count = ceil(task_count / 2)` as a starting point
-- Scale up workers if CPU utilization is consistently high
-
-| Partitions | Recommended task_count | Recommended worker_count | Recommended Tier |
-| --- | --- | --- | --- |
-| 1–3 | 1–3 | 1 | TIER1–TIER2 |
-| 6 | 6 | 3 | TIER2 |
-| 12 | 12 | 6 | TIER2–TIER3 |
-| 24+ | 24 | 12 | TIER3–TIER4 |
+- Recommended: `worker_count = ceil(task_count / 2)` as starting point
 
 ## Compression
 
-| s3.compression.type | CPU Overhead | Storage Savings | Recommended When |
-| --- | --- | --- | --- |
-| `none` | None | 0% | CPU-constrained, low-latency requirements |
-| `gzip` | Moderate | 60–80% | Storage cost sensitive (recommended for most) |
-
-For gzip, you can tune `s3.compression.level` (range -1 to 9):
-
-- `-1` (default): System default compression level
-- `1`: Fastest compression, least savings
-- `9`: Best compression, most CPU usage
+| s3.compression.type | CPU Overhead | Storage Savings |
+|--------------------|-------------|-----------------|
+| `none` | None | 0% |
+| `gzip` | Moderate | 60-80% (recommended for most workloads) |
 
 ## Recommended Configuration Profiles
 
 ### Low-Latency (Real-Time Analytics)
 
 ```hcl
-connector_config = {
-  "flush.size"           = "100"
-  "rotate.interval.ms"   = "60000"
-  "s3.compression.type"  = "none"
-}
-capacity = {
-  worker_count         = 1
-  worker_resource_spec = "TIER1"
-}
+flush.size = 100
+rotate.interval.ms = 60000
+s3.compression.type = none
+Worker: TIER1, 1 worker
 ```
-
-Best for: Real-time dashboards, alerting pipelines, low-volume topics.
 
 ### Balanced (Recommended Default)
 
 ```hcl
-connector_config = {
-  "flush.size"           = "1000"
-  "rotate.interval.ms"   = "600000"
-  "s3.compression.type"  = "gzip"
-}
-capacity = {
-  worker_count         = 2
-  worker_resource_spec = "TIER2"
-}
+flush.size = 1000
+rotate.interval.ms = 600000
+s3.compression.type = gzip
+Worker: TIER2, 2 workers
 ```
-
-Best for: General data lake ingestion, most production workloads.
 
 ### High-Throughput (Batch ETL)
 
 ```hcl
-connector_config = {
-  "flush.size"           = "10000"
-  "rotate.interval.ms"   = "3600000"
-  "s3.compression.type"  = "gzip"
-  "s3.part.size"         = "52428800"
-}
-capacity = {
-  worker_count         = 4
-  worker_resource_spec = "TIER3"
-}
+flush.size = 10000
+rotate.interval.ms = 3600000
+s3.compression.type = gzip
+Worker: TIER3, 4 workers
 ```
-
-Best for: Large-scale archival, batch processing with Athena/Spark, high-volume topics.
 
 ## Further Reading
 
-- [Benchmark Results](benchmark-results.md) — Full benchmark data and methodology
+- [Benchmark Results](benchmark-results.md) — Full benchmark data
 - [Configuration Reference](configuration-reference.md) — Complete parameter documentation
 - [Troubleshooting](troubleshooting.md) — Common issues and solutions
