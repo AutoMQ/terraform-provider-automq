@@ -51,6 +51,7 @@
 - [x] 7.4 Migration Guide
 - [x] 7.5 Troubleshooting
 
-## 步骤 8：PR 提交
-- [x] 8.1 提交所有产出
-- [x] 8.2 创建 PR（#107: https://github.com/AutoMQ/terraform-provider-automq/pull/107）
+## 步骤 8：PR 提交（向 CMP 项目）
+- [x] 8.1 在 terraform-provider-automq 提交工作记录（PoC 脚本、文档草稿）
+- [ ] 8.2 将文档复制到 CMP 项目官网文档目录
+- [ ] 8.3 在 CMP 项目创建 PR

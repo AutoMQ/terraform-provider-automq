@@ -420,12 +420,22 @@ Source 和 Sink Connector 关注的指标不同，不同插件还有特有指标
 
 这些文档作为官网文档链接，也作为前端表单中的 documentation_link。
 
-### 步骤 8：PR 提交
+### 步骤 8：PR 提交（向 CMP 项目）
 
-- 创建分支 `feat/plugin-{plugin-name}`
-- 提交所有产出：配置模板、文档、测试代码、system-plugins.json 更新
-- 推送并创建 PR
-- Commit message：`feat(plugin): add {plugin-name} configuration template and docs`
+**注意：PR 是提交到 CMP 项目（automqbox/cmp），不是 terraform-provider-automq 项目。**
+
+产出物需要提交到 CMP 项目的对应位置：
+- 配置模板 JSON → CMP 后端配置模板系统
+- 文档 → CMP 官网文档目录
+- system-plugins.json 更新（如果需要）→ `automqbox/cmp/cmp-service/src/main/resources/system-plugins.json`
+
+流程：
+1. 在 CMP 项目创建分支 `feat/plugin-{plugin-name}`
+2. 将文档和配置模板复制到 CMP 项目对应目录
+3. 提交并创建 PR
+4. Commit message：`feat(plugin): add {plugin-name} configuration template and docs`
+
+terraform-provider-automq 项目中的产出（PoC 脚本、测试代码、spec 文档）作为工作记录保留，不需要合并到 main。
 
 ---
 
