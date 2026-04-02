@@ -25,7 +25,7 @@
 - [x] 4.1 克隆 Debezium 源码（/tmp/debezium-3.1.2）
 - [x] 4.2 找到 MySqlConnector 类和 ConfigDef
 - [x] 4.3 提取所有配置参数（名称、类型、默认值、文档）
-- [ ] 4.4 提取插件特有指标（MetricGroup）
+- [x] 4.4 提取插件特有指标（已记录在 performance-tuning.md 的 Debezium 特有指标表中）
 - [x] 4.5 分析核心配置对性能的影响
 
 ## 步骤 5：性能基准测试
@@ -53,4 +53,4 @@
 
 ## 步骤 8：PR 提交
 - [x] 8.1 提交所有产出
-- [ ] 8.2 创建 PR
+- [x] 8.2 创建 PR（#107: https://github.com/AutoMQ/terraform-provider-automq/pull/107）
