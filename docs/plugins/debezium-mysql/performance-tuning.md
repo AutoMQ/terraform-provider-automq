@@ -1,5 +1,9 @@
 # Debezium MySQL CDC Source Connector - Performance Tuning
 
+## PoC 测试结果概览
+
+![PoC Results Summary](images/poc_results_summary.png)
+
 ## 性能指标
 
 ### Source Connector 核心指标
@@ -34,6 +38,8 @@
 }
 ```
 
+![snapshot.fetch.size Impact](images/snapshot_fetch_size_impact.png)
+
 | 值 | 内存占用 | 快照速度 | 适用场景 |
 |----|---------|---------|---------|
 | 2000（默认） | 低 | 慢 | 小表、内存受限 |
@@ -63,6 +69,8 @@
 
 ### 4. 选择合适的快照模式
 
+![Snapshot Mode Comparison](images/snapshot_mode_comparison.png)
+
 | 模式 | 耗时 | 适用场景 |
 |------|------|---------|
 | initial | 长 | 首次部署，需要完整数据 |
@@ -80,6 +88,8 @@
   "poll.interval.ms": "100"
 }
 ```
+
+![Batch Size Impact](images/batch_size_throughput_latency.png)
 
 | 参数 | 默认值 | 调优建议 |
 |------|--------|---------|
@@ -117,6 +127,8 @@
 ## Worker 资源配置
 
 ### Tier 选择指南
+
+![Worker Tier Comparison](images/worker_tier_comparison.png)
 
 | Tier | CPU | 内存 | 适用场景 |
 |------|-----|------|---------|
@@ -183,6 +195,10 @@ SHOW BINLOG EVENTS IN 'mysql-bin.000001' LIMIT 10;
 - MySQL: 8.0, 4 vCPU, 16GB RAM
 - Kafka: AutoMQ, 6 AKU
 - Connector: TIER2 (1 CPU, 2GB)
+
+### CDC 延迟分解
+
+![CDC Latency Breakdown](images/cdc_latency_breakdown.png)
 
 ### 测试结果
 
