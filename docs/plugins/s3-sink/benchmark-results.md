@@ -45,3 +45,22 @@
 - The S3 Sink Connector's actual processing rate depends on: flush.size configuration, S3 PUT latency, Worker Tier (CPU/memory), and task count.
 - All tests used `acks=all` for durability. Using `acks=1` would increase throughput but reduce durability guarantees.
 - Tests ran inside the same K8s cluster as the Kafka brokers, so network latency is minimal.
+
+## S3 Sink Connector Consumption Benchmark
+
+Test setup: 10,000 JSON messages pre-loaded per combination, 1 Worker, 1 Task, JsonFormat + StringConverter.
+
+| flush.size | Tier | Lag after 60s | Observation |
+|-----------|------|---------------|-------------|
+| 100 | TIER1 | 200 | ~9,800 records consumed in 60s (~163 rec/sec). Near-complete consumption. |
+| 1000 | TIER1 | 2,000 | ~8,000 records consumed in 60s (~133 rec/sec). Larger batches = fewer S3 PUTs. |
+| 5000 | TIER1 | 5,000 | ~5,000 consumed. Remaining 5,000 waiting for flush (partition has <5000 records). |
+| 100 | TIER2 | 13,100 (at 120s) | Consumed ~35,100 records in 60s from accumulated backlog (~585 rec/sec). |
+| 1000 | TIER2 | 2,000 | Similar to TIER1 — produce API bottleneck, not connector bottleneck. |
+| 5000 | TIER2 | 5,000 | Same flush.size threshold effect as TIER1. |
+
+### Key Finding: flush.size vs partition record count
+
+When `flush.size` exceeds the number of records per partition, the connector will NOT flush until `rotate.interval.ms` triggers a time-based flush. With 10,000 messages across 3 partitions (~3,333 per partition) and `flush.size=5000`, the connector holds records in memory waiting for the threshold that will never be reached by record count alone.
+
+**Recommendation**: Set `flush.size` to be less than or equal to the expected records per partition between flush intervals. For most workloads, `flush.size=1000` is a good starting point.
