@@ -88,7 +88,7 @@ Read-Only:
 Read-Only:
 
 - `file_system_count` (Number) Number of file systems
-- `file_system_type` (String) File system type. Supported values: EFS_PROVISIONED (Amazon Elastic File System), ONTAP_V2 (Amazon FSx for NetApp ONTAP)
+- `file_system_type` (String) File system type. Supported values: EFS_PROVISIONED (Amazon Elastic File System), ONTAP_V2 (Amazon FSx for NetApp ONTAP). EFS offers superior elasticity and lower costs for small-scale deployments; FSx for NetApp ONTAP features lower write latency and a more favorable cost advantage at large scales.
 - `security_groups` (List of String) Security groups for file systems
 - `throughput_mibps_per_file_system` (Number) Throughput in MiBps per file system
 
