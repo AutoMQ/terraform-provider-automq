@@ -137,7 +137,7 @@ Required:
 - `file_system_count` (Number) Number of file systems
 - `file_system_type` (String) File system type. Supported values:
 
-* `EFS_PROVISIONED` - Amazon Elastic File System (EFS), require control panel version ≥ 8.1.14
+* `EFS_PROVISIONED` - Amazon Elastic File System (EFS), require control panel version ≥ 8.2.0
 * `ONTAP_V2` - Amazon FSx for NetApp ONTAP
 
 Changing this field requires resource replacement.
