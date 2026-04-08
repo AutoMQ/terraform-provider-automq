@@ -284,7 +284,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						Attributes: map[string]schema.Attribute{
 							"file_system_type": schema.StringAttribute{
 								Required:            true,
-								MarkdownDescription: "File system type. Supported values:\n\n* `EFS_PROVISIONED` - Amazon Elastic File System (EFS)\n* `ONTAP_V2` - Amazon FSx for NetApp ONTAP\n\nChanging this field requires resource replacement.",
+								MarkdownDescription: "File system type. Supported values:\n\n* `EFS_PROVISIONED` - Amazon Elastic File System (EFS), require control panel version ≥ 8.2.0\n* `ONTAP_V2` - Amazon FSx for NetApp ONTAP\n\nChanging this field requires resource replacement.",
 								Validators: []validator.String{
 									stringvalidator.OneOf("EFS_PROVISIONED", "ONTAP_V2"),
 								},
