@@ -40,15 +40,17 @@ import (
 var accConfigPath = flag.String("acc.config", "", "path to JSON file containing acceptance test configuration")
 
 type accConfig struct {
-	Endpoint       string       `json:"endpoint"`
-	AccessKeyID    string       `json:"access_key_id"`
-	SecretKey      string       `json:"secret_key"`
-	EnvironmentID  string       `json:"environment_id"`
-	Region         string       `json:"region"`
-	Networks       []accNetwork `json:"networks"`
-	K8S            accK8SConfig `json:"k8s"`
-	Version        string       `json:"version"`
-	UpgradeVersion string       `json:"upgrade_version"`
+	Endpoint        string                   `json:"endpoint"`
+	AccessKeyID     string                   `json:"access_key_id"`
+	SecretKey       string                   `json:"secret_key"`
+	EnvironmentID   string                   `json:"environment_id"`
+	Region          string                   `json:"region"`
+	Networks        []accNetwork             `json:"networks"`
+	K8S             accK8SConfig             `json:"k8s"`
+	Connector       accConnectorConfig       `json:"connector"`
+	ConnectorPlugin accConnectorPluginConfig `json:"connector_plugin"`
+	Version         string                   `json:"version"`
+	UpgradeVersion  string                   `json:"upgrade_version"`
 }
 
 type accK8SConfig struct {
@@ -56,6 +58,28 @@ type accK8SConfig struct {
 	NodeGroups     []string `json:"node_groups"`
 	Namespace      string   `json:"namespace"`
 	ServiceAccount string   `json:"service_account"`
+}
+
+type accConnectorConfig struct {
+	PluginID             string `json:"plugin_id"`
+	PluginType           string `json:"plugin_type"`
+	ConnectorClass       string `json:"connector_class"`
+	IamRole              string `json:"iam_role"`
+	SecurityProtocol     string `json:"security_protocol"`
+	SecurityProtocolUser string `json:"security_protocol_user"`
+	SecurityProtocolPass string `json:"security_protocol_pass"`
+	ConnCfgTopics        string `json:"connector_config_topics"`
+	ConnCfgS3Region      string `json:"connector_config_s3_region"`
+	ConnCfgS3Bucket      string `json:"connector_config_s3_bucket"`
+}
+
+type accConnectorPluginConfig struct {
+	StorageUrl        string   `json:"storage_url"`
+	Types             []string `json:"types"`
+	ConnectorClass    string   `json:"connector_class"`
+	Version           string   `json:"version"`
+	Description       string   `json:"description"`
+	DocumentationLink string   `json:"documentation_link"`
 }
 
 var (
@@ -151,15 +175,17 @@ func parseAccConfigFromFile(path string) (accConfig, error) {
 		return accConfig{}, fmt.Errorf("read acc.config file: %w", err)
 	}
 	var raw struct {
-		Endpoint       string       `json:"endpoint"`
-		AccessKeyID    string       `json:"access_key_id"`
-		SecretKey      string       `json:"secret_key"`
-		EnvironmentID  string       `json:"environment_id"`
-		Region         string       `json:"region"`
-		Version        string       `json:"version"`
-		UpgradeVersion string       `json:"upgrade_version"`
-		Networks       []accNetwork `json:"networks"`
-		K8S            accK8SConfig `json:"k8s"`
+		Endpoint        string                   `json:"endpoint"`
+		AccessKeyID     string                   `json:"access_key_id"`
+		SecretKey       string                   `json:"secret_key"`
+		EnvironmentID   string                   `json:"environment_id"`
+		Region          string                   `json:"region"`
+		Version         string                   `json:"version"`
+		UpgradeVersion  string                   `json:"upgrade_version"`
+		Networks        []accNetwork             `json:"networks"`
+		K8S             accK8SConfig             `json:"k8s"`
+		Connector       accConnectorConfig       `json:"connector"`
+		ConnectorPlugin accConnectorPluginConfig `json:"connector_plugin"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return accConfig{}, fmt.Errorf("parse acc.config JSON: %w", err)
@@ -179,6 +205,26 @@ func parseAccConfigFromFile(path string) (accConfig, error) {
 			Namespace:      strings.TrimSpace(raw.K8S.Namespace),
 			ServiceAccount: strings.TrimSpace(raw.K8S.ServiceAccount),
 		},
+		Connector: accConnectorConfig{
+			PluginID:             strings.TrimSpace(raw.Connector.PluginID),
+			PluginType:           strings.TrimSpace(raw.Connector.PluginType),
+			ConnectorClass:       strings.TrimSpace(raw.Connector.ConnectorClass),
+			IamRole:              strings.TrimSpace(raw.Connector.IamRole),
+			SecurityProtocol:     strings.TrimSpace(raw.Connector.SecurityProtocol),
+			SecurityProtocolUser: strings.TrimSpace(raw.Connector.SecurityProtocolUser),
+			SecurityProtocolPass: strings.TrimSpace(raw.Connector.SecurityProtocolPass),
+			ConnCfgTopics:        strings.TrimSpace(raw.Connector.ConnCfgTopics),
+			ConnCfgS3Region:      strings.TrimSpace(raw.Connector.ConnCfgS3Region),
+			ConnCfgS3Bucket:      strings.TrimSpace(raw.Connector.ConnCfgS3Bucket),
+		},
+		ConnectorPlugin: accConnectorPluginConfig{
+			StorageUrl:        strings.TrimSpace(raw.ConnectorPlugin.StorageUrl),
+			Types:             append([]string{}, raw.ConnectorPlugin.Types...),
+			ConnectorClass:    strings.TrimSpace(raw.ConnectorPlugin.ConnectorClass),
+			Version:           strings.TrimSpace(raw.ConnectorPlugin.Version),
+			Description:       strings.TrimSpace(raw.ConnectorPlugin.Description),
+			DocumentationLink: strings.TrimSpace(raw.ConnectorPlugin.DocumentationLink),
+		},
 	}
 	return cfg.normalise(), nil
 }
@@ -196,6 +242,16 @@ func (c accConfig) normalise() accConfig {
 	c.K8S.NodeGroups = trimStringSlice(c.K8S.NodeGroups)
 	c.K8S.Namespace = strings.TrimSpace(c.K8S.Namespace)
 	c.K8S.ServiceAccount = strings.TrimSpace(c.K8S.ServiceAccount)
+	c.Connector.PluginID = strings.TrimSpace(c.Connector.PluginID)
+	c.Connector.PluginType = strings.TrimSpace(c.Connector.PluginType)
+	c.Connector.ConnectorClass = strings.TrimSpace(c.Connector.ConnectorClass)
+	c.Connector.IamRole = strings.TrimSpace(c.Connector.IamRole)
+	c.Connector.SecurityProtocol = strings.TrimSpace(c.Connector.SecurityProtocol)
+	c.Connector.SecurityProtocolUser = strings.TrimSpace(c.Connector.SecurityProtocolUser)
+	c.Connector.SecurityProtocolPass = strings.TrimSpace(c.Connector.SecurityProtocolPass)
+	c.Connector.ConnCfgTopics = strings.TrimSpace(c.Connector.ConnCfgTopics)
+	c.Connector.ConnCfgS3Region = strings.TrimSpace(c.Connector.ConnCfgS3Region)
+	c.Connector.ConnCfgS3Bucket = strings.TrimSpace(c.Connector.ConnCfgS3Bucket)
 	return c
 }
 
@@ -230,6 +286,14 @@ func (c accConfig) requireVM(t *testing.T) {
 
 func (c accConfig) hasK8S() bool {
 	return c.K8S.ClusterID != "" && len(c.K8S.NodeGroups) > 0
+}
+
+func (c accConfig) hasConnector() bool {
+	return c.Connector.PluginID != ""
+}
+
+func (c accConfig) hasConnectorPlugin() bool {
+	return c.ConnectorPlugin.StorageUrl != "" && c.ConnectorPlugin.ConnectorClass != ""
 }
 
 func TestAccKafkaInstance_VM_Scenario(t *testing.T) {
