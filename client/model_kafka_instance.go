@@ -242,8 +242,9 @@ type SpecificationVO struct {
 }
 
 type NodeConfigVO struct {
-	PaymentType   *string `json:"paymentType,omitempty"`
-	PaymentPeriod *int32  `json:"paymentPeriod,omitempty"`
+	PaymentType   *string  `json:"paymentType,omitempty"`
+	PaymentPeriod *int32   `json:"paymentPeriod,omitempty"`
+	InstanceTypes []string `json:"instanceTypes,omitempty"`
 }
 
 type InstanceZoneNetworkVO struct {

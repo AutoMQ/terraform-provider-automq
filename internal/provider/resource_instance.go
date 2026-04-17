@@ -173,6 +173,18 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							int64validator.Between(3, 100),
 						},
 					},
+					"instance_types": schema.ListAttribute{
+						ElementType:         types.StringType,
+						Optional:            true,
+						MarkdownDescription: "Instance type list for the nodes. Maximum 1 entry. Required when `pricing_mode` is `UsageBased`. Cannot be modified after creation.",
+						Validators: []validator.List{
+							listvalidator.SizeAtMost(1),
+							listvalidator.SizeAtLeast(1),
+						},
+						PlanModifiers: []planmodifier.List{
+							listplanmodifier.RequiresReplace(),
+						},
+					},
 					"deploy_type": schema.StringAttribute{
 						Optional:            true,
 						Computed:            true,
@@ -706,6 +718,19 @@ func validateKafkaInstanceConfiguration(ctx context.Context, plan *models.KafkaI
 						diagnostics.AddError(
 							"Invalid Configuration",
 							"compute_specs.reserved_node_count is required when compute_specs.pricing_mode is UsageBased.",
+						)
+					}
+				}
+				// When pricing_mode is UsageBased, instance_types is required
+				if plan.ComputeSpecs.InstanceTypes.IsNull() || plan.ComputeSpecs.InstanceTypes.IsUnknown() {
+					var stateInstanceTypes *types.List
+					if stateSpecs != nil {
+						stateInstanceTypes = &stateSpecs.InstanceTypes
+					}
+					if stateInstanceTypes == nil || stateInstanceTypes.IsNull() || stateInstanceTypes.IsUnknown() {
+						diagnostics.AddError(
+							"Invalid Configuration",
+							"compute_specs.instance_types is required when compute_specs.pricing_mode is UsageBased.",
 						)
 					}
 				}
