@@ -157,7 +157,8 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					"pricing_mode": schema.StringAttribute{
 						Optional:            true,
 						Computed:            true,
-						MarkdownDescription: "Pricing mode for the instance. Supported values: `UsageBased` (pay-as-you-go based on actual usage, requires `reserved_node_count`), `Committed` (reserved capacity pricing, requires `reserved_aku`). Changes to pricing mode require instance replacement.",
+						MarkdownDescription: "Pricing mode for the instance. Supported values: `UsageBased` (pay-as-you-go based on actual usage, requires `reserved_node_count`), `Committed` (reserved capacity pricing, requires `reserved_aku`). Defaults to `Committed`. Changes to pricing mode require instance replacement.",
+						Default:             stringdefault.StaticString("Committed"),
 						Validators: []validator.String{
 							stringvalidator.OneOf("UsageBased", "Committed"),
 						},
