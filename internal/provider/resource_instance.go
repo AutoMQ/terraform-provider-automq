@@ -148,8 +148,8 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				MarkdownDescription: "The compute specs of the instance",
 				Attributes: map[string]schema.Attribute{
 					"reserved_aku": schema.Int64Attribute{
-						Required:            true,
-						MarkdownDescription: "AKU (AutoMQ Kafka Unit) defines the cluster scale. Each AKU provides up to 30 MiB/s write or 60 MiB/s read throughput. Minimum value is 3; maximum depends on your license quota. For sizing guidance, refer to the [billing documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints).",
+						Optional:            true,
+						MarkdownDescription: "AKU (AutoMQ Kafka Unit) defines the cluster scale. Each AKU provides up to 30 MiB/s write or 60 MiB/s read throughput. Minimum value is 3; maximum depends on your license quota. Required when `pricing_mode` is `Committed`. For sizing guidance, refer to the [billing documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints).",
 						Validators: []validator.Int64{
 							int64validator.Between(3, 500),
 						},
@@ -157,9 +157,12 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					"pricing_mode": schema.StringAttribute{
 						Optional:            true,
 						Computed:            true,
-						MarkdownDescription: "Pricing mode for the instance. Supported values: `UsageBased` (pay-as-you-go based on actual usage, requires `reserved_node_count`), `Committed` (reserved capacity pricing, requires `reserved_aku`). When set to `UsageBased`, `reserved_node_count` is required. When set to `Committed`, `reserved_aku` is required.",
+						MarkdownDescription: "Pricing mode for the instance. Supported values: `UsageBased` (pay-as-you-go based on actual usage, requires `reserved_node_count`), `Committed` (reserved capacity pricing, requires `reserved_aku`). Changes to pricing mode require instance replacement.",
 						Validators: []validator.String{
 							stringvalidator.OneOf("UsageBased", "Committed"),
+						},
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
 						},
 					},
 					"reserved_node_count": schema.Int64Attribute{
@@ -797,7 +800,9 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 		"name":           instance.Name.ValueString(),
 	}
 	if instance.ComputeSpecs != nil {
-		logFields["reserved_aku"] = instance.ComputeSpecs.ReservedAku.ValueInt64()
+		if !instance.ComputeSpecs.ReservedAku.IsNull() {
+			logFields["reserved_aku"] = instance.ComputeSpecs.ReservedAku.ValueInt64()
+		}
 	}
 	tflog.Debug(ctx, "Creating new Kafka Cluster", logFields)
 
@@ -1015,27 +1020,12 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	if plan.ComputeSpecs != nil && instance.Spec != nil && instance.Spec.ReservedAku != nil {
-		planAKU := int32(plan.ComputeSpecs.ReservedAku.ValueInt64())
-		if planAKU != *instance.Spec.ReservedAku {
-			aku := planAKU
-			spec := ensureSpec()
-			spec.ReservedAku = &aku
-			hasUpdate = true
-			shouldWait = true
-		}
-	}
-
-	// Pricing Mode update
-	if plan.ComputeSpecs != nil {
-		if !plan.ComputeSpecs.PricingMode.IsNull() && !plan.ComputeSpecs.PricingMode.IsUnknown() {
-			planPricingMode := plan.ComputeSpecs.PricingMode.ValueString()
-			statePricingMode := ""
-			if state.ComputeSpecs != nil && !state.ComputeSpecs.PricingMode.IsNull() && !state.ComputeSpecs.PricingMode.IsUnknown() {
-				statePricingMode = state.ComputeSpecs.PricingMode.ValueString()
-			}
-			if planPricingMode != statePricingMode {
+		if !plan.ComputeSpecs.ReservedAku.IsNull() && !plan.ComputeSpecs.ReservedAku.IsUnknown() {
+			planAKU := int32(plan.ComputeSpecs.ReservedAku.ValueInt64())
+			if planAKU != *instance.Spec.ReservedAku {
+				aku := planAKU
 				spec := ensureSpec()
-				spec.PricingMode = &planPricingMode
+				spec.ReservedAku = &aku
 				hasUpdate = true
 				shouldWait = true
 			}

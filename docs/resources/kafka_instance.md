@@ -95,7 +95,6 @@ variable "automq_environment_id" {
 Required:
 
 - `networks` (Attributes List) To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones. (see [below for nested schema](#nestedatt--compute_specs--networks))
-- `reserved_aku` (Number) AKU (AutoMQ Kafka Unit) defines the cluster scale. Each AKU provides up to 30 MiB/s write or 60 MiB/s read throughput. Minimum value is 3; maximum depends on your license quota. For sizing guidance, refer to the [billing documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints).
 
 Optional:
 
@@ -108,7 +107,8 @@ Optional:
 - `kubernetes_namespace` (String) Kubernetes namespace for the instance deployment. If not specified, the backend will auto-assign one.
 - `kubernetes_node_groups` (Attributes List) Node groups (or node pools) are units for unified configuration management of physical nodes in Kubernetes. Different Kubernetes providers may use different terms for node groups. Select target node groups that must be created in advance and configured for either single-AZ or three-AZ deployment. The instance node type must meet the requirements specified in the documentation. If you select a single-AZ node group, the AutoMQ instance will be deployed in a single availability zone; if you select a three-AZ node group, the instance will be deployed across three availability zones. (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
 - `kubernetes_service_account` (String) Kubernetes service account for the instance pods. If not specified, the backend will auto-assign one.
-- `pricing_mode` (String) Pricing mode for the instance. Supported values: `UsageBased` (pay-as-you-go based on actual usage, requires `reserved_node_count`), `Committed` (reserved capacity pricing, requires `reserved_aku`). When set to `UsageBased`, `reserved_node_count` is required. When set to `Committed`, `reserved_aku` is required.
+- `pricing_mode` (String) Pricing mode for the instance. Supported values: `UsageBased` (pay-as-you-go based on actual usage, requires `reserved_node_count`), `Committed` (reserved capacity pricing, requires `reserved_aku`). Changes to pricing mode require instance replacement.
+- `reserved_aku` (Number) AKU (AutoMQ Kafka Unit) defines the cluster scale. Each AKU provides up to 30 MiB/s write or 60 MiB/s read throughput. Minimum value is 3; maximum depends on your license quota. Required when `pricing_mode` is `Committed`. For sizing guidance, refer to the [billing documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints).
 - `reserved_node_count` (Number) Number of reserved nodes for the instance. Valid range is 3 to 100. Required when `pricing_mode` is `UsageBased`.
 - `security_groups` (List of String) Security groups for the instance. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group.
 
