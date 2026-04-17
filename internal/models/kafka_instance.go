@@ -70,6 +70,8 @@ type NetworkModel struct {
 
 type ComputeSpecsModel struct {
 	ReservedAku           types.Int64           `tfsdk:"reserved_aku"`
+	PricingMode           types.String          `tfsdk:"pricing_mode"`
+	ReservedNodeCount     types.Int64           `tfsdk:"reserved_node_count"`
 	Networks              []NetworkModel        `tfsdk:"networks"`
 	KubernetesNodeGroups  []NodeGroupModel      `tfsdk:"kubernetes_node_groups"`
 	DeployType            types.String          `tfsdk:"deploy_type"`
@@ -244,6 +246,18 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 		request.Spec = client.SpecificationParam{
 			ReservedAku: int32(instance.ComputeSpecs.ReservedAku.ValueInt64()),
 			NodeConfig:  &client.NodeConfigParam{},
+		}
+
+		// Pricing Mode
+		if !instance.ComputeSpecs.PricingMode.IsNull() && !instance.ComputeSpecs.PricingMode.IsUnknown() {
+			pricingMode := instance.ComputeSpecs.PricingMode.ValueString()
+			request.Spec.PricingMode = &pricingMode
+		}
+
+		// Reserved Node Count
+		if !instance.ComputeSpecs.ReservedNodeCount.IsNull() && !instance.ComputeSpecs.ReservedNodeCount.IsUnknown() {
+			reservedNodeCount := int32(instance.ComputeSpecs.ReservedNodeCount.ValueInt64())
+			request.Spec.ReservedNodeCount = &reservedNodeCount
 		}
 
 		if !instance.ComputeSpecs.DeployType.IsNull() && !instance.ComputeSpecs.DeployType.IsUnknown() {
@@ -682,6 +696,8 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 		if resource.ComputeSpecs == nil {
 			resource.ComputeSpecs = &ComputeSpecsModel{
 				ReservedAku:           types.Int64Null(),
+				PricingMode:           types.StringNull(),
+				ReservedNodeCount:     types.Int64Null(),
 				Networks:              []NetworkModel{},
 				KubernetesNodeGroups:  []NodeGroupModel{},
 				DataBuckets:           types.ListNull(DataBucketObjectType),
@@ -698,6 +714,20 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 		// Reserved AKU
 		if instance.Spec.ReservedAku != nil {
 			resource.ComputeSpecs.ReservedAku = types.Int64Value(int64(*instance.Spec.ReservedAku))
+		}
+		// Pricing Mode
+		var prevPricingMode *types.String
+		if previousSpecs != nil {
+			prevPricingMode = &previousSpecs.PricingMode
+		}
+		resource.ComputeSpecs.PricingMode = coalesceStringAttr(instance.Spec.PricingMode, prevPricingMode)
+		// Reserved Node Count
+		if instance.Spec.ReservedNodeCount != nil {
+			resource.ComputeSpecs.ReservedNodeCount = types.Int64Value(int64(*instance.Spec.ReservedNodeCount))
+		} else if previousSpecs != nil && !previousSpecs.ReservedNodeCount.IsNull() && !previousSpecs.ReservedNodeCount.IsUnknown() {
+			resource.ComputeSpecs.ReservedNodeCount = previousSpecs.ReservedNodeCount
+		} else {
+			resource.ComputeSpecs.ReservedNodeCount = types.Int64Null()
 		}
 		var prevDeploy, prevDnsZone *types.String
 		var prevClusterID, prevNamespace, prevServiceAccount, prevInstanceRole *types.String

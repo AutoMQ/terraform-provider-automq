@@ -154,6 +154,21 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							int64validator.Between(3, 500),
 						},
 					},
+					"pricing_mode": schema.StringAttribute{
+						Optional:            true,
+						Computed:            true,
+						MarkdownDescription: "Pricing mode for the instance. Supported values: `UsageBased` (pay-as-you-go based on actual usage, requires `reserved_node_count`), `Committed` (reserved capacity pricing, requires `reserved_aku`). When set to `UsageBased`, `reserved_node_count` is required. When set to `Committed`, `reserved_aku` is required.",
+						Validators: []validator.String{
+							stringvalidator.OneOf("UsageBased", "Committed"),
+						},
+					},
+					"reserved_node_count": schema.Int64Attribute{
+						Optional:            true,
+						MarkdownDescription: "Number of reserved nodes for the instance. Valid range is 3 to 100. Required when `pricing_mode` is `UsageBased`.",
+						Validators: []validator.Int64{
+							int64validator.Between(3, 100),
+						},
+					},
 					"deploy_type": schema.StringAttribute{
 						Optional:            true,
 						Computed:            true,
@@ -669,6 +684,39 @@ func validateKafkaInstanceConfiguration(ctx context.Context, plan *models.KafkaI
 		stateWalMode = &state.Features.WalMode
 	}
 
+	// Pricing mode cross-field validation
+	if plan.ComputeSpecs != nil {
+		var statePricingMode *types.String
+		if stateSpecs != nil {
+			statePricingMode = &stateSpecs.PricingMode
+		}
+		if pricingMode, ok := resolvePlannedStringValue(plan.ComputeSpecs.PricingMode, statePricingMode); ok {
+			if strings.EqualFold(pricingMode, "UsageBased") {
+				// When pricing_mode is UsageBased, reserved_node_count is required
+				if plan.ComputeSpecs.ReservedNodeCount.IsNull() || plan.ComputeSpecs.ReservedNodeCount.IsUnknown() {
+					var stateNodeCount *types.Int64
+					if stateSpecs != nil {
+						stateNodeCount = &stateSpecs.ReservedNodeCount
+					}
+					if stateNodeCount == nil || stateNodeCount.IsNull() || stateNodeCount.IsUnknown() {
+						diagnostics.AddError(
+							"Invalid Configuration",
+							"compute_specs.reserved_node_count is required when compute_specs.pricing_mode is UsageBased.",
+						)
+					}
+				}
+			} else if strings.EqualFold(pricingMode, "Committed") {
+				// When pricing_mode is Committed, reserved_aku is required (already required by schema)
+				if plan.ComputeSpecs.ReservedAku.IsNull() || plan.ComputeSpecs.ReservedAku.IsUnknown() {
+					diagnostics.AddError(
+						"Invalid Configuration",
+						"compute_specs.reserved_aku is required when compute_specs.pricing_mode is Committed.",
+					)
+				}
+			}
+		}
+	}
+
 	hasFileSystemParam := plan.ComputeSpecs.FileSystemParam != nil
 
 	if plan.Features != nil {
@@ -974,6 +1022,40 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 			spec.ReservedAku = &aku
 			hasUpdate = true
 			shouldWait = true
+		}
+	}
+
+	// Pricing Mode update
+	if plan.ComputeSpecs != nil {
+		if !plan.ComputeSpecs.PricingMode.IsNull() && !plan.ComputeSpecs.PricingMode.IsUnknown() {
+			planPricingMode := plan.ComputeSpecs.PricingMode.ValueString()
+			statePricingMode := ""
+			if state.ComputeSpecs != nil && !state.ComputeSpecs.PricingMode.IsNull() && !state.ComputeSpecs.PricingMode.IsUnknown() {
+				statePricingMode = state.ComputeSpecs.PricingMode.ValueString()
+			}
+			if planPricingMode != statePricingMode {
+				spec := ensureSpec()
+				spec.PricingMode = &planPricingMode
+				hasUpdate = true
+				shouldWait = true
+			}
+		}
+	}
+
+	// Reserved Node Count update
+	if plan.ComputeSpecs != nil {
+		if !plan.ComputeSpecs.ReservedNodeCount.IsNull() && !plan.ComputeSpecs.ReservedNodeCount.IsUnknown() {
+			planNodeCount := int32(plan.ComputeSpecs.ReservedNodeCount.ValueInt64())
+			stateNodeCount := int32(0)
+			if state.ComputeSpecs != nil && !state.ComputeSpecs.ReservedNodeCount.IsNull() && !state.ComputeSpecs.ReservedNodeCount.IsUnknown() {
+				stateNodeCount = int32(state.ComputeSpecs.ReservedNodeCount.ValueInt64())
+			}
+			if planNodeCount != stateNodeCount {
+				spec := ensureSpec()
+				spec.ReservedNodeCount = &planNodeCount
+				hasUpdate = true
+				shouldWait = true
+			}
 		}
 	}
 

@@ -70,6 +70,14 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 						Computed:            true,
 						MarkdownDescription: "AKU (AutoMQ Kafka Unit) defines the cluster scale. Each AKU provides up to 30 MiB/s write or 60 MiB/s read throughput. For sizing guidance, refer to the [billing documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints).",
 					},
+					"pricing_mode": schema.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Pricing mode for the instance. Values: `UsageBased` or `Committed`.",
+					},
+					"reserved_node_count": schema.Int64Attribute{
+						Computed:            true,
+						MarkdownDescription: "Number of reserved nodes for the instance.",
+					},
 					"deploy_type": schema.StringAttribute{
 						Computed:            true,
 						MarkdownDescription: "Deployment platform for the instance.",
