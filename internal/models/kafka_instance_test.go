@@ -918,3 +918,183 @@ func TestFlattenKafkaInstanceModel_Tags(t *testing.T) {
 		})
 	}
 }
+
+func TestExpandKafkaInstanceResource_UsageBasedPricing(t *testing.T) {
+	model := KafkaInstanceResourceModel{
+		Name:    types.StringValue("usage-based-instance"),
+		Version: types.StringValue("1.0.0"),
+		ComputeSpecs: &ComputeSpecsModel{
+			PricingMode:       types.StringValue("UsageBased"),
+			ReservedNodeCount: types.Int64Value(5),
+			InstanceTypes:     types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.xlarge")}),
+			Networks: []NetworkModel{
+				{
+					Zone:    types.StringValue("us-east-1a"),
+					Subnets: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-abc")}),
+				},
+			},
+		},
+		Features: &FeaturesModel{
+			WalMode: types.StringValue("EBSWAL"),
+		},
+	}
+
+	request := &client.InstanceCreateParam{}
+	err := ExpandKafkaInstanceResource(context.Background(), model, request)
+	assert.NoError(t, err)
+
+	assert.NotNil(t, request.Spec.PricingMode)
+	assert.Equal(t, "UsageBased", *request.Spec.PricingMode)
+
+	assert.NotNil(t, request.Spec.ReservedNodeCount)
+	assert.Equal(t, int32(5), *request.Spec.ReservedNodeCount)
+
+	assert.NotNil(t, request.Spec.NodeConfig)
+	assert.Equal(t, []string{"m5.xlarge"}, request.Spec.NodeConfig.InstanceTypes)
+}
+
+func TestExpandKafkaInstanceResource_CommittedPricing(t *testing.T) {
+	model := KafkaInstanceResourceModel{
+		Name:    types.StringValue("committed-instance"),
+		Version: types.StringValue("1.0.0"),
+		ComputeSpecs: &ComputeSpecsModel{
+			PricingMode: types.StringValue("Committed"),
+			ReservedAku: types.Int64Value(6),
+		},
+		Features: &FeaturesModel{
+			WalMode: types.StringValue("EBSWAL"),
+		},
+	}
+
+	request := &client.InstanceCreateParam{}
+	err := ExpandKafkaInstanceResource(context.Background(), model, request)
+	assert.NoError(t, err)
+
+	assert.NotNil(t, request.Spec.PricingMode)
+	assert.Equal(t, "Committed", *request.Spec.PricingMode)
+	assert.Equal(t, int32(6), request.Spec.ReservedAku)
+	assert.Nil(t, request.Spec.ReservedNodeCount)
+}
+
+func TestExpandKafkaInstanceResource_NullPricingFields(t *testing.T) {
+	model := KafkaInstanceResourceModel{
+		Name:    types.StringValue("null-pricing"),
+		Version: types.StringValue("1.0.0"),
+		ComputeSpecs: &ComputeSpecsModel{
+			ReservedAku:       types.Int64Value(3),
+			PricingMode:       types.StringNull(),
+			ReservedNodeCount: types.Int64Null(),
+			InstanceTypes:     types.ListNull(types.StringType),
+		},
+	}
+
+	request := &client.InstanceCreateParam{}
+	err := ExpandKafkaInstanceResource(context.Background(), model, request)
+	assert.NoError(t, err)
+
+	assert.Nil(t, request.Spec.PricingMode)
+	assert.Nil(t, request.Spec.ReservedNodeCount)
+	assert.Empty(t, request.Spec.NodeConfig.InstanceTypes)
+}
+
+func TestFlattenKafkaInstanceModel_UsageBasedPricing(t *testing.T) {
+	pricingMode := "UsageBased"
+	reservedNodeCount := int32(5)
+	instance := &client.InstanceVO{
+		InstanceId:  strPtr("usage-based-id"),
+		Name:        strPtr("usage-based-instance"),
+		Description: strPtr("test"),
+		Version:     strPtr("1.0.0"),
+		State:       strPtr("Running"),
+		Spec: &client.SpecificationVO{
+			ReservedAku:       int32Ptr(0),
+			PricingMode:       &pricingMode,
+			ReservedNodeCount: &reservedNodeCount,
+			NodeConfig: &client.NodeConfigVO{
+				InstanceTypes: []string{"m5.xlarge"},
+			},
+		},
+		Features: &client.InstanceFeatureVO{
+			WalMode: strPtr("EBSWAL"),
+		},
+	}
+
+	resource := &KafkaInstanceResourceModel{}
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+	assert.False(t, diags.HasError())
+
+	assert.NotNil(t, resource.ComputeSpecs)
+	assert.Equal(t, types.StringValue("UsageBased"), resource.ComputeSpecs.PricingMode)
+	assert.Equal(t, types.Int64Value(5), resource.ComputeSpecs.ReservedNodeCount)
+
+	var instanceTypes []string
+	diags2 := resource.ComputeSpecs.InstanceTypes.ElementsAs(context.Background(), &instanceTypes, false)
+	assert.False(t, diags2.HasError())
+	assert.Equal(t, []string{"m5.xlarge"}, instanceTypes)
+}
+
+func TestFlattenKafkaInstanceModel_CommittedPricing(t *testing.T) {
+	pricingMode := "Committed"
+	instance := &client.InstanceVO{
+		InstanceId:  strPtr("committed-id"),
+		Name:        strPtr("committed-instance"),
+		Version:     strPtr("1.0.0"),
+		State:       strPtr("Running"),
+		Spec: &client.SpecificationVO{
+			ReservedAku: int32Ptr(6),
+			PricingMode: &pricingMode,
+		},
+		Features: &client.InstanceFeatureVO{
+			WalMode: strPtr("EBSWAL"),
+		},
+	}
+
+	resource := &KafkaInstanceResourceModel{}
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+	assert.False(t, diags.HasError())
+
+	assert.NotNil(t, resource.ComputeSpecs)
+	assert.Equal(t, types.StringValue("Committed"), resource.ComputeSpecs.PricingMode)
+	assert.Equal(t, types.Int64Value(6), resource.ComputeSpecs.ReservedAku)
+	assert.Equal(t, types.Int64Null(), resource.ComputeSpecs.ReservedNodeCount)
+	assert.Equal(t, types.ListNull(types.StringType), resource.ComputeSpecs.InstanceTypes)
+}
+
+func TestFlattenKafkaInstanceModel_PricingFieldsPreservePreviousState(t *testing.T) {
+	// When API returns nil for pricing fields, previous state should be preserved
+	instance := &client.InstanceVO{
+		InstanceId: strPtr("preserve-id"),
+		Name:       strPtr("preserve-instance"),
+		Version:    strPtr("1.0.0"),
+		State:      strPtr("Running"),
+		Spec: &client.SpecificationVO{
+			ReservedAku:       int32Ptr(0),
+			PricingMode:       nil,
+			ReservedNodeCount: nil,
+			NodeConfig:        nil,
+		},
+		Features: &client.InstanceFeatureVO{
+			WalMode: strPtr("EBSWAL"),
+		},
+	}
+
+	resource := &KafkaInstanceResourceModel{
+		ComputeSpecs: &ComputeSpecsModel{
+			PricingMode:       types.StringValue("UsageBased"),
+			ReservedNodeCount: types.Int64Value(5),
+			InstanceTypes:     types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.xlarge")}),
+		},
+	}
+
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+	assert.False(t, diags.HasError())
+
+	// Previous state should be preserved when API returns nil
+	assert.Equal(t, types.StringValue("UsageBased"), resource.ComputeSpecs.PricingMode)
+	assert.Equal(t, types.Int64Value(5), resource.ComputeSpecs.ReservedNodeCount)
+
+	var instanceTypes []string
+	diags2 := resource.ComputeSpecs.InstanceTypes.ElementsAs(context.Background(), &instanceTypes, false)
+	assert.False(t, diags2.HasError())
+	assert.Equal(t, []string{"m5.xlarge"}, instanceTypes)
+}
