@@ -1036,10 +1036,10 @@ func TestFlattenKafkaInstanceModel_UsageBasedPricing(t *testing.T) {
 func TestFlattenKafkaInstanceModel_CommittedPricing(t *testing.T) {
 	pricingMode := "Committed"
 	instance := &client.InstanceVO{
-		InstanceId:  strPtr("committed-id"),
-		Name:        strPtr("committed-instance"),
-		Version:     strPtr("1.0.0"),
-		State:       strPtr("Running"),
+		InstanceId: strPtr("committed-id"),
+		Name:       strPtr("committed-instance"),
+		Version:    strPtr("1.0.0"),
+		State:      strPtr("Running"),
 		Spec: &client.SpecificationVO{
 			ReservedAku: int32Ptr(6),
 			PricingMode: &pricingMode,
