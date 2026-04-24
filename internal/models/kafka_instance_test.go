@@ -199,6 +199,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku: types.Int64Value(4),
 					FileSystemParam: &FileSystemParamModel{
+						FileSystemType:               types.StringValue("EFS_PROVISIONED"),
 						ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 						FileSystemCount:              types.Int64Value(2),
 						SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-12345")}),
@@ -215,6 +216,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 					ReservedAku: 4,
 					NodeConfig:  &client.NodeConfigParam{},
 					FileSystem: &client.FileSystemParam{
+						FileSystemType:               stringPtr("EFS_PROVISIONED"),
 						ThroughputMiBpsPerFileSystem: 1000,
 						FileSystemCount:              2,
 						SecurityGroups:               []string{"sg-12345"},
@@ -233,6 +235,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku: types.Int64Value(4),
 					FileSystemParam: &FileSystemParamModel{
+						FileSystemType:               types.StringValue("ONTAP_V2"),
 						ThroughputMibpsPerFileSystem: types.Int64Value(500),
 						FileSystemCount:              types.Int64Value(1),
 						SecurityGroups:               types.ListNull(types.StringType),
@@ -249,6 +252,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 					ReservedAku: 4,
 					NodeConfig:  &client.NodeConfigParam{},
 					FileSystem: &client.FileSystemParam{
+						FileSystemType:               stringPtr("ONTAP_V2"),
 						ThroughputMiBpsPerFileSystem: 500,
 						FileSystemCount:              1,
 						SecurityGroups:               nil, // Should not be included when null/empty
@@ -528,6 +532,7 @@ func TestFlattenKafkaInstanceModel_FSWAL(t *testing.T) {
 				Spec: &client.SpecificationVO{
 					ReservedAku: int32Ptr(4),
 					FileSystem: &client.FileSystemVO{
+						FileSystemType:               strPtr("EFS_PROVISIONED"),
 						ThroughputMiBpsPerFileSystem: int32Ptr(1000),
 						FileSystemCount:              int32Ptr(2),
 						SecurityGroups:               []string{"sg-12345"},
@@ -546,6 +551,7 @@ func TestFlattenKafkaInstanceModel_FSWAL(t *testing.T) {
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku: types.Int64Value(4),
 					FileSystemParam: &FileSystemParamModel{
+						FileSystemType:               types.StringValue("EFS_PROVISIONED"),
 						ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 						FileSystemCount:              types.Int64Value(2),
 						SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-12345")}),
@@ -567,6 +573,7 @@ func TestFlattenKafkaInstanceModel_FSWAL(t *testing.T) {
 				Spec: &client.SpecificationVO{
 					ReservedAku: int32Ptr(2),
 					FileSystem: &client.FileSystemVO{
+						FileSystemType:               strPtr("ONTAP_V2"),
 						ThroughputMiBpsPerFileSystem: int32Ptr(500),
 						FileSystemCount:              int32Ptr(1),
 						SecurityGroups:               nil,
@@ -585,6 +592,7 @@ func TestFlattenKafkaInstanceModel_FSWAL(t *testing.T) {
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku: types.Int64Value(2),
 					FileSystemParam: &FileSystemParamModel{
+						FileSystemType:               types.StringValue("ONTAP_V2"),
 						ThroughputMibpsPerFileSystem: types.Int64Value(500),
 						FileSystemCount:              types.Int64Value(1),
 						SecurityGroups:               types.ListNull(types.StringType),
@@ -914,6 +922,194 @@ func TestFlattenKafkaInstanceModel_Tags(t *testing.T) {
 				assert.Equal(t, tt.expectedTags, resource.Tags)
 			} else {
 				assert.Equal(t, tt.initialTags, resource.Tags)
+			}
+		})
+	}
+}
+
+// TestExpandKafkaInstanceResource_FSWALNullFileSystemType tests handling of null file_system_type
+func TestExpandKafkaInstanceResource_FSWALNullFileSystemType(t *testing.T) {
+	input := KafkaInstanceResourceModel{
+		Name:    types.StringValue("test"),
+		Version: types.StringValue("1.0.0"),
+		ComputeSpecs: &ComputeSpecsModel{
+			ReservedAku: types.Int64Value(4),
+			FileSystemParam: &FileSystemParamModel{
+				FileSystemType:               types.StringNull(), // null
+				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
+				FileSystemCount:              types.Int64Value(2),
+			},
+		},
+	}
+
+	request := &client.InstanceCreateParam{}
+	err := ExpandKafkaInstanceResource(context.Background(), input, request)
+	assert.NoError(t, err)
+	assert.NotNil(t, request.Spec.FileSystem)
+	assert.Nil(t, request.Spec.FileSystem.FileSystemType)
+}
+
+// TestExpandKafkaInstanceResource_FSWALUnknownFileSystemType tests handling of unknown file_system_type
+func TestExpandKafkaInstanceResource_FSWALUnknownFileSystemType(t *testing.T) {
+	input := KafkaInstanceResourceModel{
+		Name:    types.StringValue("test"),
+		Version: types.StringValue("1.0.0"),
+		ComputeSpecs: &ComputeSpecsModel{
+			ReservedAku: types.Int64Value(4),
+			FileSystemParam: &FileSystemParamModel{
+				FileSystemType:               types.StringUnknown(), // unknown
+				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
+				FileSystemCount:              types.Int64Value(2),
+			},
+		},
+	}
+
+	request := &client.InstanceCreateParam{}
+	err := ExpandKafkaInstanceResource(context.Background(), input, request)
+	assert.NoError(t, err)
+	assert.NotNil(t, request.Spec.FileSystem)
+	assert.Nil(t, request.Spec.FileSystem.FileSystemType)
+}
+
+// TestFlattenKafkaInstanceModel_FileSystemTypeDeserialization tests correct deserialization of file_system_type
+func TestFlattenKafkaInstanceModel_FileSystemTypeDeserialization(t *testing.T) {
+	tests := []struct {
+		name              string
+		apiFileSystemType *string
+		expectedValue     types.String
+	}{
+		{
+			name:              "EFS_PROVISIONED",
+			apiFileSystemType: strPtr("EFS_PROVISIONED"),
+			expectedValue:     types.StringValue("EFS_PROVISIONED"),
+		},
+		{
+			name:              "ONTAP_V2",
+			apiFileSystemType: strPtr("ONTAP_V2"),
+			expectedValue:     types.StringValue("ONTAP_V2"),
+		},
+		{
+			name:              "nil file_system_type",
+			apiFileSystemType: nil,
+			expectedValue:     types.StringNull(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			instance := &client.InstanceVO{
+				InstanceId: strPtr("test"),
+				Spec: &client.SpecificationVO{
+					FileSystem: &client.FileSystemVO{
+						FileSystemType:               tt.apiFileSystemType,
+						ThroughputMiBpsPerFileSystem: int32Ptr(1000),
+						FileSystemCount:              int32Ptr(2),
+					},
+				},
+			}
+
+			resource := &KafkaInstanceResourceModel{}
+			diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+			assert.False(t, diags.HasError())
+			assert.NotNil(t, resource.ComputeSpecs)
+			assert.NotNil(t, resource.ComputeSpecs.FileSystemParam)
+			assert.Equal(t, tt.expectedValue, resource.ComputeSpecs.FileSystemParam.FileSystemType)
+		})
+	}
+}
+
+// TestFlattenKafkaInstanceModel_FileSystemTypeStatePreservation tests state preservation when API doesn't return file_system_type
+func TestFlattenKafkaInstanceModel_FileSystemTypeStatePreservation(t *testing.T) {
+	// Create a resource with existing file_system_type in state
+	previousResource := &KafkaInstanceResourceModel{
+		ComputeSpecs: &ComputeSpecsModel{
+			FileSystemParam: &FileSystemParamModel{
+				FileSystemType:               types.StringValue("EFS_PROVISIONED"),
+				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
+				FileSystemCount:              types.Int64Value(2),
+			},
+		},
+	}
+
+	// API response without file_system_type (old API version)
+	instance := &client.InstanceVO{
+		InstanceId: strPtr("test"),
+		Spec: &client.SpecificationVO{
+			FileSystem: &client.FileSystemVO{
+				FileSystemType:               nil, // API doesn't return this field
+				ThroughputMiBpsPerFileSystem: int32Ptr(1000),
+				FileSystemCount:              int32Ptr(2),
+			},
+		},
+	}
+
+	resource := &KafkaInstanceResourceModel{
+		ComputeSpecs: &ComputeSpecsModel{
+			FileSystemParam: previousResource.ComputeSpecs.FileSystemParam,
+		},
+	}
+
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+	assert.False(t, diags.HasError())
+	assert.NotNil(t, resource.ComputeSpecs.FileSystemParam)
+	// State should be preserved when API doesn't return the value
+	assert.Equal(t, types.StringValue("EFS_PROVISIONED"), resource.ComputeSpecs.FileSystemParam.FileSystemType)
+}
+
+// TestExpandKafkaInstanceResource_FileSystemTypeVariations tests different file_system_type values
+func TestExpandKafkaInstanceResource_FileSystemTypeVariations(t *testing.T) {
+	tests := []struct {
+		name             string
+		fileSystemType   types.String
+		expectedAPIValue *string
+	}{
+		{
+			name:             "EFS_PROVISIONED",
+			fileSystemType:   types.StringValue("EFS_PROVISIONED"),
+			expectedAPIValue: stringPtr("EFS_PROVISIONED"),
+		},
+		{
+			name:             "ONTAP_V2",
+			fileSystemType:   types.StringValue("ONTAP_V2"),
+			expectedAPIValue: stringPtr("ONTAP_V2"),
+		},
+		{
+			name:             "null file_system_type",
+			fileSystemType:   types.StringNull(),
+			expectedAPIValue: nil,
+		},
+		{
+			name:             "unknown file_system_type",
+			fileSystemType:   types.StringUnknown(),
+			expectedAPIValue: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := KafkaInstanceResourceModel{
+				Name:    types.StringValue("test"),
+				Version: types.StringValue("1.0.0"),
+				ComputeSpecs: &ComputeSpecsModel{
+					ReservedAku: types.Int64Value(4),
+					FileSystemParam: &FileSystemParamModel{
+						FileSystemType:               tt.fileSystemType,
+						ThroughputMibpsPerFileSystem: types.Int64Value(1000),
+						FileSystemCount:              types.Int64Value(2),
+					},
+				},
+			}
+
+			request := &client.InstanceCreateParam{}
+			err := ExpandKafkaInstanceResource(context.Background(), input, request)
+			assert.NoError(t, err)
+			assert.NotNil(t, request.Spec.FileSystem)
+
+			if tt.expectedAPIValue == nil {
+				assert.Nil(t, request.Spec.FileSystem.FileSystemType)
+			} else {
+				assert.NotNil(t, request.Spec.FileSystem.FileSystemType)
+				assert.Equal(t, *tt.expectedAPIValue, *request.Spec.FileSystem.FileSystemType)
 			}
 		})
 	}

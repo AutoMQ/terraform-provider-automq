@@ -95,9 +95,10 @@ type DataBucketModel struct {
 }
 
 type FileSystemParamModel struct {
-	ThroughputMibpsPerFileSystem types.Int64 `tfsdk:"throughput_mibps_per_file_system"`
-	FileSystemCount              types.Int64 `tfsdk:"file_system_count"`
-	SecurityGroups               types.List  `tfsdk:"security_groups"`
+	FileSystemType               types.String `tfsdk:"file_system_type"`
+	ThroughputMibpsPerFileSystem types.Int64  `tfsdk:"throughput_mibps_per_file_system"`
+	FileSystemCount              types.Int64  `tfsdk:"file_system_count"`
+	SecurityGroups               types.List   `tfsdk:"security_groups"`
 }
 
 var DataBucketObjectType = types.ObjectType{
@@ -365,6 +366,13 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 				FileSystemCount:              int32(instance.ComputeSpecs.FileSystemParam.FileSystemCount.ValueInt64()),
 			}
 
+			// File system type
+			if !instance.ComputeSpecs.FileSystemParam.FileSystemType.IsNull() &&
+				!instance.ComputeSpecs.FileSystemParam.FileSystemType.IsUnknown() {
+				fsType := instance.ComputeSpecs.FileSystemParam.FileSystemType.ValueString()
+				fileSystemParam.FileSystemType = &fsType
+			}
+
 			// Security groups protection logic: only include if not empty
 			if !instance.ComputeSpecs.FileSystemParam.SecurityGroups.IsNull() &&
 				!instance.ComputeSpecs.FileSystemParam.SecurityGroups.IsUnknown() {
@@ -611,7 +619,14 @@ func ConvertKafkaInstanceModel(resource *KafkaInstanceResourceModel, model *Kafk
 		model.Features = nil
 	}
 	model.Endpoints = resource.Endpoints
-	model.Tags = resource.Tags
+	// Ensure Tags has proper type information
+	if resource.Tags.IsNull() {
+		model.Tags = types.MapNull(types.StringType)
+	} else if resource.Tags.IsUnknown() {
+		model.Tags = types.MapUnknown(types.StringType)
+	} else {
+		model.Tags = resource.Tags
+	}
 	model.CreatedAt = resource.CreatedAt
 	model.LastUpdated = resource.LastUpdated
 	model.InstanceStatus = resource.InstanceStatus
@@ -837,7 +852,7 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 			if !sgDiags.HasError() {
 				resource.ComputeSpecs.SecurityGroups = securityGroupsList
 			}
-		} else if previousSpecs != nil && !previousSpecs.SecurityGroups.IsNull() {
+		} else if previousSpecs != nil && !previousSpecs.SecurityGroups.IsNull() && !previousSpecs.SecurityGroups.IsUnknown() {
 			resource.ComputeSpecs.SecurityGroups = previousSpecs.SecurityGroups
 		} else {
 			resource.ComputeSpecs.SecurityGroups = types.ListNull(types.StringType)
@@ -850,6 +865,7 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 		}
 		if instance.Spec.FileSystem != nil {
 			fileSystemParam := &FileSystemParamModel{
+				FileSystemType:               types.StringNull(),
 				ThroughputMibpsPerFileSystem: types.Int64Null(),
 				FileSystemCount:              types.Int64Null(),
 				SecurityGroups:               types.ListNull(types.StringType),
@@ -857,12 +873,16 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 
 			// Copy previous values if they exist
 			if previousFileSystemParam != nil {
+				fileSystemParam.FileSystemType = previousFileSystemParam.FileSystemType
 				fileSystemParam.ThroughputMibpsPerFileSystem = previousFileSystemParam.ThroughputMibpsPerFileSystem
 				fileSystemParam.FileSystemCount = previousFileSystemParam.FileSystemCount
 				fileSystemParam.SecurityGroups = previousFileSystemParam.SecurityGroups
 			}
 
 			// Update with API response values
+			if instance.Spec.FileSystem.FileSystemType != nil {
+				fileSystemParam.FileSystemType = types.StringValue(*instance.Spec.FileSystem.FileSystemType)
+			}
 			if instance.Spec.FileSystem.ThroughputMiBpsPerFileSystem != nil {
 				fileSystemParam.ThroughputMibpsPerFileSystem = types.Int64Value(int64(*instance.Spec.FileSystem.ThroughputMiBpsPerFileSystem))
 			}
