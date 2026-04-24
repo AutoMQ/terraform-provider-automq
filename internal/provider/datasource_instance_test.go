@@ -264,4 +264,13 @@ func TestKafkaInstanceDataSourceSchema_PricingFields(t *testing.T) {
 		t.Fatalf("reserved_node_count has unexpected type %T", reservedNodeCount)
 	}
 	assert.True(t, reservedNodeCountAttr.IsComputed(), "reserved_node_count should be computed")
+
+	// Verify instance_types exists and is computed
+	instanceTypes, exists := computeSpecsNested.Attributes["instance_types"]
+	assert.True(t, exists, "instance_types should exist in compute_specs")
+	instanceTypesAttr, ok := instanceTypes.(schema.ListAttribute)
+	if !ok {
+		t.Fatalf("instance_types has unexpected type %T", instanceTypes)
+	}
+	assert.True(t, instanceTypesAttr.IsComputed(), "instance_types should be computed")
 }

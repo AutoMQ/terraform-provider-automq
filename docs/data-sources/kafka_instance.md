@@ -66,6 +66,7 @@ Read-Only:
 - `dns_zone` (String) DNS zone used when creating custom records.
 - `file_system_param` (Attributes) File system configuration for FSWAL mode (see [below for nested schema](#nestedatt--compute_specs--file_system_param))
 - `instance_role` (String) IAM role ARN for the Kafka instance.
+- `instance_types` (List of String) Instance type list for the nodes. Only available when `deploy_type` is `IAAS`; not returned for `K8S` deployments.
 - `kubernetes_cluster_id` (String) Identifier for the target Kubernetes cluster.
 - `kubernetes_namespace` (String) Kubernetes namespace for the instance deployment.
 - `kubernetes_node_groups` (Attributes List) Kubernetes node groups configuration (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))

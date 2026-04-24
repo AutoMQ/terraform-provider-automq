@@ -78,6 +78,11 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 						Computed:            true,
 						MarkdownDescription: "Number of reserved nodes for the instance.",
 					},
+					"instance_types": schema.ListAttribute{
+						ElementType:         types.StringType,
+						Computed:            true,
+						MarkdownDescription: "Instance type list for the nodes. Only available when `deploy_type` is `IAAS`; not returned for `K8S` deployments.",
+					},
 					"deploy_type": schema.StringAttribute{
 						Computed:            true,
 						MarkdownDescription: "Deployment platform for the instance.",
