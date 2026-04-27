@@ -149,7 +149,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				Attributes: map[string]schema.Attribute{
 					"reserved_aku": schema.Int64Attribute{
 						Optional:            true,
-						MarkdownDescription: "AKU (AutoMQ Kafka Unit) defines the cluster scale. Each AKU provides up to 30 MiB/s write or 60 MiB/s read throughput. Minimum value is 3; maximum depends on your license quota. Required when `pricing_mode` is `Committed`. For sizing guidance, refer to the [billing documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints).",
+						MarkdownDescription: "AKU (AutoMQ Kafka Unit) defines the cluster scale. Each AKU provides up to 30 MiB/s write or 60 MiB/s read throughput. Minimum value is 3; maximum depends on your license quota. Required when `pricing_mode` is `SubscriptionBased`. For sizing guidance, refer to the [billing documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints).",
 						Validators: []validator.Int64{
 							int64validator.Between(3, 500),
 						},
@@ -157,10 +157,10 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					"pricing_mode": schema.StringAttribute{
 						Optional:            true,
 						Computed:            true,
-						MarkdownDescription: "Pricing mode for the instance. Supported values: `UsageBased` (pay-as-you-go based on actual usage, requires `reserved_node_count`), `Committed` (reserved capacity pricing, requires `reserved_aku`). Defaults to `Committed`. Changes to pricing mode require instance replacement.",
-						Default:             stringdefault.StaticString("Committed"),
+						MarkdownDescription: "Pricing mode for the instance. Supported values: `UsageBased` (pay-as-you-go based on actual usage, requires `reserved_node_count`), `SubscriptionBased` (subscription-based pricing, requires `reserved_aku`). Defaults to `SubscriptionBased`. Changes to pricing mode require instance replacement.",
+						Default:             stringdefault.StaticString("SubscriptionBased"),
 						Validators: []validator.String{
-							stringvalidator.OneOf("UsageBased", "Committed"),
+							stringvalidator.OneOf("UsageBased", "SubscriptionBased"),
 						},
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.RequiresReplace(),
@@ -744,12 +744,12 @@ func validateKafkaInstanceConfiguration(ctx context.Context, plan *models.KafkaI
 						)
 					}
 				}
-			} else if strings.EqualFold(pricingMode, "Committed") {
-				// When pricing_mode is Committed, reserved_aku is required (already required by schema)
+			} else if strings.EqualFold(pricingMode, "SubscriptionBased") {
+				// When pricing_mode is SubscriptionBased, reserved_aku is required (already required by schema)
 				if plan.ComputeSpecs.ReservedAku.IsNull() || plan.ComputeSpecs.ReservedAku.IsUnknown() {
 					diagnostics.AddError(
 						"Invalid Configuration",
-						"compute_specs.reserved_aku is required when compute_specs.pricing_mode is Committed.",
+						"compute_specs.reserved_aku is required when compute_specs.pricing_mode is SubscriptionBased.",
 					)
 				}
 			}

@@ -1154,7 +1154,7 @@ func TestExpandKafkaInstanceResource_CommittedPricing(t *testing.T) {
 		Name:    types.StringValue("committed-instance"),
 		Version: types.StringValue("1.0.0"),
 		ComputeSpecs: &ComputeSpecsModel{
-			PricingMode: types.StringValue("Committed"),
+			PricingMode: types.StringValue("SubscriptionBased"),
 			ReservedAku: types.Int64Value(6),
 		},
 		Features: &FeaturesModel{
@@ -1167,7 +1167,7 @@ func TestExpandKafkaInstanceResource_CommittedPricing(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.NotNil(t, request.Spec.PricingMode)
-	assert.Equal(t, "Committed", *request.Spec.PricingMode)
+	assert.Equal(t, "SubscriptionBased", *request.Spec.PricingMode)
 	assert.Equal(t, int32(6), request.Spec.ReservedAku)
 	assert.Nil(t, request.Spec.ReservedNodeCount)
 }
@@ -1230,7 +1230,7 @@ func TestFlattenKafkaInstanceModel_UsageBasedPricing(t *testing.T) {
 }
 
 func TestFlattenKafkaInstanceModel_CommittedPricing(t *testing.T) {
-	pricingMode := "Committed"
+	pricingMode := "SubscriptionBased"
 	instance := &client.InstanceVO{
 		InstanceId: strPtr("committed-id"),
 		Name:       strPtr("committed-instance"),
@@ -1250,7 +1250,7 @@ func TestFlattenKafkaInstanceModel_CommittedPricing(t *testing.T) {
 	assert.False(t, diags.HasError())
 
 	assert.NotNil(t, resource.ComputeSpecs)
-	assert.Equal(t, types.StringValue("Committed"), resource.ComputeSpecs.PricingMode)
+	assert.Equal(t, types.StringValue("SubscriptionBased"), resource.ComputeSpecs.PricingMode)
 	assert.Equal(t, types.Int64Value(6), resource.ComputeSpecs.ReservedAku)
 	assert.Equal(t, types.Int64Null(), resource.ComputeSpecs.ReservedNodeCount)
 	assert.Equal(t, types.ListNull(types.StringType), resource.ComputeSpecs.InstanceTypes)

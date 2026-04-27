@@ -72,7 +72,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 					},
 					"pricing_mode": schema.StringAttribute{
 						Computed:            true,
-						MarkdownDescription: "Pricing mode for the instance. Values: `UsageBased` or `Committed`.",
+						MarkdownDescription: "Pricing mode for the instance. Values: `UsageBased` or `SubscriptionBased`.",
 					},
 					"reserved_node_count": schema.Int64Attribute{
 						Computed:            true,

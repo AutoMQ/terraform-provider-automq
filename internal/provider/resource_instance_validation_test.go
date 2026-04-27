@@ -1024,7 +1024,7 @@ func TestValidateKafkaInstanceConfiguration_UsageBasedMissingInstanceTypes(t *te
 func TestValidateKafkaInstanceConfiguration_CommittedMissingAku(t *testing.T) {
 	plan := &models.KafkaInstanceResourceModel{
 		ComputeSpecs: &models.ComputeSpecsModel{
-			PricingMode: types.StringValue("Committed"),
+			PricingMode: types.StringValue("SubscriptionBased"),
 			ReservedAku: types.Int64Null(),
 			Networks: []models.NetworkModel{{
 				Zone:    types.StringValue("us-east-1a"),
@@ -1036,7 +1036,7 @@ func TestValidateKafkaInstanceConfiguration_CommittedMissingAku(t *testing.T) {
 
 	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
 	if !diags.HasError() {
-		t.Fatalf("expected error when reserved_aku is missing for Committed pricing")
+		t.Fatalf("expected error when reserved_aku is missing for SubscriptionBased pricing")
 	}
 	found := false
 	for _, d := range diags {
