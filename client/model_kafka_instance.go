@@ -16,6 +16,8 @@ type InstanceCreateParam struct {
 
 type SpecificationParam struct {
 	ReservedAku              int32                      `json:"reservedAku"`
+	PricingMode              *string                    `json:"pricingMode,omitempty"`
+	ReservedNodeCount        *int32                     `json:"reservedNodeCount,omitempty"`
 	NodeConfig               *NodeConfigParam           `json:"nodeConfig,omitempty"`
 	Networks                 []InstanceNetworkParam     `json:"networks,omitempty"`
 	KubernetesNodeGroups     []KubernetesNodeGroupParam `json:"kubernetesNodeGroups,omitempty"`
@@ -218,6 +220,8 @@ type InstanceStatisticVO struct {
 type SpecificationVO struct {
 	NodeConfig               *NodeConfigVO            `json:"nodeConfig,omitempty"`
 	ReservedAku              *int32                   `json:"reservedAku,omitempty"`
+	PricingMode              *string                  `json:"pricingMode,omitempty"`
+	ReservedNodeCount        *int32                   `json:"reservedNodeCount,omitempty"`
 	CurrentAku               *int32                   `json:"currentAku,omitempty"`
 	Networks                 []InstanceZoneNetworkVO  `json:"networks,omitempty"`
 	KubernetesNodeGroups     []KubernetesNodeGroupVO  `json:"kubernetesNodeGroups,omitempty"`
@@ -239,8 +243,9 @@ type SpecificationVO struct {
 }
 
 type NodeConfigVO struct {
-	PaymentType   *string `json:"paymentType,omitempty"`
-	PaymentPeriod *int32  `json:"paymentPeriod,omitempty"`
+	PaymentType   *string  `json:"paymentType,omitempty"`
+	PaymentPeriod *int32   `json:"paymentPeriod,omitempty"`
+	InstanceTypes []string `json:"instanceTypes,omitempty"`
 }
 
 type InstanceZoneNetworkVO struct {
@@ -367,6 +372,8 @@ type InstanceConfigParam struct {
 
 type SpecificationUpdateParam struct {
 	ReservedAku              *int32                     `json:"reservedAku,omitempty"`
+	PricingMode              *string                    `json:"pricingMode,omitempty"`
+	ReservedNodeCount        *int32                     `json:"reservedNodeCount,omitempty"`
 	NodeConfig               *NodeConfigParam           `json:"nodeConfig,omitempty"`
 	SecurityGroups           []string                   `json:"securityGroups,omitempty"`
 	Template                 *string                    `json:"template,omitempty"`
