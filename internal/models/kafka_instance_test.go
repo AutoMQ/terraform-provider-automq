@@ -691,6 +691,47 @@ func int32Ptr(i int32) *int32 {
 	return &i
 }
 
+func TestFlattenKafkaInstanceModel_SetsDefaultInstanceTypesFromAPI(t *testing.T) {
+	resource := &KafkaInstanceResourceModel{
+		ComputeSpecs: &ComputeSpecsModel{
+			InstanceTypes: types.ListNull(types.StringType),
+		},
+	}
+	instance := &client.InstanceVO{
+		InstanceId: strPtr("test-instance"),
+		Spec: &client.SpecificationVO{
+			NodeConfig: &client.NodeConfigVO{
+				InstanceTypes: []string{"r6i.large"},
+			},
+		},
+	}
+
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+
+	assert.False(t, diags.HasError())
+	assert.NotNil(t, resource.ComputeSpecs)
+	assert.False(t, resource.ComputeSpecs.InstanceTypes.IsNull())
+	assert.Equal(t, []attr.Value{types.StringValue("r6i.large")}, resource.ComputeSpecs.InstanceTypes.Elements())
+}
+
+func TestFlattenKafkaInstanceModel_SetsInstanceTypesWithoutPriorConfig(t *testing.T) {
+	resource := &KafkaInstanceResourceModel{}
+	instance := &client.InstanceVO{
+		InstanceId: strPtr("test-instance"),
+		Spec: &client.SpecificationVO{
+			NodeConfig: &client.NodeConfigVO{
+				InstanceTypes: []string{"r6i.large"},
+			},
+		},
+	}
+
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+
+	assert.False(t, diags.HasError())
+	assert.NotNil(t, resource.ComputeSpecs)
+	assert.False(t, resource.ComputeSpecs.InstanceTypes.IsNull())
+}
+
 func timePtr(s string) *time.Time {
 	t, _ := time.Parse(time.RFC3339, s)
 	return &t

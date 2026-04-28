@@ -995,6 +995,7 @@ func TestValidateKafkaInstanceConfiguration_UsageBasedMissingInstanceTypes(t *te
 	plan := &models.KafkaInstanceResourceModel{
 		ComputeSpecs: &models.ComputeSpecsModel{
 			PricingMode:       types.StringValue("UsageBased"),
+			DeployType:        types.StringValue("IAAS"),
 			ReservedNodeCount: types.Int64Value(5),
 			InstanceTypes:     types.ListNull(types.StringType),
 			Networks: []models.NetworkModel{{
@@ -1018,6 +1019,27 @@ func TestValidateKafkaInstanceConfiguration_UsageBasedMissingInstanceTypes(t *te
 	}
 	if !found {
 		t.Fatalf("expected error mentioning instance_types, got: %v", diags)
+	}
+}
+
+func TestValidateKafkaInstanceConfiguration_UsageBasedK8SAllowsMissingInstanceTypes(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			PricingMode:         types.StringValue("UsageBased"),
+			DeployType:          types.StringValue("K8S"),
+			ReservedNodeCount:   types.Int64Value(5),
+			InstanceTypes:       types.ListNull(types.StringType),
+			KubernetesClusterID: types.StringValue("cluster-1"),
+			KubernetesNodeGroups: []models.NodeGroupModel{{
+				ID: types.StringValue("ng-1"),
+			}},
+		},
+		Features: &models.FeaturesModel{WalMode: types.StringValue("EBSWAL")},
+	}
+
+	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics when instance_types is omitted for UsageBased K8S: %v", diags)
 	}
 }
 
@@ -1142,6 +1164,9 @@ func TestInstanceTypesSchemaValidator(t *testing.T) {
 
 	if !instanceTypesAttr.IsOptional() {
 		t.Fatalf("expected instance_types to be optional")
+	}
+	if !instanceTypesAttr.IsComputed() {
+		t.Fatalf("expected instance_types to be computed")
 	}
 
 	// Should have size validators (at most 1, at least 1)

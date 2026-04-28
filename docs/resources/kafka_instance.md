@@ -103,7 +103,7 @@ Optional:
 - `dns_zone` (String) DNS zone used when creating custom records.
 - `file_system_param` (Attributes) File system configuration for FSWAL mode (see [below for nested schema](#nestedatt--compute_specs--file_system_param))
 - `instance_role` (String) IAM role ARN for the Kafka instance. If not specified, the backend will auto-generate an appropriate role. Format: `arn:aws:iam::<account-id>:role/<role-name>`.
-- `instance_types` (List of String) Instance type list for the nodes. Maximum 1 entry. Required when `pricing_mode` is `UsageBased`. Cannot be modified after creation.
+- `instance_types` (List of String) Instance type list for the nodes. Maximum 1 entry. Required when `pricing_mode` is `UsageBased` and `deploy_type` is `IAAS`. Cannot be modified after creation.
 - `kubernetes_cluster_id` (String) Identifier for the target Kubernetes cluster when `deploy_type` is `K8S`.
 - `kubernetes_namespace` (String) Kubernetes namespace for the instance deployment. If not specified, the backend will auto-assign one.
 - `kubernetes_node_groups` (Attributes List) Node groups (or node pools) are units for unified configuration management of physical nodes in Kubernetes. Different Kubernetes providers may use different terms for node groups. Select target node groups that must be created in advance and configured for either single-AZ or three-AZ deployment. The instance node type must meet the requirements specified in the documentation. If you select a single-AZ node group, the AutoMQ instance will be deployed in a single availability zone; if you select a three-AZ node group, the instance will be deployed across three availability zones. (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
