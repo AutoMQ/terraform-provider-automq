@@ -1,25 +1,17 @@
 resource "automq_connector" "example" {
-  environment_id             = var.automq_environment_id
-  name                       = "my-s3-sink"
-  description                = "S3 sink connector for order events"
-  plugin_id                  = "plugin-s3-sink"
-  kubernetes_cluster_id      = "k8s-cluster-id"
-  kubernetes_namespace       = "kafka-connect"
-  kubernetes_service_account = "connect-sa"
-  task_count                 = 2
-  version                    = "1.2.0"
+  environment_id     = var.automq_environment_id
+  connect_cluster_id = automq_connect_cluster.example.id
+  name               = "orders-s3-sink"
+  description        = "S3 sink connector for order events"
+  connector_class    = "io.confluent.connect.s3.S3SinkConnector"
+  task_count         = 2
 
-  capacity {
-    worker_count         = 2
-    worker_resource_spec = "TIER2"
-  }
-
-  kafka_cluster {
-    kafka_instance_id = automq_kafka_instance.example.id
-    security_protocol {
-      security_protocol = "SASL_PLAINTEXT"
-      username          = "connect-user"
-      password          = var.connect_password
+  kafka_cluster = {
+    security_protocol = {
+      protocol       = "SASL_PLAINTEXT"
+      username       = "connect-user"
+      password       = var.connect_password
+      sasl_mechanism = "SCRAM-SHA-512"
     }
   }
 
@@ -34,8 +26,8 @@ resource "automq_connector" "example" {
     "partitioner.class"  = "io.confluent.connect.storage.partitioner.DefaultPartitioner"
   }
 
-  labels = {
-    team = "data-platform"
+  connector_config_sensitive = {
+    "aws.secret.access.key" = var.aws_secret_access_key
   }
 }
 
@@ -44,6 +36,11 @@ variable "automq_environment_id" {
 }
 
 variable "connect_password" {
+  type      = string
+  sensitive = true
+}
+
+variable "aws_secret_access_key" {
   type      = string
   sensitive = true
 }

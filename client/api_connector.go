@@ -7,10 +7,10 @@ import (
 )
 
 const (
-	connectorCollectionPath = "/api/v1/connectors"
-	connectorItemPath       = "/api/v1/connectors/%s"
-	connectorPausePath      = "/api/v1/connectors/%s:pause"
-	connectorResumePath     = "/api/v1/connectors/%s:resume"
+	connectorCollectionPath = "/api/v1/connect/connectors"
+	connectorItemPath       = "/api/v1/connect/connectors/%s"
+	connectorPausePath      = "/api/v1/connect/connectors/%s:pause"
+	connectorResumePath     = "/api/v1/connect/connectors/%s:resume"
 )
 
 func (c *Client) CreateConnector(ctx context.Context, param ConnectorCreateParam) (*ConnectorVO, error) {

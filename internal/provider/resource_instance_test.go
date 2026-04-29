@@ -61,8 +61,8 @@ type accK8SConfig struct {
 }
 
 type accConnectorConfig struct {
-	PluginID             string `json:"plugin_id"`
-	PluginType           string `json:"plugin_type"`
+	PluginName           string `json:"plugin_name"`
+	PluginVersion        string `json:"plugin_version"`
 	ConnectorClass       string `json:"connector_class"`
 	IamRole              string `json:"iam_role"`
 	SecurityProtocol     string `json:"security_protocol"`
@@ -206,8 +206,8 @@ func parseAccConfigFromFile(path string) (accConfig, error) {
 			ServiceAccount: strings.TrimSpace(raw.K8S.ServiceAccount),
 		},
 		Connector: accConnectorConfig{
-			PluginID:             strings.TrimSpace(raw.Connector.PluginID),
-			PluginType:           strings.TrimSpace(raw.Connector.PluginType),
+			PluginName:           strings.TrimSpace(raw.Connector.PluginName),
+			PluginVersion:        strings.TrimSpace(raw.Connector.PluginVersion),
 			ConnectorClass:       strings.TrimSpace(raw.Connector.ConnectorClass),
 			IamRole:              strings.TrimSpace(raw.Connector.IamRole),
 			SecurityProtocol:     strings.TrimSpace(raw.Connector.SecurityProtocol),
@@ -242,8 +242,8 @@ func (c accConfig) normalise() accConfig {
 	c.K8S.NodeGroups = trimStringSlice(c.K8S.NodeGroups)
 	c.K8S.Namespace = strings.TrimSpace(c.K8S.Namespace)
 	c.K8S.ServiceAccount = strings.TrimSpace(c.K8S.ServiceAccount)
-	c.Connector.PluginID = strings.TrimSpace(c.Connector.PluginID)
-	c.Connector.PluginType = strings.TrimSpace(c.Connector.PluginType)
+	c.Connector.PluginName = strings.TrimSpace(c.Connector.PluginName)
+	c.Connector.PluginVersion = strings.TrimSpace(c.Connector.PluginVersion)
 	c.Connector.ConnectorClass = strings.TrimSpace(c.Connector.ConnectorClass)
 	c.Connector.IamRole = strings.TrimSpace(c.Connector.IamRole)
 	c.Connector.SecurityProtocol = strings.TrimSpace(c.Connector.SecurityProtocol)
@@ -289,7 +289,7 @@ func (c accConfig) hasK8S() bool {
 }
 
 func (c accConfig) hasConnector() bool {
-	return c.Connector.PluginID != ""
+	return c.Connector.PluginName != "" && c.Connector.PluginVersion != "" && c.Connector.ConnectorClass != ""
 }
 
 func (c accConfig) hasConnectorPlugin() bool {

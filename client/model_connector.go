@@ -19,38 +19,24 @@ const (
 // ---------------------------------------------------------------------------
 
 type ConnectorCreateParam struct {
+	ConnectClusterId         string                         `json:"connectClusterId"`
 	Name                     string                         `json:"name"`
-	KubernetesClusterId      string                         `json:"kubernetesClusterId"`
 	Description              *string                        `json:"description,omitempty"`
-	PluginId                 string                         `json:"pluginId"`
-	Capacity                 ConnectorCapacityParam         `json:"capacity"`
+	ConnectorClass           string                         `json:"connectorClass"`
 	TaskCount                int32                          `json:"taskCount"`
-	Type                     *string                        `json:"type,omitempty"`
-	ConnectorClass           *string                        `json:"connectorClass,omitempty"`
-	IamRole                  *string                        `json:"iamRole,omitempty"`
-	KubernetesServiceAccount string                         `json:"kubernetesServiceAccount"`
-	KubernetesNamespace      string                         `json:"kubernetesNamespace"`
-	KafkaCluster             ConnectorKafkaClusterParam     `json:"kafkaCluster"`
-	WorkerConfig             *ConnectorWorkerConfigParam    `json:"workerConfig,omitempty"`
+	KafkaCluster             *ConnectorKafkaClusterParam    `json:"kafkaCluster,omitempty"`
 	ConnectorConfig          *ConnectorConnectorConfigParam `json:"connectorConfig,omitempty"`
-	MetricExporter           *ConnectMetricsConfigParam     `json:"metricExporter,omitempty"`
-	Version                  *string                        `json:"version,omitempty"`
-	SchedulingSpec           *string                        `json:"schedulingSpec,omitempty"`
+	ConnectorConfigSensitive *ConnectorConnectorConfigParam `json:"connectorConfigSensitive,omitempty"`
+	InitialOffsets           []InitialOffsetParam           `json:"initialOffsets,omitempty"`
 }
 
 type ConnectorUpdateParam struct {
-	Name                   *string                        `json:"name,omitempty"`
-	Description            *string                        `json:"description,omitempty"`
-	PluginId               *string                        `json:"pluginId,omitempty"`
-	TaskCount              *int32                         `json:"taskCount,omitempty"`
-	Capacity               *ConnectorCapacityParam        `json:"capacity,omitempty"`
-	SecurityProtocolConfig *SecurityProtocolConfig        `json:"securityProtocolConfig,omitempty"`
-	SchedulingSpec         *string                        `json:"schedulingSpec,omitempty"`
-	WorkerConfig           *ConnectorWorkerConfigParam    `json:"workerConfig,omitempty"`
-	ConnectorConfig        *ConnectorConnectorConfigParam `json:"connectorConfig,omitempty"`
-	Labels                 map[string]string              `json:"labels,omitempty"`
-	MetricExporter         *ConnectMetricsConfigParam     `json:"metricExporter,omitempty"`
-	Version                *string                        `json:"version,omitempty"`
+	Name                     *string                        `json:"name,omitempty"`
+	Description              *string                        `json:"description,omitempty"`
+	TaskCount                *int32                         `json:"taskCount,omitempty"`
+	SecurityProtocolConfig   *SecurityProtocolConfig        `json:"securityProtocolConfig,omitempty"`
+	ConnectorConfig          *ConnectorConnectorConfigParam `json:"connectorConfig,omitempty"`
+	ConnectorConfigSensitive *ConnectorConnectorConfigParam `json:"connectorConfigSensitive,omitempty"`
 }
 
 type ConnectorCapacityParam struct {
@@ -59,12 +45,13 @@ type ConnectorCapacityParam struct {
 }
 
 type ConnectorKafkaClusterParam struct {
-	KafkaInstanceId        string                 `json:"kafkaInstanceId"`
-	SecurityProtocolConfig SecurityProtocolConfig `json:"securityProtocolConfig"`
+	KafkaInstanceId        string                  `json:"kafkaInstanceId,omitempty"`
+	SecurityProtocolConfig *SecurityProtocolConfig `json:"securityProtocolConfig,omitempty"`
 }
 
 type SecurityProtocolConfig struct {
 	SecurityProtocol *string `json:"securityProtocol,omitempty"`
+	Protocol         *string `json:"protocol,omitempty"`
 	Username         *string `json:"username,omitempty"`
 	Password         *string `json:"password,omitempty"`
 	SaslMechanism    *string `json:"saslMechanism,omitempty"`
@@ -82,6 +69,11 @@ type ConnectorWorkerConfigParam struct {
 
 type ConnectorConnectorConfigParam struct {
 	Properties map[string]string `json:"properties,omitempty"`
+}
+
+type InitialOffsetParam struct {
+	Partition map[string]string `json:"partition"`
+	Offset    map[string]string `json:"offset"`
 }
 
 type ConnectMetricsConfigParam struct {
@@ -108,6 +100,7 @@ type ConnectRemoteWriteConfigParam struct {
 
 type ConnectorVO struct {
 	Id                       *string                     `json:"id,omitempty"`
+	ConnectClusterId         *string                     `json:"connectClusterId,omitempty"`
 	Name                     *string                     `json:"name,omitempty"`
 	Description              *string                     `json:"description,omitempty"`
 	State                    *string                     `json:"state,omitempty"`
@@ -121,10 +114,14 @@ type ConnectorVO struct {
 	IamRole                  *string                     `json:"iamRole,omitempty"`
 	Labels                   map[string]string           `json:"labels,omitempty"`
 	ConnType                 *string                     `json:"connType,omitempty"`
+	ConnectorType            *string                     `json:"connectorType,omitempty"`
 	ConnClass                *string                     `json:"connClass,omitempty"`
+	ConnectorClass           *string                     `json:"connectorClass,omitempty"`
+	PluginId                 *string                     `json:"pluginId,omitempty"`
 	TaskCount                *int32                      `json:"taskCount,omitempty"`
 	WorkerConfig             map[string]interface{}      `json:"workerConfig,omitempty"`
 	ConnectorConfig          map[string]interface{}      `json:"connectorConfig,omitempty"`
+	ConnectorConfigSensitive map[string]interface{}      `json:"connectorConfigSensitive,omitempty"`
 	Plugin                   *ConnectPluginSummaryVO     `json:"plugin,omitempty"`
 	MetricExporter           *ConnectMetricsConfigVO     `json:"metricExporter,omitempty"`
 	Runtime                  *ConnectorRuntimeSnapshotVO `json:"runtime,omitempty"`

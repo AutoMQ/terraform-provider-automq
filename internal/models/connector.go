@@ -12,51 +12,42 @@ import (
 )
 
 type ConnectorResourceModel struct {
-	EnvironmentID            types.String                   `tfsdk:"environment_id"`
-	ID                       types.String                   `tfsdk:"id"`
-	Name                     types.String                   `tfsdk:"name"`
-	Description              types.String                   `tfsdk:"description"`
-	PluginID                 types.String                   `tfsdk:"plugin_id"`
-	PluginType               types.String                   `tfsdk:"plugin_type"`
-	ConnectorClass           types.String                   `tfsdk:"connector_class"`
-	IamRole                  types.String                   `tfsdk:"iam_role"`
-	KubernetesClusterID      types.String                   `tfsdk:"kubernetes_cluster_id"`
-	KubernetesNamespace      types.String                   `tfsdk:"kubernetes_namespace"`
-	KubernetesServiceAccount types.String                   `tfsdk:"kubernetes_service_account"`
-	Capacity                 *ConnectorCapacityModel        `tfsdk:"capacity"`
-	TaskCount                types.Int64                    `tfsdk:"task_count"`
-	WorkerConfig             types.Map                      `tfsdk:"worker_config"`
-	ConnectorConfig          types.Map                      `tfsdk:"connector_config"`
-	KafkaCluster             *ConnectorKafkaClusterModel    `tfsdk:"kafka_cluster"`
-	MetricExporter           *ConnectorMetricsExporterModel `tfsdk:"metric_exporter"`
-	Labels                   types.Map                      `tfsdk:"labels"`
-	Version                  types.String                   `tfsdk:"version"`
-	SchedulingSpec           types.String                   `tfsdk:"scheduling_spec"`
-	State                    types.String                   `tfsdk:"state"`
-	KafkaConnectVersion      types.String                   `tfsdk:"kafka_connect_version"`
-	CreatedAt                timetypes.RFC3339              `tfsdk:"created_at"`
-	UpdatedAt                timetypes.RFC3339              `tfsdk:"updated_at"`
-	Timeouts                 timeouts.Value                 `tfsdk:"timeouts"`
-}
-
-type ConnectorCapacityModel struct {
-	WorkerCount        types.Int64  `tfsdk:"worker_count"`
-	WorkerResourceSpec types.String `tfsdk:"worker_resource_spec"`
+	EnvironmentID            types.String                `tfsdk:"environment_id"`
+	ID                       types.String                `tfsdk:"id"`
+	ConnectClusterID         types.String                `tfsdk:"connect_cluster_id"`
+	Name                     types.String                `tfsdk:"name"`
+	Description              types.String                `tfsdk:"description"`
+	ConnectorClass           types.String                `tfsdk:"connector_class"`
+	TaskCount                types.Int64                 `tfsdk:"task_count"`
+	KafkaCluster             *ConnectorKafkaClusterModel `tfsdk:"kafka_cluster"`
+	ConnectorConfig          types.Map                   `tfsdk:"connector_config"`
+	ConnectorConfigSensitive types.Map                   `tfsdk:"connector_config_sensitive"`
+	InitialOffsets           []InitialOffsetModel        `tfsdk:"initial_offsets"`
+	State                    types.String                `tfsdk:"state"`
+	ConnectorType            types.String                `tfsdk:"connector_type"`
+	PluginID                 types.String                `tfsdk:"plugin_id"`
+	CreatedAt                timetypes.RFC3339           `tfsdk:"created_at"`
+	UpdatedAt                timetypes.RFC3339           `tfsdk:"updated_at"`
+	Timeouts                 timeouts.Value              `tfsdk:"timeouts"`
 }
 
 type ConnectorKafkaClusterModel struct {
-	KafkaInstanceID types.String                 `tfsdk:"kafka_instance_id"`
-	Security        *SecurityProtocolConfigModel `tfsdk:"security_protocol"`
+	Security *SecurityProtocolConfigModel `tfsdk:"security_protocol"`
 }
 
 type SecurityProtocolConfigModel struct {
-	SecurityProtocol types.String `tfsdk:"security_protocol"`
-	Username         types.String `tfsdk:"username"`
-	Password         types.String `tfsdk:"password"`
-	SaslMechanism    types.String `tfsdk:"sasl_mechanism"`
-	TruststoreCerts  types.String `tfsdk:"truststore_certs"`
-	ClientCert       types.String `tfsdk:"client_cert"`
-	PrivateKey       types.String `tfsdk:"private_key"`
+	Protocol        types.String `tfsdk:"protocol"`
+	Username        types.String `tfsdk:"username"`
+	Password        types.String `tfsdk:"password"`
+	SaslMechanism   types.String `tfsdk:"sasl_mechanism"`
+	TruststoreCerts types.String `tfsdk:"truststore_certs"`
+	ClientCert      types.String `tfsdk:"client_cert"`
+	PrivateKey      types.String `tfsdk:"private_key"`
+}
+
+type InitialOffsetModel struct {
+	Partition types.Map `tfsdk:"partition"`
+	Offset    types.Map `tfsdk:"offset"`
 }
 
 type ConnectorMetricsExporterModel struct {
@@ -77,61 +68,34 @@ type ConnectorRemoteWriteModel struct {
 	Labels             types.Map    `tfsdk:"labels"`
 }
 
-// ExpandConnectorCreate converts the Terraform plan into an API create request.
 func ExpandConnectorCreate(plan ConnectorResourceModel) (*client.ConnectorCreateParam, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	if plan.Capacity == nil {
-		diags.AddError("Missing capacity", "capacity block must be specified")
-		return nil, diags
-	}
-	if plan.KafkaCluster == nil || plan.KafkaCluster.Security == nil {
-		diags.AddError("Missing kafka_cluster", "kafka_cluster with security_protocol must be specified")
-		return nil, diags
-	}
-
 	request := &client.ConnectorCreateParam{
-		Name:                     plan.Name.ValueString(),
-		KubernetesClusterId:      plan.KubernetesClusterID.ValueString(),
-		PluginId:                 plan.PluginID.ValueString(),
-		Capacity:                 cExpandCapacity(plan.Capacity),
-		TaskCount:                int32(plan.TaskCount.ValueInt64()),
-		KubernetesServiceAccount: plan.KubernetesServiceAccount.ValueString(),
-		KubernetesNamespace:      plan.KubernetesNamespace.ValueString(),
-		KafkaCluster: client.ConnectorKafkaClusterParam{
-			KafkaInstanceId:        plan.KafkaCluster.KafkaInstanceID.ValueString(),
-			SecurityProtocolConfig: *cExpandSecurityProtocol(plan.KafkaCluster.Security),
-		},
+		ConnectClusterId: plan.ConnectClusterID.ValueString(),
+		Name:             plan.Name.ValueString(),
+		ConnectorClass:   plan.ConnectorClass.ValueString(),
+		TaskCount:        int32(plan.TaskCount.ValueInt64()),
 	}
 	if s := cOptStr(plan.Description); s != nil {
 		request.Description = s
 	}
-	if s := cOptStr(plan.PluginType); s != nil {
-		request.Type = s
-	}
-	connClass := plan.ConnectorClass.ValueString()
-	request.ConnectorClass = &connClass
-	if s := cOptStr(plan.IamRole); s != nil {
-		request.IamRole = s
-	}
-	if s := cOptStr(plan.Version); s != nil {
-		request.Version = s
-	}
-	if s := cOptStr(plan.SchedulingSpec); s != nil {
-		request.SchedulingSpec = s
-	}
-	if m := cExpandStringMap(plan.WorkerConfig); m != nil {
-		request.WorkerConfig = &client.ConnectorWorkerConfigParam{Properties: m}
+	if plan.KafkaCluster != nil && plan.KafkaCluster.Security != nil {
+		request.KafkaCluster = &client.ConnectorKafkaClusterParam{
+			SecurityProtocolConfig: cExpandSecurityProtocol(plan.KafkaCluster.Security),
+		}
 	}
 	if m := cExpandStringMap(plan.ConnectorConfig); m != nil {
 		request.ConnectorConfig = &client.ConnectorConnectorConfigParam{Properties: m}
 	}
-	if cfg := cExpandMetrics(plan.MetricExporter); cfg != nil {
-		request.MetricExporter = cfg
+	if m := cExpandStringMap(plan.ConnectorConfigSensitive); m != nil {
+		request.ConnectorConfigSensitive = &client.ConnectorConnectorConfigParam{Properties: m}
+	}
+	if offsets := cExpandInitialOffsets(plan.InitialOffsets); len(offsets) > 0 {
+		request.InitialOffsets = offsets
 	}
 	return request, diags
 }
 
-// ExpandConnectorUpdate converts the Terraform plan into an API update request.
 func ExpandConnectorUpdate(plan ConnectorResourceModel) (*client.ConnectorUpdateParam, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	request := &client.ConnectorUpdateParam{}
@@ -141,42 +105,22 @@ func ExpandConnectorUpdate(plan ConnectorResourceModel) (*client.ConnectorUpdate
 	if s := cOptStr(plan.Description); s != nil {
 		request.Description = s
 	}
-	if s := cOptStr(plan.PluginID); s != nil {
-		request.PluginId = s
-	}
 	if !plan.TaskCount.IsNull() && !plan.TaskCount.IsUnknown() {
 		tc := int32(plan.TaskCount.ValueInt64())
 		request.TaskCount = &tc
 	}
-	if plan.Capacity != nil {
-		expanded := cExpandCapacity(plan.Capacity)
-		request.Capacity = &expanded
-	}
 	if plan.KafkaCluster != nil && plan.KafkaCluster.Security != nil {
 		request.SecurityProtocolConfig = cExpandSecurityProtocol(plan.KafkaCluster.Security)
-	}
-	if s := cOptStr(plan.Version); s != nil {
-		request.Version = s
-	}
-	if s := cOptStr(plan.SchedulingSpec); s != nil {
-		request.SchedulingSpec = s
-	}
-	if m := cExpandStringMap(plan.WorkerConfig); m != nil {
-		request.WorkerConfig = &client.ConnectorWorkerConfigParam{Properties: m}
 	}
 	if m := cExpandStringMap(plan.ConnectorConfig); m != nil {
 		request.ConnectorConfig = &client.ConnectorConnectorConfigParam{Properties: m}
 	}
-	if m := cExpandStringMap(plan.Labels); m != nil {
-		request.Labels = m
-	}
-	if cfg := cExpandMetrics(plan.MetricExporter); cfg != nil {
-		request.MetricExporter = cfg
+	if m := cExpandStringMap(plan.ConnectorConfigSensitive); m != nil {
+		request.ConnectorConfigSensitive = &client.ConnectorConnectorConfigParam{Properties: m}
 	}
 	return request, diags
 }
 
-// FlattenConnector maps an API response into the Terraform state model.
 func FlattenConnector(vo *client.ConnectorVO, state *ConnectorResourceModel) diag.Diagnostics {
 	var diags diag.Diagnostics
 	if vo == nil {
@@ -184,54 +128,48 @@ func FlattenConnector(vo *client.ConnectorVO, state *ConnectorResourceModel) dia
 		return diags
 	}
 	state.ID = cToStr(vo.Id)
+	state.ConnectClusterID = cRetainStr(vo.ConnectClusterId, state.ConnectClusterID)
 	state.Name = cToStr(vo.Name)
 	state.Description = cToStr(vo.Description)
-	if vo.Plugin != nil && vo.Plugin.Id != nil {
-		state.PluginID = types.StringValue(*vo.Plugin.Id)
-	}
-	state.PluginType = cToStr(vo.ConnType)
-	state.ConnectorClass = cToStr(vo.ConnClass)
-	state.IamRole = cToStr(vo.IamRole)
-	state.KubernetesClusterID = cToStr(vo.KubernetesClusterId)
-	state.KubernetesNamespace = cToStr(vo.KubernetesNamespace)
-	state.KubernetesServiceAccount = cToStr(vo.KubernetesServiceAccount)
 	state.TaskCount = cToInt64(vo.TaskCount)
 	state.State = cToStr(vo.State)
-	state.Version = cToStr(vo.Version)
-	state.KafkaConnectVersion = cToStr(vo.KafkaConnectVersion)
-	state.SchedulingSpec = cToStr(vo.SchedulingSpec)
+	state.ConnectorType = cToStr(firstString(vo.ConnectorType, vo.ConnType))
+	state.ConnectorClass = cToStr(firstString(vo.ConnectorClass, vo.ConnClass))
+	state.PluginID = cToStr(firstString(vo.PluginId, pluginSummaryID(vo.Plugin)))
 	if vo.CreateTime != nil {
 		state.CreatedAt = timetypes.NewRFC3339TimePointerValue(vo.CreateTime)
 	}
 	if vo.UpdateTime != nil {
 		state.UpdatedAt = timetypes.NewRFC3339TimePointerValue(vo.UpdateTime)
 	}
-	state.Capacity = cFlattenCapacity(vo, state.Capacity)
-	state.KafkaCluster = cFlattenKafkaCluster(vo, state.KafkaCluster)
-	state.WorkerConfig = cFlattenInterfaceMap(vo.WorkerConfig)
+	state.KafkaCluster = cFlattenConnectorKafkaCluster(vo.SecurityProtocolConfig, state.KafkaCluster)
 	state.ConnectorConfig = cFlattenInterfaceMap(vo.ConnectorConfig)
-	state.Labels = cFlattenStringMap(vo.Labels)
-	state.MetricExporter = cFlattenMetrics(vo.MetricExporter, state.MetricExporter)
+	state.ConnectorConfigSensitive = cRetainMap(cFlattenInterfaceMap(vo.ConnectorConfigSensitive), state.ConnectorConfigSensitive)
 	return diags
 }
 
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
-func cExpandCapacity(m *ConnectorCapacityModel) client.ConnectorCapacityParam {
-	return client.ConnectorCapacityParam{
-		WorkerCount:        int32(m.WorkerCount.ValueInt64()),
-		WorkerResourceSpec: m.WorkerResourceSpec.ValueString(),
+func cExpandInitialOffsets(offsets []InitialOffsetModel) []client.InitialOffsetParam {
+	if len(offsets) == 0 {
+		return nil
 	}
+	result := make([]client.InitialOffsetParam, 0, len(offsets))
+	for _, offset := range offsets {
+		result = append(result, client.InitialOffsetParam{
+			Partition: cExpandStringMap(offset.Partition),
+			Offset:    cExpandStringMap(offset.Offset),
+		})
+	}
+	return result
 }
 
 func cExpandSecurityProtocol(m *SecurityProtocolConfigModel) *client.SecurityProtocolConfig {
 	if m == nil {
 		return nil
 	}
+	protocol := cOptStr(m.Protocol)
 	return &client.SecurityProtocolConfig{
-		SecurityProtocol: cOptStr(m.SecurityProtocol),
+		Protocol:         protocol,
+		SecurityProtocol: protocol,
 		Username:         cOptStr(m.Username),
 		Password:         cOptStr(m.Password),
 		SaslMechanism:    cOptStr(m.SaslMechanism),
@@ -263,58 +201,26 @@ func cExpandMetrics(m *ConnectorMetricsExporterModel) *client.ConnectMetricsConf
 	}
 }
 
-func cExpandStringMap(v types.Map) map[string]string {
-	if v.IsNull() || v.IsUnknown() {
+func cFlattenConnectorKafkaCluster(cfg *client.SecurityProtocolConfig, prev *ConnectorKafkaClusterModel) *ConnectorKafkaClusterModel {
+	if cfg == nil && prev == nil {
 		return nil
 	}
-	result := make(map[string]string, len(v.Elements()))
-	for k, val := range v.Elements() {
-		sv, ok := val.(types.String)
-		if !ok || sv.IsNull() || sv.IsUnknown() {
-			continue
-		}
-		result[k] = sv.ValueString()
-	}
-	if len(result) == 0 {
-		return nil
-	}
-	return result
-}
-
-func cFlattenCapacity(vo *client.ConnectorVO, prev *ConnectorCapacityModel) *ConnectorCapacityModel {
-	m := &ConnectorCapacityModel{WorkerCount: types.Int64Null(), WorkerResourceSpec: types.StringNull()}
-	if prev != nil {
-		m = prev
-	}
-	if vo.WorkerCount != nil {
-		m.WorkerCount = types.Int64Value(int64(*vo.WorkerCount))
-	}
-	if vo.WorkerResourceSpec != nil {
-		m.WorkerResourceSpec = types.StringValue(*vo.WorkerResourceSpec)
-	}
-	return m
-}
-
-func cFlattenKafkaCluster(vo *client.ConnectorVO, prev *ConnectorKafkaClusterModel) *ConnectorKafkaClusterModel {
 	if prev == nil {
-		prev = &ConnectorKafkaClusterModel{KafkaInstanceID: types.StringNull()}
+		prev = &ConnectorKafkaClusterModel{}
 	}
-	if vo.KafkaInstanceId != nil {
-		prev.KafkaInstanceID = types.StringValue(*vo.KafkaInstanceId)
-	}
-	prev.Security = cFlattenSecurityProtocol(vo.SecurityProtocolConfig, prev.Security)
+	prev.Security = cFlattenSecurityProtocol(cfg, prev.Security)
 	return prev
 }
 
 func cFlattenSecurityProtocol(cfg *client.SecurityProtocolConfig, prev *SecurityProtocolConfigModel) *SecurityProtocolConfigModel {
 	m := &SecurityProtocolConfigModel{
-		SecurityProtocol: types.StringNull(),
-		Username:         types.StringNull(),
-		Password:         types.StringNull(),
-		SaslMechanism:    types.StringNull(),
-		TruststoreCerts:  types.StringNull(),
-		ClientCert:       types.StringNull(),
-		PrivateKey:       types.StringNull(),
+		Protocol:        types.StringNull(),
+		Username:        types.StringNull(),
+		Password:        types.StringNull(),
+		SaslMechanism:   types.StringNull(),
+		TruststoreCerts: types.StringNull(),
+		ClientCert:      types.StringNull(),
+		PrivateKey:      types.StringNull(),
 	}
 	if prev != nil {
 		m = prev
@@ -322,7 +228,7 @@ func cFlattenSecurityProtocol(cfg *client.SecurityProtocolConfig, prev *Security
 	if cfg == nil {
 		return m
 	}
-	m.SecurityProtocol = cRetainStr(cfg.SecurityProtocol, m.SecurityProtocol)
+	m.Protocol = cRetainStr(firstString(cfg.Protocol, cfg.SecurityProtocol), m.Protocol)
 	m.Username = cRetainStr(cfg.Username, m.Username)
 	m.Password = cRetainStr(cfg.Password, m.Password)
 	m.SaslMechanism = cRetainStr(cfg.SaslMechanism, m.SaslMechanism)
@@ -366,6 +272,24 @@ func cFlattenRemoteWrite(cfg *client.ConnectRemoteWriteConfigVO, prev *Connector
 	return m
 }
 
+func cExpandStringMap(v types.Map) map[string]string {
+	if v.IsNull() || v.IsUnknown() {
+		return nil
+	}
+	result := make(map[string]string, len(v.Elements()))
+	for k, val := range v.Elements() {
+		sv, ok := val.(types.String)
+		if !ok || sv.IsNull() || sv.IsUnknown() {
+			continue
+		}
+		result[k] = sv.ValueString()
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
 func cFlattenInterfaceMap(src map[string]interface{}) types.Map {
 	if len(src) == 0 {
 		return types.MapNull(types.StringType)
@@ -386,6 +310,16 @@ func cFlattenStringMap(src map[string]string) types.Map {
 		vals[k] = types.StringValue(v)
 	}
 	return types.MapValueMust(types.StringType, vals)
+}
+
+func cRetainMap(api types.Map, existing types.Map) types.Map {
+	if !api.IsNull() && !api.IsUnknown() {
+		return api
+	}
+	if existing.IsNull() || existing.IsUnknown() {
+		return types.MapNull(types.StringType)
+	}
+	return existing
 }
 
 func cRetainStr(api *string, existing types.String) types.String {
@@ -426,4 +360,20 @@ func cToInt64(v *int32) types.Int64 {
 		return types.Int64Null()
 	}
 	return types.Int64Value(int64(*v))
+}
+
+func firstString(values ...*string) *string {
+	for _, value := range values {
+		if value != nil && *value != "" {
+			return value
+		}
+	}
+	return nil
+}
+
+func pluginSummaryID(plugin *client.ConnectPluginSummaryVO) *string {
+	if plugin == nil {
+		return nil
+	}
+	return plugin.Id
 }

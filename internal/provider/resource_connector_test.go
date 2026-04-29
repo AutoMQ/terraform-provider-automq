@@ -44,14 +44,15 @@ func TestAccConnectorResource_basic(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create
 			{
-				Config: instanceHCL + prereqHCL + renderConnectorConfig(env, connName, connUser, connPass, topicName, 1, 1, "TIER1"),
+				Config: instanceHCL + prereqHCL + renderConnectClusterConfig(env, fmt.Sprintf("acc-connect-cluster-%s", suffix), 1, "TIER1") + renderConnectorConfig(env, connName, connUser, connPass, topicName, 1),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("automq_connector.test", "name", connName),
+					resource.TestCheckResourceAttrPair("automq_connector.test", "connect_cluster_id", "automq_connect_cluster.test", "id"),
+					resource.TestCheckResourceAttr("automq_connector.test", "connector_class", env.Connector.ConnectorClass),
 					resource.TestCheckResourceAttr("automq_connector.test", "task_count", "1"),
-					resource.TestCheckResourceAttr("automq_connector.test", "capacity.worker_count", "1"),
-					resource.TestCheckResourceAttr("automq_connector.test", "capacity.worker_resource_spec", "TIER1"),
 					resource.TestCheckResourceAttrSet("automq_connector.test", "id"),
 					resource.TestCheckResourceAttrSet("automq_connector.test", "state"),
+					resource.TestCheckResourceAttrSet("automq_connector.test", "plugin_id"),
 				),
 			},
 			// ImportState
@@ -61,6 +62,7 @@ func TestAccConnectorResource_basic(t *testing.T) {
 				ImportStateVerify: true,
 				ImportStateVerifyIgnore: []string{
 					"kafka_cluster.security_protocol.password",
+					"connector_config_sensitive",
 					"timeouts",
 				},
 				ImportStateIdFunc: func(s *terraform.State) (string, error) {
@@ -71,14 +73,12 @@ func TestAccConnectorResource_basic(t *testing.T) {
 					return rs.Primary.Attributes["environment_id"] + "@" + rs.Primary.Attributes["id"], nil
 				},
 			},
-			// Update name + task_count + capacity
+			// Update connector business settings. Capacity belongs to automq_connect_cluster.
 			{
-				Config: instanceHCL + prereqHCL + renderConnectorConfig(env, connName+"-upd", connUser, connPass, topicName, 2, 2, "TIER2"),
+				Config: instanceHCL + prereqHCL + renderConnectClusterConfig(env, fmt.Sprintf("acc-connect-cluster-%s", suffix), 1, "TIER1") + renderConnectorConfig(env, connName+"-upd", connUser, connPass, topicName, 2),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("automq_connector.test", "name", connName+"-upd"),
 					resource.TestCheckResourceAttr("automq_connector.test", "task_count", "2"),
-					resource.TestCheckResourceAttr("automq_connector.test", "capacity.worker_count", "2"),
-					resource.TestCheckResourceAttr("automq_connector.test", "capacity.worker_resource_spec", "TIER2"),
 				),
 			},
 		},
@@ -162,19 +162,57 @@ resource "automq_kafka_acl" "conn_txn" {
 		envID, username)
 }
 
-func renderConnectorConfig(env accConfig, name, saslUser, saslPass, topicName string, taskCount, workerCount int, workerSpec string) string {
+func renderConnectClusterConfig(env accConfig, name string, workerCount int, workerSpec string) string {
 	conn := env.Connector
 
 	optionalFields := ""
-	if conn.PluginType != "" {
-		optionalFields += fmt.Sprintf("  plugin_type                  = %q\n", conn.PluginType)
-	}
-	if conn.ConnectorClass != "" {
-		optionalFields += fmt.Sprintf("  connector_class              = %q\n", conn.ConnectorClass)
-	}
 	if conn.IamRole != "" {
-		optionalFields += fmt.Sprintf("  iam_role                     = %q\n", conn.IamRole)
+		optionalFields += fmt.Sprintf("    iam_role = %q\n", conn.IamRole)
 	}
+
+	return fmt.Sprintf(`
+resource "automq_connect_cluster" "test" {
+  environment_id = %q
+  name           = %q
+
+  plugins = [{
+    name    = %q
+    version = %q
+  }]
+
+  kafka_cluster = {
+    kafka_instance_id = automq_kafka_instance.test.id
+  }
+
+  capacity = {
+    type = "provisioned"
+    provisioned = {
+      worker_count         = %d
+      worker_resource_spec = %q
+    }
+  }
+
+  compute = {
+    type = "k8s"
+    kubernetes = {
+      cluster_id      = %q
+      namespace       = "default"
+      service_account = "default"
+    }
+%s
+  }
+
+  timeouts = {
+    create = "30m"
+    update = "30m"
+    delete = "20m"
+  }
+}
+`, env.EnvironmentID, name, conn.PluginName, conn.PluginVersion, workerCount, workerSpec, env.K8S.ClusterID, optionalFields)
+}
+
+func renderConnectorConfig(env accConfig, name, saslUser, saslPass, topicName string, taskCount int) string {
+	conn := env.Connector
 
 	connectorConfig := ""
 	if conn.ConnCfgS3Bucket != "" {
@@ -192,25 +230,18 @@ func renderConnectorConfig(env accConfig, name, saslUser, saslPass, topicName st
 
 	return fmt.Sprintf(`
 resource "automq_connector" "test" {
-  environment_id             = %q
-  name                       = %q
-  plugin_id                  = %q
-  kubernetes_cluster_id      = %q
-  kubernetes_namespace       = "default"
-  kubernetes_service_account = "default"
-  task_count                 = %d
-%s%s
-  capacity = {
-    worker_count         = %d
-    worker_resource_spec = %q
-  }
+  environment_id     = %q
+  connect_cluster_id = automq_connect_cluster.test.id
+  name               = %q
+  connector_class    = %q
+  task_count         = %d
+%s
 
   kafka_cluster = {
-    kafka_instance_id = automq_kafka_instance.test.id
     security_protocol = {
-      security_protocol = "SASL_PLAINTEXT"
-      username          = %q
-      password          = %q
+      protocol = "SASL_PLAINTEXT"
+      username = %q
+      password = %q
     }
   }
 
@@ -221,6 +252,7 @@ resource "automq_connector" "test" {
   }
 
   depends_on = [
+    automq_connect_cluster.test,
     automq_kafka_user.conn,
     automq_kafka_topic.conn,
     automq_kafka_acl.conn_topic,
@@ -229,9 +261,5 @@ resource "automq_connector" "test" {
     automq_kafka_acl.conn_txn,
   ]
 }
-`, env.EnvironmentID, name, conn.PluginID,
-		env.K8S.ClusterID,
-		taskCount, optionalFields, connectorConfig,
-		workerCount, workerSpec,
-		saslUser, saslPass)
+`, env.EnvironmentID, name, conn.ConnectorClass, taskCount, connectorConfig, saslUser, saslPass)
 }

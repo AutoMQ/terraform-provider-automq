@@ -13,84 +13,62 @@ func connStrPtr(s string) *string { return &s }
 func connInt32Ptr(i int32) *int32 { return &i }
 
 func TestExpandConnectorCreate(t *testing.T) {
+	sensitive, diags := types.MapValueFrom(t.Context(), types.StringType, map[string]string{"database.password": "secret"})
+	assert.False(t, diags.HasError())
+	config, diags := types.MapValueFrom(t.Context(), types.StringType, map[string]string{"topics": "orders"})
+	assert.False(t, diags.HasError())
+	partition, diags := types.MapValueFrom(t.Context(), types.StringType, map[string]string{"server": "server_01"})
+	assert.False(t, diags.HasError())
+	offset, diags := types.MapValueFrom(t.Context(), types.StringType, map[string]string{"file": "mysql-bin.000001", "pos": "123"})
+	assert.False(t, diags.HasError())
+
 	plan := ConnectorResourceModel{
+		ConnectClusterID:         types.StringValue("connect-cluster-1"),
 		Name:                     types.StringValue("test-connector"),
-		KubernetesClusterID:      types.StringValue("k8s-123"),
-		PluginID:                 types.StringValue("plugin-1"),
-		TaskCount:                types.Int64Value(3),
-		KubernetesServiceAccount: types.StringValue("sa-test"),
-		KubernetesNamespace:      types.StringValue("ns-test"),
 		Description:              types.StringValue("a test connector"),
-		PluginType:               types.StringValue("SOURCE"),
-		ConnectorClass:           types.StringValue("com.example.Source"),
-		IamRole:                  types.StringValue("arn:aws:iam::role/test"),
-		Version:                  types.StringValue("1.2.0"),
-		SchedulingSpec:           types.StringValue("nodeSelector:\n  zone: us-east-1a"),
-		WorkerConfig:             types.MapNull(types.StringType),
-		ConnectorConfig:          types.MapNull(types.StringType),
-		Labels:                   types.MapNull(types.StringType),
-		Capacity: &ConnectorCapacityModel{
-			WorkerCount:        types.Int64Value(2),
-			WorkerResourceSpec: types.StringValue("TIER2"),
-		},
+		ConnectorClass:           types.StringValue("io.example.SourceConnector"),
+		TaskCount:                types.Int64Value(3),
+		ConnectorConfig:          config,
+		ConnectorConfigSensitive: sensitive,
 		KafkaCluster: &ConnectorKafkaClusterModel{
-			KafkaInstanceID: types.StringValue("kf-abc"),
 			Security: &SecurityProtocolConfigModel{
-				SecurityProtocol: types.StringValue("SASL_PLAINTEXT"),
-				Username:         types.StringValue("user1"),
-				Password:         types.StringValue("pass1"),
-				SaslMechanism:    types.StringNull(),
-				TruststoreCerts:  types.StringNull(),
-				ClientCert:       types.StringNull(),
-				PrivateKey:       types.StringNull(),
+				Protocol:      types.StringValue("SASL_PLAINTEXT"),
+				Username:      types.StringValue("user1"),
+				Password:      types.StringValue("pass1"),
+				SaslMechanism: types.StringNull(),
 			},
 		},
+		InitialOffsets: []InitialOffsetModel{{Partition: partition, Offset: offset}},
 	}
 
 	req, diags := ExpandConnectorCreate(plan)
 	assert.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+	assert.Equal(t, "connect-cluster-1", req.ConnectClusterId)
 	assert.Equal(t, "test-connector", req.Name)
-	assert.Equal(t, "k8s-123", req.KubernetesClusterId)
-	assert.Equal(t, "plugin-1", req.PluginId)
+	assert.Equal(t, "io.example.SourceConnector", req.ConnectorClass)
 	assert.Equal(t, int32(3), req.TaskCount)
-	assert.Equal(t, int32(2), req.Capacity.WorkerCount)
-	assert.Equal(t, "TIER2", req.Capacity.WorkerResourceSpec)
-	assert.Equal(t, "kf-abc", req.KafkaCluster.KafkaInstanceId)
-	assert.Equal(t, "SASL_PLAINTEXT", *req.KafkaCluster.SecurityProtocolConfig.SecurityProtocol)
+	assert.Equal(t, "a test connector", *req.Description)
+	assert.Equal(t, "SASL_PLAINTEXT", *req.KafkaCluster.SecurityProtocolConfig.Protocol)
 	assert.Equal(t, "user1", *req.KafkaCluster.SecurityProtocolConfig.Username)
 	assert.Equal(t, "pass1", *req.KafkaCluster.SecurityProtocolConfig.Password)
-	assert.Equal(t, "a test connector", *req.Description)
-	assert.Equal(t, "SOURCE", *req.Type)
-	assert.Equal(t, "com.example.Source", *req.ConnectorClass)
-	assert.Equal(t, "arn:aws:iam::role/test", *req.IamRole)
-	assert.Equal(t, "1.2.0", *req.Version)
-	assert.Contains(t, *req.SchedulingSpec, "nodeSelector")
-}
-
-func TestExpandConnectorCreate_MissingCapacity(t *testing.T) {
-	plan := ConnectorResourceModel{
-		KafkaCluster: &ConnectorKafkaClusterModel{
-			Security: &SecurityProtocolConfigModel{},
-		},
-	}
-	_, diags := ExpandConnectorCreate(plan)
-	assert.True(t, diags.HasError())
+	assert.Equal(t, "orders", req.ConnectorConfig.Properties["topics"])
+	assert.Equal(t, "secret", req.ConnectorConfigSensitive.Properties["database.password"])
+	assert.Len(t, req.InitialOffsets, 1)
+	assert.Equal(t, "server_01", req.InitialOffsets[0].Partition["server"])
+	assert.Equal(t, "123", req.InitialOffsets[0].Offset["pos"])
 }
 
 func TestExpandConnectorUpdate(t *testing.T) {
+	config, diags := types.MapValueFrom(t.Context(), types.StringType, map[string]string{"topics": "orders-updated"})
+	assert.False(t, diags.HasError())
+
 	plan := ConnectorResourceModel{
 		Name:            types.StringValue("updated"),
 		Description:     types.StringValue("new desc"),
-		PluginID:        types.StringValue("plugin-2"),
 		TaskCount:       types.Int64Value(5),
-		Version:         types.StringValue("1.3.0"),
-		SchedulingSpec:  types.StringValue("tolerations: []"),
-		WorkerConfig:    types.MapNull(types.StringType),
-		ConnectorConfig: types.MapNull(types.StringType),
-		Labels:          types.MapNull(types.StringType),
-		Capacity: &ConnectorCapacityModel{
-			WorkerCount:        types.Int64Value(4),
-			WorkerResourceSpec: types.StringValue("TIER3"),
+		ConnectorConfig: config,
+		KafkaCluster: &ConnectorKafkaClusterModel{
+			Security: &SecurityProtocolConfigModel{Protocol: types.StringValue("PLAINTEXT")},
 		},
 	}
 
@@ -99,62 +77,60 @@ func TestExpandConnectorUpdate(t *testing.T) {
 	assert.Equal(t, "updated", *req.Name)
 	assert.Equal(t, "new desc", *req.Description)
 	assert.Equal(t, int32(5), *req.TaskCount)
-	assert.Equal(t, int32(4), req.Capacity.WorkerCount)
-	assert.Equal(t, "1.3.0", *req.Version)
-	assert.Equal(t, "tolerations: []", *req.SchedulingSpec)
+	assert.Equal(t, "PLAINTEXT", *req.SecurityProtocolConfig.Protocol)
+	assert.Equal(t, "orders-updated", req.ConnectorConfig.Properties["topics"])
 }
 
 func TestFlattenConnector(t *testing.T) {
 	now := time.Now()
 	vo := &client.ConnectorVO{
-		Id:                       connStrPtr("conn-1"),
-		Name:                     connStrPtr("my-connector"),
-		Description:              connStrPtr("desc"),
-		State:                    connStrPtr("RUNNING"),
-		WorkerCount:              connInt32Ptr(2),
-		WorkerResourceSpec:       connStrPtr("TIER2"),
-		KafkaInstanceId:          connStrPtr("kf-abc"),
-		KubernetesClusterId:      connStrPtr("k8s-123"),
-		KubernetesNamespace:      connStrPtr("ns"),
-		KubernetesServiceAccount: connStrPtr("sa"),
-		IamRole:                  connStrPtr("role-arn"),
-		ConnType:                 connStrPtr("SOURCE"),
-		ConnClass:                connStrPtr("com.example.Source"),
-		TaskCount:                connInt32Ptr(3),
-		Version:                  connStrPtr("1.2.0"),
-		KafkaConnectVersion:      connStrPtr("3.7.0"),
-		SchedulingSpec:           connStrPtr("nodeSelector: {}"),
-		CreateTime:               &now,
-		UpdateTime:               &now,
-		Plugin:                   &client.ConnectPluginSummaryVO{Id: connStrPtr("plugin-1")},
-		Labels:                   map[string]string{"env": "test"},
+		Id:               connStrPtr("conn-1"),
+		ConnectClusterId: connStrPtr("connect-cluster-1"),
+		Name:             connStrPtr("my-connector"),
+		Description:      connStrPtr("desc"),
+		State:            connStrPtr("RUNNING"),
+		ConnectorType:    connStrPtr("SOURCE"),
+		ConnectorClass:   connStrPtr("io.example.SourceConnector"),
+		PluginId:         connStrPtr("plugin-1"),
+		TaskCount:        connInt32Ptr(3),
+		CreateTime:       &now,
+		UpdateTime:       &now,
+		ConnectorConfig:  map[string]interface{}{"topics": "orders"},
 		SecurityProtocolConfig: &client.SecurityProtocolConfig{
-			SecurityProtocol: connStrPtr("SASL_PLAINTEXT"),
-			Username:         connStrPtr("user1"),
+			Protocol: connStrPtr("SASL_PLAINTEXT"),
+			Username: connStrPtr("user1"),
 		},
 	}
-
 	state := &ConnectorResourceModel{
-		WorkerConfig:    types.MapNull(types.StringType),
-		ConnectorConfig: types.MapNull(types.StringType),
-		Labels:          types.MapNull(types.StringType),
+		ConnectorConfigSensitive: types.MapNull(types.StringType),
 	}
+
 	diags := FlattenConnector(vo, state)
 	assert.False(t, diags.HasError())
 	assert.Equal(t, "conn-1", state.ID.ValueString())
+	assert.Equal(t, "connect-cluster-1", state.ConnectClusterID.ValueString())
 	assert.Equal(t, "my-connector", state.Name.ValueString())
 	assert.Equal(t, "RUNNING", state.State.ValueString())
-	assert.Equal(t, int64(2), state.Capacity.WorkerCount.ValueInt64())
-	assert.Equal(t, "TIER2", state.Capacity.WorkerResourceSpec.ValueString())
-	assert.Equal(t, "kf-abc", state.KafkaCluster.KafkaInstanceID.ValueString())
-	assert.Equal(t, "SASL_PLAINTEXT", state.KafkaCluster.Security.SecurityProtocol.ValueString())
+	assert.Equal(t, "SOURCE", state.ConnectorType.ValueString())
+	assert.Equal(t, "io.example.SourceConnector", state.ConnectorClass.ValueString())
 	assert.Equal(t, "plugin-1", state.PluginID.ValueString())
-	assert.Equal(t, "1.2.0", state.Version.ValueString())
-	assert.Equal(t, "3.7.0", state.KafkaConnectVersion.ValueString())
-	assert.Equal(t, "nodeSelector: {}", state.SchedulingSpec.ValueString())
-	labelVal, ok := state.Labels.Elements()["env"].(types.String)
-	assert.True(t, ok, "expected types.String for label 'env'")
-	assert.Equal(t, "test", labelVal.ValueString())
+	assert.Equal(t, int64(3), state.TaskCount.ValueInt64())
+	assert.Equal(t, "SASL_PLAINTEXT", state.KafkaCluster.Security.Protocol.ValueString())
+	assert.Equal(t, "user1", state.KafkaCluster.Security.Username.ValueString())
+	configVal, ok := state.ConnectorConfig.Elements()["topics"].(types.String)
+	assert.True(t, ok)
+	assert.Equal(t, "orders", configVal.ValueString())
+}
+
+func TestFlattenConnector_RetainsSensitiveConfig(t *testing.T) {
+	existing, diags := types.MapValueFrom(t.Context(), types.StringType, map[string]string{"database.password": "secret"})
+	assert.False(t, diags.HasError())
+	state := &ConnectorResourceModel{ConnectorConfigSensitive: existing}
+
+	diags = FlattenConnector(&client.ConnectorVO{Id: connStrPtr("conn-1")}, state)
+	assert.False(t, diags.HasError())
+	got := state.ConnectorConfigSensitive.Elements()["database.password"].(types.String)
+	assert.Equal(t, "secret", got.ValueString())
 }
 
 func TestFlattenConnector_Nil(t *testing.T) {
