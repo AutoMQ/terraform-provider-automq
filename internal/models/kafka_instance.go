@@ -244,7 +244,6 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 		// Reserved AKU
 		request.Spec = client.SpecificationParam{
 			ReservedAku: int32(instance.ComputeSpecs.ReservedAku.ValueInt64()),
-			NodeConfig:  &client.NodeConfigParam{},
 		}
 
 		if !instance.ComputeSpecs.DeployType.IsNull() && !instance.ComputeSpecs.DeployType.IsUnknown() {

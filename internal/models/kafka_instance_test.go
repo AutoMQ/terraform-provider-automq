@@ -78,7 +78,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				Version:     "1.0.0",
 				Spec: client.SpecificationParam{
 					ReservedAku: 4,
-					NodeConfig:  &client.NodeConfigParam{},
 					DeployType:  stringPtr("IAAS"),
 					Networks: []client.InstanceNetworkParam{
 						{
@@ -137,7 +136,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				Version: "1.0.0",
 				Spec: client.SpecificationParam{
 					ReservedAku: 1,
-					NodeConfig:  &client.NodeConfigParam{},
 				},
 			},
 		},
@@ -161,7 +159,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				Version: "1.0.0",
 				Spec: client.SpecificationParam{
 					ReservedAku:          2,
-					NodeConfig:           &client.NodeConfigParam{},
 					Networks:             nil,
 					KubernetesNodeGroups: nil,
 				},
@@ -186,7 +183,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				Version: "1.0.0",
 				Spec: client.SpecificationParam{
 					ReservedAku: 2,
-					NodeConfig:  &client.NodeConfigParam{},
 				},
 				Features: nil,
 			},
@@ -214,7 +210,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				Version: "1.0.0",
 				Spec: client.SpecificationParam{
 					ReservedAku: 4,
-					NodeConfig:  &client.NodeConfigParam{},
 					FileSystem: &client.FileSystemParam{
 						FileSystemType:               stringPtr("EFS_PROVISIONED"),
 						ThroughputMiBpsPerFileSystem: 1000,
@@ -250,7 +245,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				Version: "1.0.0",
 				Spec: client.SpecificationParam{
 					ReservedAku: 4,
-					NodeConfig:  &client.NodeConfigParam{},
 					FileSystem: &client.FileSystemParam{
 						FileSystemType:               stringPtr("ONTAP_V2"),
 						ThroughputMiBpsPerFileSystem: 500,
@@ -281,7 +275,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				Version: "1.0.0",
 				Spec: client.SpecificationParam{
 					ReservedAku:    4,
-					NodeConfig:     &client.NodeConfigParam{},
 					SecurityGroups: []string{"sg-abc123", "sg-def456"},
 				},
 				Features: &client.InstanceFeatureParam{
@@ -307,7 +300,6 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				Version: "1.0.0",
 				Spec: client.SpecificationParam{
 					ReservedAku:    4,
-					NodeConfig:     &client.NodeConfigParam{},
 					SecurityGroups: nil, // Should not be included when null
 				},
 				Features: &client.InstanceFeatureParam{
