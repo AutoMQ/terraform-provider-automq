@@ -760,17 +760,6 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 		} else {
 			resource.ComputeSpecs.ReservedNodeCount = types.Int64Null()
 		}
-		// Instance Types (from NodeConfig)
-		if instance.Spec.NodeConfig != nil && len(instance.Spec.NodeConfig.InstanceTypes) > 0 {
-			instanceTypesList, itDiags := types.ListValueFrom(ctx, types.StringType, instance.Spec.NodeConfig.InstanceTypes)
-			if !itDiags.HasError() {
-				resource.ComputeSpecs.InstanceTypes = instanceTypesList
-			}
-		} else if previousSpecs != nil && !previousSpecs.InstanceTypes.IsNull() && !previousSpecs.InstanceTypes.IsUnknown() {
-			resource.ComputeSpecs.InstanceTypes = previousSpecs.InstanceTypes
-		} else {
-			resource.ComputeSpecs.InstanceTypes = types.ListNull(types.StringType)
-		}
 		var prevDeploy, prevDnsZone *types.String
 		var prevClusterID, prevNamespace, prevServiceAccount, prevInstanceRole *types.String
 		if previousSpecs != nil {
@@ -787,6 +776,19 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 		resource.ComputeSpecs.KubernetesNamespace = coalesceStringAttr(instance.Spec.KubernetesNamespace, prevNamespace)
 		resource.ComputeSpecs.KubernetesServiceAcct = coalesceStringAttr(instance.Spec.KubernetesServiceAccount, prevServiceAccount)
 		resource.ComputeSpecs.InstanceRole = coalesceStringAttr(instance.Spec.InstanceRole, prevInstanceRole)
+		// Instance Types (from NodeConfig)
+		isUsageBasedIAAS := strings.EqualFold(resource.ComputeSpecs.PricingMode.ValueString(), "UsageBased") &&
+			strings.EqualFold(resource.ComputeSpecs.DeployType.ValueString(), "IAAS")
+		if isUsageBasedIAAS && instance.Spec.NodeConfig != nil && len(instance.Spec.NodeConfig.InstanceTypes) > 0 {
+			instanceTypesList, itDiags := types.ListValueFrom(ctx, types.StringType, instance.Spec.NodeConfig.InstanceTypes)
+			if !itDiags.HasError() {
+				resource.ComputeSpecs.InstanceTypes = instanceTypesList
+			}
+		} else if isUsageBasedIAAS && previousSpecs != nil && !previousSpecs.InstanceTypes.IsNull() && !previousSpecs.InstanceTypes.IsUnknown() {
+			resource.ComputeSpecs.InstanceTypes = previousSpecs.InstanceTypes
+		} else {
+			resource.ComputeSpecs.InstanceTypes = types.ListNull(types.StringType)
+		}
 
 		// Kubernetes Node Groups
 		if instance.Spec.KubernetesNodeGroups != nil {
