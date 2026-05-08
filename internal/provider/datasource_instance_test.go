@@ -228,3 +228,49 @@ data "automq_kafka_instance" "test" {
 		name,
 	)
 }
+
+func TestKafkaInstanceDataSourceSchema_PricingFields(t *testing.T) {
+	ds := NewKafkaInstanceDataSource()
+
+	req := datasource.SchemaRequest{}
+	resp := &datasource.SchemaResponse{}
+
+	ds.Schema(context.Background(), req, resp)
+
+	assert.False(t, resp.Diagnostics.HasError(), "Schema should not have errors")
+
+	computeSpecs, exists := resp.Schema.Attributes["compute_specs"]
+	assert.True(t, exists, "compute_specs should exist in schema")
+
+	computeSpecsNested, ok := computeSpecs.(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("compute_specs has unexpected type %T", computeSpecs)
+	}
+
+	// Verify pricing_mode exists and is computed
+	pricingMode, exists := computeSpecsNested.Attributes["pricing_mode"]
+	assert.True(t, exists, "pricing_mode should exist in compute_specs")
+	pricingModeAttr, ok := pricingMode.(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("pricing_mode has unexpected type %T", pricingMode)
+	}
+	assert.True(t, pricingModeAttr.IsComputed(), "pricing_mode should be computed")
+
+	// Verify reserved_node_count exists and is computed
+	reservedNodeCount, exists := computeSpecsNested.Attributes["reserved_node_count"]
+	assert.True(t, exists, "reserved_node_count should exist in compute_specs")
+	reservedNodeCountAttr, ok := reservedNodeCount.(schema.Int64Attribute)
+	if !ok {
+		t.Fatalf("reserved_node_count has unexpected type %T", reservedNodeCount)
+	}
+	assert.True(t, reservedNodeCountAttr.IsComputed(), "reserved_node_count should be computed")
+
+	// Verify instance_types exists and is computed
+	instanceTypes, exists := computeSpecsNested.Attributes["instance_types"]
+	assert.True(t, exists, "instance_types should exist in compute_specs")
+	instanceTypesAttr, ok := instanceTypes.(schema.ListAttribute)
+	if !ok {
+		t.Fatalf("instance_types has unexpected type %T", instanceTypes)
+	}
+	assert.True(t, instanceTypesAttr.IsComputed(), "instance_types should be computed")
+}

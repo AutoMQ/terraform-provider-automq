@@ -148,10 +148,41 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				MarkdownDescription: "The compute specs of the instance",
 				Attributes: map[string]schema.Attribute{
 					"reserved_aku": schema.Int64Attribute{
-						Required:            true,
-						MarkdownDescription: "AKU (AutoMQ Kafka Unit) defines the cluster scale. Each AKU provides up to 30 MiB/s write or 60 MiB/s read throughput. Minimum value is 3; maximum depends on your license quota. For sizing guidance, refer to the [billing documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints).",
+						Optional:            true,
+						MarkdownDescription: "AKU (AutoMQ Kafka Unit) defines the cluster scale. Each AKU provides up to 30 MiB/s write or 60 MiB/s read throughput. Minimum value is 3; maximum depends on your license quota. Required when `pricing_mode` is `SubscriptionBased`. For sizing guidance, refer to the [billing documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints).",
 						Validators: []validator.Int64{
 							int64validator.Between(3, 500),
+						},
+					},
+					"pricing_mode": schema.StringAttribute{
+						Optional:            true,
+						Computed:            true,
+						MarkdownDescription: "Pricing mode for the instance. Supported values: `UsageBased` (pay-as-you-go based on actual usage, requires `reserved_node_count`), `SubscriptionBased` (subscription-based pricing, requires `reserved_aku`). Defaults to `SubscriptionBased`. Changes to pricing mode require instance replacement.",
+						Default:             stringdefault.StaticString("SubscriptionBased"),
+						Validators: []validator.String{
+							stringvalidator.OneOf("UsageBased", "SubscriptionBased"),
+						},
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
+					},
+					"reserved_node_count": schema.Int64Attribute{
+						Optional:            true,
+						MarkdownDescription: "Number of reserved nodes for the instance. Valid range is 3 to 100. Required when `pricing_mode` is `UsageBased`.",
+						Validators: []validator.Int64{
+							int64validator.Between(3, 100),
+						},
+					},
+					"instance_types": schema.ListAttribute{
+						ElementType:         types.StringType,
+						Optional:            true,
+						MarkdownDescription: "Instance type list for the nodes. Maximum 1 entry. Required when `pricing_mode` is `UsageBased` and `deploy_type` is `IAAS`. Cannot be modified after creation.",
+						Validators: []validator.List{
+							listvalidator.SizeAtMost(1),
+							listvalidator.SizeAtLeast(1),
+						},
+						PlanModifiers: []planmodifier.List{
+							listplanmodifier.RequiresReplace(),
 						},
 					},
 					"deploy_type": schema.StringAttribute{
@@ -679,6 +710,54 @@ func validateKafkaInstanceConfiguration(ctx context.Context, plan *models.KafkaI
 		stateWalMode = &state.Features.WalMode
 	}
 
+	// Pricing mode cross-field validation
+	if plan.ComputeSpecs != nil {
+		var statePricingMode *types.String
+		if stateSpecs != nil {
+			statePricingMode = &stateSpecs.PricingMode
+		}
+		if pricingMode, ok := resolvePlannedStringValue(plan.ComputeSpecs.PricingMode, statePricingMode); ok {
+			if strings.EqualFold(pricingMode, "UsageBased") {
+				// When pricing_mode is UsageBased, reserved_node_count is required
+				if plan.ComputeSpecs.ReservedNodeCount.IsNull() || plan.ComputeSpecs.ReservedNodeCount.IsUnknown() {
+					var stateNodeCount *types.Int64
+					if stateSpecs != nil {
+						stateNodeCount = &stateSpecs.ReservedNodeCount
+					}
+					if stateNodeCount == nil || stateNodeCount.IsNull() || stateNodeCount.IsUnknown() {
+						diagnostics.AddError(
+							"Invalid Configuration",
+							"compute_specs.reserved_node_count is required when compute_specs.pricing_mode is UsageBased.",
+						)
+					}
+				}
+				if deployType, deployTypeSet := resolvePlannedStringValue(plan.ComputeSpecs.DeployType, stateDeploy); deployTypeSet && strings.EqualFold(deployType, "IAAS") {
+					// When pricing_mode is UsageBased and deploy_type is IAAS, instance_types is required.
+					if plan.ComputeSpecs.InstanceTypes.IsNull() || plan.ComputeSpecs.InstanceTypes.IsUnknown() {
+						var stateInstanceTypes *types.List
+						if stateSpecs != nil {
+							stateInstanceTypes = &stateSpecs.InstanceTypes
+						}
+						if stateInstanceTypes == nil || stateInstanceTypes.IsNull() || stateInstanceTypes.IsUnknown() {
+							diagnostics.AddError(
+								"Invalid Configuration",
+								"compute_specs.instance_types is required when compute_specs.pricing_mode is UsageBased and compute_specs.deploy_type is IAAS.",
+							)
+						}
+					}
+				}
+			} else if strings.EqualFold(pricingMode, "SubscriptionBased") {
+				// When pricing_mode is SubscriptionBased, reserved_aku is required (already required by schema)
+				if plan.ComputeSpecs.ReservedAku.IsNull() || plan.ComputeSpecs.ReservedAku.IsUnknown() {
+					diagnostics.AddError(
+						"Invalid Configuration",
+						"compute_specs.reserved_aku is required when compute_specs.pricing_mode is SubscriptionBased.",
+					)
+				}
+			}
+		}
+	}
+
 	hasFileSystemParam := plan.ComputeSpecs.FileSystemParam != nil
 
 	if plan.Features != nil {
@@ -774,7 +853,9 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 		"name":           instance.Name.ValueString(),
 	}
 	if instance.ComputeSpecs != nil {
-		logFields["reserved_aku"] = instance.ComputeSpecs.ReservedAku.ValueInt64()
+		if !instance.ComputeSpecs.ReservedAku.IsNull() {
+			logFields["reserved_aku"] = instance.ComputeSpecs.ReservedAku.ValueInt64()
+		}
 	}
 	tflog.Debug(ctx, "Creating new Kafka Cluster", logFields)
 
@@ -992,13 +1073,32 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	if plan.ComputeSpecs != nil && instance.Spec != nil && instance.Spec.ReservedAku != nil {
-		planAKU := int32(plan.ComputeSpecs.ReservedAku.ValueInt64())
-		if planAKU != *instance.Spec.ReservedAku {
-			aku := planAKU
-			spec := ensureSpec()
-			spec.ReservedAku = &aku
-			hasUpdate = true
-			shouldWait = true
+		if !plan.ComputeSpecs.ReservedAku.IsNull() && !plan.ComputeSpecs.ReservedAku.IsUnknown() {
+			planAKU := int32(plan.ComputeSpecs.ReservedAku.ValueInt64())
+			if planAKU != *instance.Spec.ReservedAku {
+				aku := planAKU
+				spec := ensureSpec()
+				spec.ReservedAku = &aku
+				hasUpdate = true
+				shouldWait = true
+			}
+		}
+	}
+
+	// Reserved Node Count update
+	if plan.ComputeSpecs != nil {
+		if !plan.ComputeSpecs.ReservedNodeCount.IsNull() && !plan.ComputeSpecs.ReservedNodeCount.IsUnknown() {
+			planNodeCount := int32(plan.ComputeSpecs.ReservedNodeCount.ValueInt64())
+			stateNodeCount := int32(0)
+			if state.ComputeSpecs != nil && !state.ComputeSpecs.ReservedNodeCount.IsNull() && !state.ComputeSpecs.ReservedNodeCount.IsUnknown() {
+				stateNodeCount = int32(state.ComputeSpecs.ReservedNodeCount.ValueInt64())
+			}
+			if planNodeCount != stateNodeCount {
+				spec := ensureSpec()
+				spec.ReservedNodeCount = &planNodeCount
+				hasUpdate = true
+				shouldWait = true
+			}
 		}
 	}
 
