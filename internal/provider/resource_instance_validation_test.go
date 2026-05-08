@@ -1136,12 +1136,12 @@ func TestPricingModeSchemaValidator(t *testing.T) {
 		t.Fatalf("pricing_mode has unexpected type %T", computeAttr.Attributes["pricing_mode"])
 	}
 
-	// pricing_mode should be optional with a default, but not computed.
+	// pricing_mode should be Optional+Computed with a default.
 	if !pricingModeAttr.IsOptional() {
 		t.Fatalf("expected pricing_mode to be optional")
 	}
-	if pricingModeAttr.IsComputed() {
-		t.Fatalf("expected pricing_mode not to be computed")
+	if !pricingModeAttr.IsComputed() {
+		t.Fatalf("expected pricing_mode to be computed")
 	}
 
 	// Should have validators
