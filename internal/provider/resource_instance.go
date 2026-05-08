@@ -156,7 +156,6 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					},
 					"pricing_mode": schema.StringAttribute{
 						Optional:            true,
-						Computed:            true,
 						MarkdownDescription: "Pricing mode for the instance. Supported values: `UsageBased` (pay-as-you-go based on actual usage, requires `reserved_node_count`), `SubscriptionBased` (subscription-based pricing, requires `reserved_aku`). Defaults to `SubscriptionBased`. Changes to pricing mode require instance replacement.",
 						Default:             stringdefault.StaticString("SubscriptionBased"),
 						Validators: []validator.String{
@@ -176,7 +175,6 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					"instance_types": schema.ListAttribute{
 						ElementType:         types.StringType,
 						Optional:            true,
-						Computed:            true,
 						MarkdownDescription: "Instance type list for the nodes. Maximum 1 entry. Required when `pricing_mode` is `UsageBased` and `deploy_type` is `IAAS`. Cannot be modified after creation.",
 						Validators: []validator.List{
 							listvalidator.SizeAtMost(1),
