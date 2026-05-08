@@ -692,6 +692,8 @@ func int32Ptr(i int32) *int32 {
 }
 
 func TestFlattenKafkaInstanceModel_SetsDefaultInstanceTypesFromAPI(t *testing.T) {
+	pricingMode := "UsageBased"
+	deployType := "IAAS"
 	resource := &KafkaInstanceResourceModel{
 		ComputeSpecs: &ComputeSpecsModel{
 			InstanceTypes: types.ListNull(types.StringType),
@@ -700,6 +702,8 @@ func TestFlattenKafkaInstanceModel_SetsDefaultInstanceTypesFromAPI(t *testing.T)
 	instance := &client.InstanceVO{
 		InstanceId: strPtr("test-instance"),
 		Spec: &client.SpecificationVO{
+			PricingMode: &pricingMode,
+			DeployType:  &deployType,
 			NodeConfig: &client.NodeConfigVO{
 				InstanceTypes: []string{"r6i.large"},
 			},
@@ -715,10 +719,14 @@ func TestFlattenKafkaInstanceModel_SetsDefaultInstanceTypesFromAPI(t *testing.T)
 }
 
 func TestFlattenKafkaInstanceModel_SetsInstanceTypesWithoutPriorConfig(t *testing.T) {
+	pricingMode := "UsageBased"
+	deployType := "IAAS"
 	resource := &KafkaInstanceResourceModel{}
 	instance := &client.InstanceVO{
 		InstanceId: strPtr("test-instance"),
 		Spec: &client.SpecificationVO{
+			PricingMode: &pricingMode,
+			DeployType:  &deployType,
 			NodeConfig: &client.NodeConfigVO{
 				InstanceTypes: []string{"r6i.large"},
 			},
@@ -730,6 +738,50 @@ func TestFlattenKafkaInstanceModel_SetsInstanceTypesWithoutPriorConfig(t *testin
 	assert.False(t, diags.HasError())
 	assert.NotNil(t, resource.ComputeSpecs)
 	assert.False(t, resource.ComputeSpecs.InstanceTypes.IsNull())
+}
+
+func TestFlattenKafkaInstanceModel_IgnoresInstanceTypesForSubscriptionBased(t *testing.T) {
+	pricingMode := "SubscriptionBased"
+	deployType := "IAAS"
+	resource := &KafkaInstanceResourceModel{}
+	instance := &client.InstanceVO{
+		InstanceId: strPtr("test-instance"),
+		Spec: &client.SpecificationVO{
+			PricingMode: &pricingMode,
+			DeployType:  &deployType,
+			NodeConfig: &client.NodeConfigVO{
+				InstanceTypes: []string{"r6i.large"},
+			},
+		},
+	}
+
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+
+	assert.False(t, diags.HasError())
+	assert.NotNil(t, resource.ComputeSpecs)
+	assert.True(t, resource.ComputeSpecs.InstanceTypes.IsNull())
+}
+
+func TestFlattenKafkaInstanceModel_IgnoresInstanceTypesForUsageBasedK8S(t *testing.T) {
+	pricingMode := "UsageBased"
+	deployType := "K8S"
+	resource := &KafkaInstanceResourceModel{}
+	instance := &client.InstanceVO{
+		InstanceId: strPtr("test-instance"),
+		Spec: &client.SpecificationVO{
+			PricingMode: &pricingMode,
+			DeployType:  &deployType,
+			NodeConfig: &client.NodeConfigVO{
+				InstanceTypes: []string{"r6i.large"},
+			},
+		},
+	}
+
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+
+	assert.False(t, diags.HasError())
+	assert.NotNil(t, resource.ComputeSpecs)
+	assert.True(t, resource.ComputeSpecs.InstanceTypes.IsNull())
 }
 
 func timePtr(s string) *time.Time {
@@ -1236,6 +1288,7 @@ func TestExpandKafkaInstanceResource_NullPricingFields(t *testing.T) {
 
 func TestFlattenKafkaInstanceModel_UsageBasedPricing(t *testing.T) {
 	pricingMode := "UsageBased"
+	deployType := "IAAS"
 	reservedNodeCount := int32(5)
 	instance := &client.InstanceVO{
 		InstanceId:  strPtr("usage-based-id"),
@@ -1246,6 +1299,7 @@ func TestFlattenKafkaInstanceModel_UsageBasedPricing(t *testing.T) {
 		Spec: &client.SpecificationVO{
 			ReservedAku:       int32Ptr(0),
 			PricingMode:       &pricingMode,
+			DeployType:        &deployType,
 			ReservedNodeCount: &reservedNodeCount,
 			NodeConfig: &client.NodeConfigVO{
 				InstanceTypes: []string{"m5.xlarge"},
@@ -1318,6 +1372,7 @@ func TestFlattenKafkaInstanceModel_PricingFieldsPreservePreviousState(t *testing
 	resource := &KafkaInstanceResourceModel{
 		ComputeSpecs: &ComputeSpecsModel{
 			PricingMode:       types.StringValue("UsageBased"),
+			DeployType:        types.StringValue("IAAS"),
 			ReservedNodeCount: types.Int64Value(5),
 			InstanceTypes:     types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.xlarge")}),
 		},
