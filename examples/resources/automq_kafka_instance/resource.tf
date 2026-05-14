@@ -36,6 +36,9 @@ resource "automq_kafka_instance" "example" {
       authentication_methods   = ["anonymous"]
       transit_encryption_modes = ["plaintext"]
     }
+    schema_registry = {
+      enabled = true
+    }
   }
 }
 

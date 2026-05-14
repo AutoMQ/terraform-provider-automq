@@ -87,6 +87,7 @@ type InstanceFeatureParam struct {
 	S3Failover      *InstanceFailoverParam        `json:"s3Failover,omitempty"`
 	MetricsExporter *InstanceMetricsExporterParam `json:"metricsExporter,omitempty"`
 	TableTopic      *TableTopicParam              `json:"tableTopic,omitempty"`
+	SchemaRegistry  *SchemaRegistryParam          `json:"schemaRegistry,omitempty"`
 	InboundRules    []InboundRuleParam            `json:"inboundRules,omitempty"`
 	ExtendListeners []InstanceListenerParam       `json:"extendListeners,omitempty"`
 }
@@ -143,6 +144,10 @@ type TableTopicParam struct {
 	UserPrincipal     *string `json:"userPrincipal,omitempty"`
 	KeytabFile        *string `json:"keytabFile,omitempty"`
 	Krb5ConfFile      *string `json:"krb5confFile,omitempty"`
+}
+
+type SchemaRegistryParam struct {
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 type InboundRuleParam struct {
@@ -276,6 +281,7 @@ type InstanceFeatureVO struct {
 	S3Failover      *InstanceFailoverVO        `json:"s3Failover,omitempty"`
 	MetricsExporter *InstanceMetricsExporterVO `json:"metricsExporter,omitempty"`
 	TableTopic      *TableTopicVO              `json:"tableTopic,omitempty"`
+	SchemaRegistry  *SchemaRegistryVO          `json:"schemaRegistry,omitempty"`
 	ExtendListeners []InstanceListenerVO       `json:"extendListeners,omitempty"`
 	InboundRules    []InstanceInboundRuleVO    `json:"inboundRules,omitempty"`
 }
@@ -326,6 +332,10 @@ type TableTopicVO struct {
 	UserPrincipal     *string `json:"userPrincipal,omitempty"`
 	KeytabFile        *string `json:"keytabFile,omitempty"`
 	Krb5ConfFile      *string `json:"krb5confFile,omitempty"`
+}
+
+type SchemaRegistryVO struct {
+	Enabled bool `json:"enabled"`
 }
 
 type InstanceListenerVO struct {

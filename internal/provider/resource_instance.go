@@ -532,6 +532,18 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							objectplanmodifier.RequiresReplace(),
 						},
 					},
+					"schema_registry": schema.SingleNestedAttribute{
+						Computed:            true,
+						Optional:            true,
+						MarkdownDescription: "Schema Registry feature configuration.",
+						Attributes: map[string]schema.Attribute{
+							"enabled": schema.BoolAttribute{
+								Computed:            true,
+								Optional:            true,
+								MarkdownDescription: "Whether to enable Schema Registry for this Kafka instance.",
+							},
+						},
+					},
 				},
 			},
 			"created_at": schema.StringAttribute{
@@ -700,6 +712,16 @@ func validateKafkaInstanceConfiguration(ctx context.Context, plan *models.KafkaI
 			diagnostics.AddError(
 				"Invalid Configuration",
 				"features.metrics_exporter must include a prometheus block with required attributes. Remove the metrics_exporter block entirely to disable metrics export.",
+			)
+		}
+	}
+
+	if plan.Features != nil && plan.Features.TableTopic != nil && plan.Features.SchemaRegistry != nil {
+		enabled := plan.Features.SchemaRegistry.Enabled
+		if !enabled.IsNull() && !enabled.IsUnknown() && !enabled.ValueBool() {
+			diagnostics.AddError(
+				"Invalid Configuration",
+				"features.schema_registry.enabled cannot be false when features.table_topic is configured.",
 			)
 		}
 	}
@@ -1072,6 +1094,24 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 		}
 	}
 
+	if plan.Features != nil {
+		var stateSchemaRegistry *models.SchemaRegistryModel
+		if state.Features != nil {
+			stateSchemaRegistry = state.Features.SchemaRegistry
+		}
+		if schemaRegistryChanged(plan.Features.SchemaRegistry, stateSchemaRegistry) {
+			if plan.Features.SchemaRegistry != nil {
+				if !plan.Features.SchemaRegistry.Enabled.IsNull() && !plan.Features.SchemaRegistry.Enabled.IsUnknown() {
+					enabled := plan.Features.SchemaRegistry.Enabled.ValueBool()
+					features := ensureFeatures()
+					features.SchemaRegistry = &client.SchemaRegistryParam{Enabled: &enabled}
+					hasUpdate = true
+					shouldWait = true
+				}
+			}
+		}
+	}
+
 	if plan.ComputeSpecs != nil && instance.Spec != nil && instance.Spec.ReservedAku != nil {
 		if !plan.ComputeSpecs.ReservedAku.IsNull() && !plan.ComputeSpecs.ReservedAku.IsUnknown() {
 			planAKU := int32(plan.ComputeSpecs.ReservedAku.ValueInt64())
@@ -1433,6 +1473,16 @@ func buildPrometheusExporterParam(model *models.PrometheusExporterModel) (*clien
 	return prom, true
 }
 
+func schemaRegistryChanged(plan, state *models.SchemaRegistryModel) bool {
+	if plan == nil {
+		return false
+	}
+	if state == nil {
+		return !plan.Enabled.IsNull() && !plan.Enabled.IsUnknown()
+	}
+	return !boolAttrEqual(plan.Enabled, state.Enabled)
+}
+
 func stringAttrEqual(plan, state types.String) bool {
 	if plan.IsUnknown() {
 		return true
@@ -1444,6 +1494,19 @@ func stringAttrEqual(plan, state types.String) bool {
 		return false
 	}
 	return plan.ValueString() == state.ValueString()
+}
+
+func boolAttrEqual(plan, state types.Bool) bool {
+	if plan.IsUnknown() {
+		return true
+	}
+	if plan.IsNull() {
+		return state.IsNull() || state.IsUnknown()
+	}
+	if state.IsNull() || state.IsUnknown() {
+		return false
+	}
+	return plan.ValueBool() == state.ValueBool()
 }
 
 func listAttrEqual(plan, state types.List) bool {
