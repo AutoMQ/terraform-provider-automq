@@ -205,6 +205,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku: types.Int64Value(4),
 					FileSystemParam: &FileSystemParamModel{
+						FileSystemType:               types.StringValue("EFS_PROVISIONED"),
 						ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 						FileSystemCount:              types.Int64Value(2),
 						SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-12345")}),
@@ -221,6 +222,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 					ReservedAku: 4,
 					NodeConfig:  &client.NodeConfigParam{},
 					FileSystem: &client.FileSystemParam{
+						FileSystemType:               stringPtr("EFS_PROVISIONED"),
 						ThroughputMiBpsPerFileSystem: 1000,
 						FileSystemCount:              2,
 						SecurityGroups:               []string{"sg-12345"},
@@ -239,6 +241,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku: types.Int64Value(4),
 					FileSystemParam: &FileSystemParamModel{
+						FileSystemType:               types.StringValue("ONTAP_V2"),
 						ThroughputMibpsPerFileSystem: types.Int64Value(500),
 						FileSystemCount:              types.Int64Value(1),
 						SecurityGroups:               types.ListNull(types.StringType),
@@ -255,6 +258,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 					ReservedAku: 4,
 					NodeConfig:  &client.NodeConfigParam{},
 					FileSystem: &client.FileSystemParam{
+						FileSystemType:               stringPtr("ONTAP_V2"),
 						ThroughputMiBpsPerFileSystem: 500,
 						FileSystemCount:              1,
 						SecurityGroups:               nil, // Should not be included when null/empty
@@ -559,6 +563,7 @@ func TestFlattenKafkaInstanceModel_FSWAL(t *testing.T) {
 				Spec: &client.SpecificationVO{
 					ReservedAku: int32Ptr(4),
 					FileSystem: &client.FileSystemVO{
+						FileSystemType:               strPtr("EFS_PROVISIONED"),
 						ThroughputMiBpsPerFileSystem: int32Ptr(1000),
 						FileSystemCount:              int32Ptr(2),
 						SecurityGroups:               []string{"sg-12345"},
@@ -577,6 +582,7 @@ func TestFlattenKafkaInstanceModel_FSWAL(t *testing.T) {
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku: types.Int64Value(4),
 					FileSystemParam: &FileSystemParamModel{
+						FileSystemType:               types.StringValue("EFS_PROVISIONED"),
 						ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 						FileSystemCount:              types.Int64Value(2),
 						SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-12345")}),
@@ -598,6 +604,7 @@ func TestFlattenKafkaInstanceModel_FSWAL(t *testing.T) {
 				Spec: &client.SpecificationVO{
 					ReservedAku: int32Ptr(2),
 					FileSystem: &client.FileSystemVO{
+						FileSystemType:               strPtr("ONTAP_V2"),
 						ThroughputMiBpsPerFileSystem: int32Ptr(500),
 						FileSystemCount:              int32Ptr(1),
 						SecurityGroups:               nil,
@@ -616,6 +623,7 @@ func TestFlattenKafkaInstanceModel_FSWAL(t *testing.T) {
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku: types.Int64Value(2),
 					FileSystemParam: &FileSystemParamModel{
+						FileSystemType:               types.StringValue("ONTAP_V2"),
 						ThroughputMibpsPerFileSystem: types.Int64Value(500),
 						FileSystemCount:              types.Int64Value(1),
 						SecurityGroups:               types.ListNull(types.StringType),
@@ -712,6 +720,99 @@ func strPtr(s string) *string {
 
 func int32Ptr(i int32) *int32 {
 	return &i
+}
+
+func TestFlattenKafkaInstanceModel_SetsDefaultInstanceTypesFromAPI(t *testing.T) {
+	pricingMode := "UsageBased"
+	deployType := "IAAS"
+	resource := &KafkaInstanceResourceModel{
+		ComputeSpecs: &ComputeSpecsModel{
+			InstanceTypes: types.ListNull(types.StringType),
+		},
+	}
+	instance := &client.InstanceVO{
+		InstanceId: strPtr("test-instance"),
+		Spec: &client.SpecificationVO{
+			PricingMode: &pricingMode,
+			DeployType:  &deployType,
+			NodeConfig: &client.NodeConfigVO{
+				InstanceTypes: []string{"r6i.large"},
+			},
+		},
+	}
+
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+
+	assert.False(t, diags.HasError())
+	assert.NotNil(t, resource.ComputeSpecs)
+	assert.False(t, resource.ComputeSpecs.InstanceTypes.IsNull())
+	assert.Equal(t, []attr.Value{types.StringValue("r6i.large")}, resource.ComputeSpecs.InstanceTypes.Elements())
+}
+
+func TestFlattenKafkaInstanceModel_SetsInstanceTypesWithoutPriorConfig(t *testing.T) {
+	pricingMode := "UsageBased"
+	deployType := "IAAS"
+	resource := &KafkaInstanceResourceModel{}
+	instance := &client.InstanceVO{
+		InstanceId: strPtr("test-instance"),
+		Spec: &client.SpecificationVO{
+			PricingMode: &pricingMode,
+			DeployType:  &deployType,
+			NodeConfig: &client.NodeConfigVO{
+				InstanceTypes: []string{"r6i.large"},
+			},
+		},
+	}
+
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+
+	assert.False(t, diags.HasError())
+	assert.NotNil(t, resource.ComputeSpecs)
+	assert.False(t, resource.ComputeSpecs.InstanceTypes.IsNull())
+}
+
+func TestFlattenKafkaInstanceModel_IgnoresInstanceTypesForSubscriptionBased(t *testing.T) {
+	pricingMode := "SubscriptionBased"
+	deployType := "IAAS"
+	resource := &KafkaInstanceResourceModel{}
+	instance := &client.InstanceVO{
+		InstanceId: strPtr("test-instance"),
+		Spec: &client.SpecificationVO{
+			PricingMode: &pricingMode,
+			DeployType:  &deployType,
+			NodeConfig: &client.NodeConfigVO{
+				InstanceTypes: []string{"r6i.large"},
+			},
+		},
+	}
+
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+
+	assert.False(t, diags.HasError())
+	assert.NotNil(t, resource.ComputeSpecs)
+	assert.True(t, resource.ComputeSpecs.InstanceTypes.IsNull())
+}
+
+func TestFlattenKafkaInstanceModel_IgnoresInstanceTypesForUsageBasedK8S(t *testing.T) {
+	pricingMode := "UsageBased"
+	deployType := "K8S"
+	resource := &KafkaInstanceResourceModel{}
+	instance := &client.InstanceVO{
+		InstanceId: strPtr("test-instance"),
+		Spec: &client.SpecificationVO{
+			PricingMode: &pricingMode,
+			DeployType:  &deployType,
+			NodeConfig: &client.NodeConfigVO{
+				InstanceTypes: []string{"r6i.large"},
+			},
+		},
+	}
+
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+
+	assert.False(t, diags.HasError())
+	assert.NotNil(t, resource.ComputeSpecs)
+	assert.True(t, resource.ComputeSpecs.InstanceTypes.IsNull())
 }
 
 func timePtr(s string) *time.Time {
@@ -948,4 +1049,375 @@ func TestFlattenKafkaInstanceModel_Tags(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestExpandKafkaInstanceResource_FSWALNullFileSystemType tests handling of null file_system_type
+func TestExpandKafkaInstanceResource_FSWALNullFileSystemType(t *testing.T) {
+	input := KafkaInstanceResourceModel{
+		Name:    types.StringValue("test"),
+		Version: types.StringValue("1.0.0"),
+		ComputeSpecs: &ComputeSpecsModel{
+			ReservedAku: types.Int64Value(4),
+			FileSystemParam: &FileSystemParamModel{
+				FileSystemType:               types.StringNull(), // null
+				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
+				FileSystemCount:              types.Int64Value(2),
+			},
+		},
+	}
+
+	request := &client.InstanceCreateParam{}
+	err := ExpandKafkaInstanceResource(context.Background(), input, request)
+	assert.NoError(t, err)
+	assert.NotNil(t, request.Spec.FileSystem)
+	assert.Nil(t, request.Spec.FileSystem.FileSystemType)
+}
+
+// TestExpandKafkaInstanceResource_FSWALUnknownFileSystemType tests handling of unknown file_system_type
+func TestExpandKafkaInstanceResource_FSWALUnknownFileSystemType(t *testing.T) {
+	input := KafkaInstanceResourceModel{
+		Name:    types.StringValue("test"),
+		Version: types.StringValue("1.0.0"),
+		ComputeSpecs: &ComputeSpecsModel{
+			ReservedAku: types.Int64Value(4),
+			FileSystemParam: &FileSystemParamModel{
+				FileSystemType:               types.StringUnknown(), // unknown
+				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
+				FileSystemCount:              types.Int64Value(2),
+			},
+		},
+	}
+
+	request := &client.InstanceCreateParam{}
+	err := ExpandKafkaInstanceResource(context.Background(), input, request)
+	assert.NoError(t, err)
+	assert.NotNil(t, request.Spec.FileSystem)
+	assert.Nil(t, request.Spec.FileSystem.FileSystemType)
+}
+
+// TestFlattenKafkaInstanceModel_FileSystemTypeDeserialization tests correct deserialization of file_system_type
+func TestFlattenKafkaInstanceModel_FileSystemTypeDeserialization(t *testing.T) {
+	tests := []struct {
+		name              string
+		apiFileSystemType *string
+		expectedValue     types.String
+	}{
+		{
+			name:              "EFS_PROVISIONED",
+			apiFileSystemType: strPtr("EFS_PROVISIONED"),
+			expectedValue:     types.StringValue("EFS_PROVISIONED"),
+		},
+		{
+			name:              "ONTAP_V2",
+			apiFileSystemType: strPtr("ONTAP_V2"),
+			expectedValue:     types.StringValue("ONTAP_V2"),
+		},
+		{
+			name:              "nil file_system_type",
+			apiFileSystemType: nil,
+			expectedValue:     types.StringNull(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			instance := &client.InstanceVO{
+				InstanceId: strPtr("test"),
+				Spec: &client.SpecificationVO{
+					FileSystem: &client.FileSystemVO{
+						FileSystemType:               tt.apiFileSystemType,
+						ThroughputMiBpsPerFileSystem: int32Ptr(1000),
+						FileSystemCount:              int32Ptr(2),
+					},
+				},
+			}
+
+			resource := &KafkaInstanceResourceModel{}
+			diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+			assert.False(t, diags.HasError())
+			assert.NotNil(t, resource.ComputeSpecs)
+			assert.NotNil(t, resource.ComputeSpecs.FileSystemParam)
+			assert.Equal(t, tt.expectedValue, resource.ComputeSpecs.FileSystemParam.FileSystemType)
+		})
+	}
+}
+
+// TestFlattenKafkaInstanceModel_FileSystemTypeStatePreservation tests state preservation when API doesn't return file_system_type
+func TestFlattenKafkaInstanceModel_FileSystemTypeStatePreservation(t *testing.T) {
+	// Create a resource with existing file_system_type in state
+	previousResource := &KafkaInstanceResourceModel{
+		ComputeSpecs: &ComputeSpecsModel{
+			FileSystemParam: &FileSystemParamModel{
+				FileSystemType:               types.StringValue("EFS_PROVISIONED"),
+				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
+				FileSystemCount:              types.Int64Value(2),
+			},
+		},
+	}
+
+	// API response without file_system_type (old API version)
+	instance := &client.InstanceVO{
+		InstanceId: strPtr("test"),
+		Spec: &client.SpecificationVO{
+			FileSystem: &client.FileSystemVO{
+				FileSystemType:               nil, // API doesn't return this field
+				ThroughputMiBpsPerFileSystem: int32Ptr(1000),
+				FileSystemCount:              int32Ptr(2),
+			},
+		},
+	}
+
+	resource := &KafkaInstanceResourceModel{
+		ComputeSpecs: &ComputeSpecsModel{
+			FileSystemParam: previousResource.ComputeSpecs.FileSystemParam,
+		},
+	}
+
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+	assert.False(t, diags.HasError())
+	assert.NotNil(t, resource.ComputeSpecs.FileSystemParam)
+	// State should be preserved when API doesn't return the value
+	assert.Equal(t, types.StringValue("EFS_PROVISIONED"), resource.ComputeSpecs.FileSystemParam.FileSystemType)
+}
+
+// TestExpandKafkaInstanceResource_FileSystemTypeVariations tests different file_system_type values
+func TestExpandKafkaInstanceResource_FileSystemTypeVariations(t *testing.T) {
+	tests := []struct {
+		name             string
+		fileSystemType   types.String
+		expectedAPIValue *string
+	}{
+		{
+			name:             "EFS_PROVISIONED",
+			fileSystemType:   types.StringValue("EFS_PROVISIONED"),
+			expectedAPIValue: stringPtr("EFS_PROVISIONED"),
+		},
+		{
+			name:             "ONTAP_V2",
+			fileSystemType:   types.StringValue("ONTAP_V2"),
+			expectedAPIValue: stringPtr("ONTAP_V2"),
+		},
+		{
+			name:             "null file_system_type",
+			fileSystemType:   types.StringNull(),
+			expectedAPIValue: nil,
+		},
+		{
+			name:             "unknown file_system_type",
+			fileSystemType:   types.StringUnknown(),
+			expectedAPIValue: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := KafkaInstanceResourceModel{
+				Name:    types.StringValue("test"),
+				Version: types.StringValue("1.0.0"),
+				ComputeSpecs: &ComputeSpecsModel{
+					ReservedAku: types.Int64Value(4),
+					FileSystemParam: &FileSystemParamModel{
+						FileSystemType:               tt.fileSystemType,
+						ThroughputMibpsPerFileSystem: types.Int64Value(1000),
+						FileSystemCount:              types.Int64Value(2),
+					},
+				},
+			}
+
+			request := &client.InstanceCreateParam{}
+			err := ExpandKafkaInstanceResource(context.Background(), input, request)
+			assert.NoError(t, err)
+			assert.NotNil(t, request.Spec.FileSystem)
+
+			if tt.expectedAPIValue == nil {
+				assert.Nil(t, request.Spec.FileSystem.FileSystemType)
+			} else {
+				assert.NotNil(t, request.Spec.FileSystem.FileSystemType)
+				assert.Equal(t, *tt.expectedAPIValue, *request.Spec.FileSystem.FileSystemType)
+			}
+		})
+	}
+}
+
+func TestExpandKafkaInstanceResource_UsageBasedPricing(t *testing.T) {
+	model := KafkaInstanceResourceModel{
+		Name:    types.StringValue("usage-based-instance"),
+		Version: types.StringValue("1.0.0"),
+		ComputeSpecs: &ComputeSpecsModel{
+			PricingMode:       types.StringValue("UsageBased"),
+			ReservedNodeCount: types.Int64Value(5),
+			InstanceTypes:     types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.xlarge")}),
+			Networks: []NetworkModel{
+				{
+					Zone:    types.StringValue("us-east-1a"),
+					Subnets: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-abc")}),
+				},
+			},
+		},
+		Features: &FeaturesModel{
+			WalMode: types.StringValue("EBSWAL"),
+		},
+	}
+
+	request := &client.InstanceCreateParam{}
+	err := ExpandKafkaInstanceResource(context.Background(), model, request)
+	assert.NoError(t, err)
+
+	assert.NotNil(t, request.Spec.PricingMode)
+	assert.Equal(t, "UsageBased", *request.Spec.PricingMode)
+
+	assert.NotNil(t, request.Spec.ReservedNodeCount)
+	assert.Equal(t, int32(5), *request.Spec.ReservedNodeCount)
+
+	assert.NotNil(t, request.Spec.NodeConfig)
+	assert.Equal(t, []string{"m5.xlarge"}, request.Spec.NodeConfig.InstanceTypes)
+}
+
+func TestExpandKafkaInstanceResource_CommittedPricing(t *testing.T) {
+	model := KafkaInstanceResourceModel{
+		Name:    types.StringValue("committed-instance"),
+		Version: types.StringValue("1.0.0"),
+		ComputeSpecs: &ComputeSpecsModel{
+			PricingMode: types.StringValue("SubscriptionBased"),
+			ReservedAku: types.Int64Value(6),
+		},
+		Features: &FeaturesModel{
+			WalMode: types.StringValue("EBSWAL"),
+		},
+	}
+
+	request := &client.InstanceCreateParam{}
+	err := ExpandKafkaInstanceResource(context.Background(), model, request)
+	assert.NoError(t, err)
+
+	assert.NotNil(t, request.Spec.PricingMode)
+	assert.Equal(t, "SubscriptionBased", *request.Spec.PricingMode)
+	assert.Equal(t, int32(6), request.Spec.ReservedAku)
+	assert.Nil(t, request.Spec.ReservedNodeCount)
+}
+
+func TestExpandKafkaInstanceResource_NullPricingFields(t *testing.T) {
+	model := KafkaInstanceResourceModel{
+		Name:    types.StringValue("null-pricing"),
+		Version: types.StringValue("1.0.0"),
+		ComputeSpecs: &ComputeSpecsModel{
+			ReservedAku:       types.Int64Value(3),
+			PricingMode:       types.StringNull(),
+			ReservedNodeCount: types.Int64Null(),
+			InstanceTypes:     types.ListNull(types.StringType),
+		},
+	}
+
+	request := &client.InstanceCreateParam{}
+	err := ExpandKafkaInstanceResource(context.Background(), model, request)
+	assert.NoError(t, err)
+
+	assert.Nil(t, request.Spec.PricingMode)
+	assert.Nil(t, request.Spec.ReservedNodeCount)
+	assert.Empty(t, request.Spec.NodeConfig.InstanceTypes)
+}
+
+func TestFlattenKafkaInstanceModel_UsageBasedPricing(t *testing.T) {
+	pricingMode := "UsageBased"
+	deployType := "IAAS"
+	reservedNodeCount := int32(5)
+	instance := &client.InstanceVO{
+		InstanceId:  strPtr("usage-based-id"),
+		Name:        strPtr("usage-based-instance"),
+		Description: strPtr("test"),
+		Version:     strPtr("1.0.0"),
+		State:       strPtr("Running"),
+		Spec: &client.SpecificationVO{
+			ReservedAku:       int32Ptr(0),
+			PricingMode:       &pricingMode,
+			DeployType:        &deployType,
+			ReservedNodeCount: &reservedNodeCount,
+			NodeConfig: &client.NodeConfigVO{
+				InstanceTypes: []string{"m5.xlarge"},
+			},
+		},
+		Features: &client.InstanceFeatureVO{
+			WalMode: strPtr("EBSWAL"),
+		},
+	}
+
+	resource := &KafkaInstanceResourceModel{}
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+	assert.False(t, diags.HasError())
+
+	assert.NotNil(t, resource.ComputeSpecs)
+	assert.Equal(t, types.StringValue("UsageBased"), resource.ComputeSpecs.PricingMode)
+	assert.Equal(t, types.Int64Value(5), resource.ComputeSpecs.ReservedNodeCount)
+
+	var instanceTypes []string
+	diags2 := resource.ComputeSpecs.InstanceTypes.ElementsAs(context.Background(), &instanceTypes, false)
+	assert.False(t, diags2.HasError())
+	assert.Equal(t, []string{"m5.xlarge"}, instanceTypes)
+}
+
+func TestFlattenKafkaInstanceModel_CommittedPricing(t *testing.T) {
+	pricingMode := "SubscriptionBased"
+	instance := &client.InstanceVO{
+		InstanceId: strPtr("committed-id"),
+		Name:       strPtr("committed-instance"),
+		Version:    strPtr("1.0.0"),
+		State:      strPtr("Running"),
+		Spec: &client.SpecificationVO{
+			ReservedAku: int32Ptr(6),
+			PricingMode: &pricingMode,
+		},
+		Features: &client.InstanceFeatureVO{
+			WalMode: strPtr("EBSWAL"),
+		},
+	}
+
+	resource := &KafkaInstanceResourceModel{}
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+	assert.False(t, diags.HasError())
+
+	assert.NotNil(t, resource.ComputeSpecs)
+	assert.Equal(t, types.StringValue("SubscriptionBased"), resource.ComputeSpecs.PricingMode)
+	assert.Equal(t, types.Int64Value(6), resource.ComputeSpecs.ReservedAku)
+	assert.Equal(t, types.Int64Null(), resource.ComputeSpecs.ReservedNodeCount)
+	assert.Equal(t, types.ListNull(types.StringType), resource.ComputeSpecs.InstanceTypes)
+}
+
+func TestFlattenKafkaInstanceModel_PricingFieldsPreservePreviousState(t *testing.T) {
+	// When API returns nil for pricing fields, previous state should be preserved
+	instance := &client.InstanceVO{
+		InstanceId: strPtr("preserve-id"),
+		Name:       strPtr("preserve-instance"),
+		Version:    strPtr("1.0.0"),
+		State:      strPtr("Running"),
+		Spec: &client.SpecificationVO{
+			ReservedAku:       int32Ptr(0),
+			PricingMode:       nil,
+			ReservedNodeCount: nil,
+			NodeConfig:        nil,
+		},
+		Features: &client.InstanceFeatureVO{
+			WalMode: strPtr("EBSWAL"),
+		},
+	}
+
+	resource := &KafkaInstanceResourceModel{
+		ComputeSpecs: &ComputeSpecsModel{
+			PricingMode:       types.StringValue("UsageBased"),
+			DeployType:        types.StringValue("IAAS"),
+			ReservedNodeCount: types.Int64Value(5),
+			InstanceTypes:     types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.xlarge")}),
+		},
+	}
+
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+	assert.False(t, diags.HasError())
+
+	// Previous state should be preserved when API returns nil
+	assert.Equal(t, types.StringValue("UsageBased"), resource.ComputeSpecs.PricingMode)
+	assert.Equal(t, types.Int64Value(5), resource.ComputeSpecs.ReservedNodeCount)
+
+	var instanceTypes []string
+	diags2 := resource.ComputeSpecs.InstanceTypes.ElementsAs(context.Background(), &instanceTypes, false)
+	assert.False(t, diags2.HasError())
+	assert.Equal(t, []string{"m5.xlarge"}, instanceTypes)
 }

@@ -70,6 +70,19 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 						Computed:            true,
 						MarkdownDescription: "AKU (AutoMQ Kafka Unit) defines the cluster scale. Each AKU provides up to 30 MiB/s write or 60 MiB/s read throughput. For sizing guidance, refer to the [billing documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints).",
 					},
+					"pricing_mode": schema.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Pricing mode for the instance. Values: `UsageBased` or `SubscriptionBased`.",
+					},
+					"reserved_node_count": schema.Int64Attribute{
+						Computed:            true,
+						MarkdownDescription: "Number of reserved nodes for the instance.",
+					},
+					"instance_types": schema.ListAttribute{
+						ElementType:         types.StringType,
+						Computed:            true,
+						MarkdownDescription: "Instance type list for the nodes. Only available when `deploy_type` is `IAAS`; not returned for `K8S` deployments.",
+					},
 					"deploy_type": schema.StringAttribute{
 						Computed:            true,
 						MarkdownDescription: "Deployment platform for the instance.",
@@ -126,6 +139,10 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 						Computed:            true,
 						MarkdownDescription: "File system configuration for FSWAL mode",
 						Attributes: map[string]schema.Attribute{
+							"file_system_type": schema.StringAttribute{
+								Computed:            true,
+								MarkdownDescription: "File system type. Supported values: EFS_PROVISIONED (Amazon Elastic File System), ONTAP_V2 (Amazon FSx for NetApp ONTAP). EFS offers superior elasticity and lower costs for small-scale deployments; FSx for NetApp ONTAP features lower write latency and a more favorable cost advantage at large scales.",
+							},
 							"throughput_mibps_per_file_system": schema.Int64Attribute{
 								Computed:            true,
 								MarkdownDescription: "Throughput in MiBps per file system",

@@ -66,12 +66,15 @@ Read-Only:
 - `dns_zone` (String) DNS zone used when creating custom records.
 - `file_system_param` (Attributes) File system configuration for FSWAL mode (see [below for nested schema](#nestedatt--compute_specs--file_system_param))
 - `instance_role` (String) IAM role ARN for the Kafka instance.
+- `instance_types` (List of String) Instance type list for the nodes. Only available when `deploy_type` is `IAAS`; not returned for `K8S` deployments.
 - `kubernetes_cluster_id` (String) Identifier for the target Kubernetes cluster.
 - `kubernetes_namespace` (String) Kubernetes namespace for the instance deployment.
 - `kubernetes_node_groups` (Attributes List) Kubernetes node groups configuration (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
 - `kubernetes_service_account` (String) Kubernetes service account for the instance pods.
 - `networks` (Attributes List) To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones. (see [below for nested schema](#nestedatt--compute_specs--networks))
+- `pricing_mode` (String) Pricing mode for the instance. Values: `UsageBased` or `SubscriptionBased`.
 - `reserved_aku` (Number) AKU (AutoMQ Kafka Unit) defines the cluster scale. Each AKU provides up to 30 MiB/s write or 60 MiB/s read throughput. For sizing guidance, refer to the [billing documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints).
+- `reserved_node_count` (Number) Number of reserved nodes for the instance.
 - `security_groups` (List of String) Security groups for the instance
 
 <a id="nestedatt--compute_specs--data_buckets"></a>
@@ -88,6 +91,7 @@ Read-Only:
 Read-Only:
 
 - `file_system_count` (Number) Number of file systems
+- `file_system_type` (String) File system type. Supported values: EFS_PROVISIONED (Amazon Elastic File System), ONTAP_V2 (Amazon FSx for NetApp ONTAP). EFS offers superior elasticity and lower costs for small-scale deployments; FSx for NetApp ONTAP features lower write latency and a more favorable cost advantage at large scales.
 - `security_groups` (List of String) Security groups for file systems
 - `throughput_mibps_per_file_system` (Number) Throughput in MiBps per file system
 
