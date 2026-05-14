@@ -146,6 +146,7 @@ type FeaturesModel struct {
 	Security        *SecurityModel        `tfsdk:"security"`
 	MetricsExporter *MetricsExporterModel `tfsdk:"metrics_exporter"`
 	TableTopic      *TableTopicModel      `tfsdk:"table_topic"`
+	SchemaRegistry  *SchemaRegistryModel  `tfsdk:"schema_registry"`
 }
 
 type FeaturesSummaryModel struct {
@@ -154,6 +155,7 @@ type FeaturesSummaryModel struct {
 	Security        *SecuritySummaryModel `tfsdk:"security"`
 	MetricsExporter *MetricsExporterModel `tfsdk:"metrics_exporter"`
 	TableTopic      *TableTopicModel      `tfsdk:"table_topic"`
+	SchemaRegistry  *SchemaRegistryModel  `tfsdk:"schema_registry"`
 }
 
 type SecurityModel struct {
@@ -215,6 +217,10 @@ type TableTopicModel struct {
 	UserPrincipal     types.String `tfsdk:"user_principal"`
 	KeytabFile        types.String `tfsdk:"keytab_file"`
 	Krb5ConfFile      types.String `tfsdk:"krb5conf_file"`
+}
+
+type SchemaRegistryModel struct {
+	Enabled types.Bool `tfsdk:"enabled"`
 }
 
 // ExpandKafkaInstanceResource converts a KafkaInstanceResourceModel to a client.InstanceCreateParam.
@@ -540,6 +546,16 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 			request.Features.TableTopic = topic
 		}
 
+		// Schema Registry
+		if instance.Features.SchemaRegistry != nil {
+			if !instance.Features.SchemaRegistry.Enabled.IsNull() && !instance.Features.SchemaRegistry.Enabled.IsUnknown() {
+				enabled := instance.Features.SchemaRegistry.Enabled.ValueBool()
+				schemaRegistry := &client.SchemaRegistryParam{}
+				schemaRegistry.Enabled = &enabled
+				request.Features.SchemaRegistry = schemaRegistry
+			}
+		}
+
 		// Instance Configs
 		if !instance.Features.InstanceConfigs.IsNull() {
 			instanceConfigs := ExpandStringValueMap(instance.Features.InstanceConfigs)
@@ -568,6 +584,7 @@ func ConvertKafkaInstanceModel(resource *KafkaInstanceResourceModel, model *Kafk
 			InstanceConfigs: resource.Features.InstanceConfigs,
 			MetricsExporter: resource.Features.MetricsExporter,
 			TableTopic:      resource.Features.TableTopic,
+			SchemaRegistry:  resource.Features.SchemaRegistry,
 		}
 		if resource.Features.Security != nil {
 			features.Security = &SecuritySummaryModel{
@@ -918,6 +935,13 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 		}
 		resource.Features.TableTopic = flattenTableTopicVO(instance.Features.TableTopic, previousTableTopic)
 
+		// Schema Registry
+		var previousSchemaRegistry *SchemaRegistryModel
+		if previousFeatures != nil {
+			previousSchemaRegistry = previousFeatures.SchemaRegistry
+		}
+		resource.Features.SchemaRegistry = flattenSchemaRegistryVO(instance.Features.SchemaRegistry, previousSchemaRegistry)
+
 	}
 
 	// Timestamps
@@ -1062,6 +1086,21 @@ func flattenTableTopicVO(vo *client.TableTopicVO, previous *TableTopicModel) *Ta
 	topic.Krb5ConfFile = retainString(vo.Krb5ConfFile, topic.Krb5ConfFile)
 
 	return &topic
+}
+
+func flattenSchemaRegistryVO(vo *client.SchemaRegistryVO, previous *SchemaRegistryModel) *SchemaRegistryModel {
+	if vo == nil {
+		return nil
+	}
+
+	schemaRegistry := SchemaRegistryModel{
+		Enabled: types.BoolValue(vo.Enabled),
+	}
+	if previous != nil && vo.Enabled == previous.Enabled.ValueBool() {
+		schemaRegistry = *previous
+	}
+	schemaRegistry.Enabled = types.BoolValue(vo.Enabled)
+	return &schemaRegistry
 }
 
 func retainString(api *string, previous types.String) types.String {

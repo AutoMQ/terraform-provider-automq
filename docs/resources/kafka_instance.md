@@ -55,6 +55,9 @@ resource "automq_kafka_instance" "example" {
       authentication_methods   = ["anonymous"]
       transit_encryption_modes = ["plaintext"]
     }
+    schema_registry = {
+      enabled = true
+    }
   }
 }
 
@@ -163,6 +166,7 @@ Optional:
 
 - `instance_configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
 - `metrics_exporter` (Attributes) Configure Prometheus Remote Write metrics exporter. (see [below for nested schema](#nestedatt--features--metrics_exporter))
+- `schema_registry` (Attributes) Schema Registry feature configuration. (see [below for nested schema](#nestedatt--features--schema_registry))
 - `table_topic` (Attributes) Inline table topic (Iceberg/Hive) configuration replacing legacy integration references. (see [below for nested schema](#nestedatt--features--table_topic))
 
 <a id="nestedatt--features--security"></a>
@@ -240,6 +244,13 @@ Optional:
 - `metastore_uri` (String) Hive Metastore endpoint. Required when `catalog_type` is `hive`. Format: `thrift://<host>:<port>`.
 - `user_principal` (String) Kerberos user principal for authentication, e.g. `username@REALM`. Required when `hive_auth_mode` is `KERBEROS`.
 
+
+<a id="nestedatt--features--schema_registry"></a>
+### Nested Schema for `features.schema_registry`
+
+Optional:
+
+- `enabled` (Boolean) Whether to enable Schema Registry for this Kafka instance.
 
 
 <a id="nestedblock--timeouts"></a>

@@ -145,6 +145,74 @@ func TestMetricsExporterAuthTypeSchema(t *testing.T) {
 	}
 }
 
+func TestSchemaRegistrySchema(t *testing.T) {
+	s := getKafkaInstanceResourceSchema(t)
+	featuresAttrRaw, ok := s.Attributes["features"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("features attribute has unexpected type %T", s.Attributes["features"])
+	}
+	schemaRegistryAttrRaw, ok := featuresAttrRaw.Attributes["schema_registry"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("schema_registry attribute has unexpected type %T", featuresAttrRaw.Attributes["schema_registry"])
+	}
+	enabledAttrRaw, ok := schemaRegistryAttrRaw.Attributes["enabled"].(schema.BoolAttribute)
+	if !ok {
+		t.Fatalf("schema_registry.enabled attribute has unexpected type %T", schemaRegistryAttrRaw.Attributes["enabled"])
+	}
+	if !schemaRegistryAttrRaw.Optional || !schemaRegistryAttrRaw.Computed {
+		t.Fatalf("schema_registry should be optional and computed")
+	}
+	if !enabledAttrRaw.Optional || !enabledAttrRaw.Computed {
+		t.Fatalf("schema_registry.enabled should be optional and computed")
+	}
+	if _, ok := schemaRegistryAttrRaw.Attributes["type"]; ok {
+		t.Fatalf("schema_registry.type should not be exposed")
+	}
+	if _, ok := schemaRegistryAttrRaw.Attributes["runtime"]; ok {
+		t.Fatalf("schema_registry.runtime should not be exposed")
+	}
+}
+
+func TestValidateKafkaInstanceConfiguration_TableTopicRequiresSchemaRegistryEnabled(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			ReservedAku: types.Int64Value(6),
+			DeployType:  types.StringValue("IAAS"),
+			Networks: []models.NetworkModel{{
+				Zone: types.StringValue("cn-test-1"),
+				Subnets: types.ListValueMust(types.StringType, []attr.Value{
+					types.StringValue("subnet-1"),
+				}),
+			}},
+		},
+		Features: &models.FeaturesModel{
+			WalMode: types.StringValue("EBSWAL"),
+			TableTopic: &models.TableTopicModel{
+				Warehouse:   types.StringValue("warehouse"),
+				CatalogType: types.StringValue("HIVE"),
+			},
+			SchemaRegistry: &models.SchemaRegistryModel{
+				Enabled: types.BoolValue(false),
+			},
+		},
+	}
+
+	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
+	if !diags.HasError() {
+		t.Fatalf("expected diagnostics when table_topic is configured with schema_registry.enabled=false")
+	}
+	found := false
+	for _, d := range diags {
+		if strings.Contains(d.Detail(), "schema_registry.enabled cannot be false") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected schema registry dependency error, got: %v", diags)
+	}
+}
+
 func TestWalModeValidatorRejectsUnsupportedValue(t *testing.T) {
 	s := getKafkaInstanceResourceSchema(t)
 	featuresAttrRaw, ok := s.Attributes["features"].(schema.SingleNestedAttribute)
