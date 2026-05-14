@@ -88,6 +88,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 						MarkdownDescription: "Deployment platform for the instance.",
 					},
 					"dns_zone":                   schema.StringAttribute{Computed: true, MarkdownDescription: "DNS zone used when creating custom records."},
+					"dns_zone_type":              schema.StringAttribute{Computed: true, MarkdownDescription: "DNS zone type used by the instance."},
 					"kubernetes_cluster_id":      schema.StringAttribute{Computed: true, MarkdownDescription: "Identifier for the target Kubernetes cluster."},
 					"kubernetes_namespace":       schema.StringAttribute{Computed: true, MarkdownDescription: "Kubernetes namespace for the instance deployment."},
 					"kubernetes_service_account": schema.StringAttribute{Computed: true, MarkdownDescription: "Kubernetes service account for the instance pods."},

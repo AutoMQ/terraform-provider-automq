@@ -30,6 +30,7 @@ type SpecificationParam struct {
 	Scope                    *string                    `json:"scope,omitempty"`
 	Vpc                      *string                    `json:"vpc,omitempty"`
 	DnsZone                  *string                    `json:"dnsZone,omitempty"`
+	DnsZoneType              *string                    `json:"dnsZoneType,omitempty"`
 	KubernetesClusterId      *string                    `json:"kubernetesClusterId,omitempty"`
 	KubernetesNamespace      *string                    `json:"kubernetesNamespace,omitempty"`
 	KubernetesServiceAccount *string                    `json:"kubernetesServiceAccount,omitempty"`
@@ -235,6 +236,7 @@ type SpecificationVO struct {
 	Scope                    *string                  `json:"scope,omitempty"`
 	Vpc                      *string                  `json:"vpc,omitempty"`
 	DnsZone                  *string                  `json:"dnsZone,omitempty"`
+	DnsZoneType              *string                  `json:"dnsZoneType,omitempty"`
 	KubernetesClusterId      *string                  `json:"kubernetesClusterId,omitempty"`
 	KubernetesNamespace      *string                  `json:"kubernetesNamespace,omitempty"`
 	KubernetesServiceAccount *string                  `json:"kubernetesServiceAccount,omitempty"`
@@ -386,6 +388,7 @@ type SpecificationUpdateParam struct {
 	Scope                    *string                    `json:"scope,omitempty"`
 	Vpc                      *string                    `json:"vpc,omitempty"`
 	DnsZone                  *string                    `json:"dnsZone,omitempty"`
+	DnsZoneType              *string                    `json:"dnsZoneType,omitempty"`
 	KubernetesClusterId      *string                    `json:"kubernetesClusterId,omitempty"`
 	KubernetesNamespace      *string                    `json:"kubernetesNamespace,omitempty"`
 	KubernetesServiceAccount *string                    `json:"kubernetesServiceAccount,omitempty"`

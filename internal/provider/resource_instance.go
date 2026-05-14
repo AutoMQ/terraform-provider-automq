@@ -202,6 +202,18 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							stringplanmodifier.RequiresReplace(),
 						},
 					},
+					"dns_zone_type": schema.StringAttribute{
+						Optional:            true,
+						Computed:            true,
+						MarkdownDescription: "DNS zone type used by the instance. Supported values: `PRIVATE`, `PUBLIC`.",
+						Validators: []validator.String{
+							stringvalidator.OneOf("PRIVATE", "PUBLIC"),
+						},
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+							stringplanmodifier.RequiresReplace(),
+						},
+					},
 					"networks": schema.ListNestedAttribute{
 						Required:            true,
 						MarkdownDescription: "To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones.",
