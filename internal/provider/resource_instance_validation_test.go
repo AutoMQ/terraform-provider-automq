@@ -960,3 +960,239 @@ func TestValidateKafkaInstanceConfiguration_FSWALMissingFileSystemType(t *testin
 		t.Fatalf("expected error about missing file_system_type, got: %v", diags)
 	}
 }
+
+func TestValidateKafkaInstanceConfiguration_UsageBasedMissingNodeCount(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			PricingMode:       types.StringValue("UsageBased"),
+			ReservedNodeCount: types.Int64Null(),
+			InstanceTypes:     types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.xlarge")}),
+			Networks: []models.NetworkModel{{
+				Zone:    types.StringValue("us-east-1a"),
+				Subnets: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
+			}},
+		},
+		Features: &models.FeaturesModel{WalMode: types.StringValue("EBSWAL")},
+	}
+
+	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
+	if !diags.HasError() {
+		t.Fatalf("expected error when reserved_node_count is missing for UsageBased pricing")
+	}
+	found := false
+	for _, d := range diags {
+		if strings.Contains(d.Detail(), "reserved_node_count") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected error mentioning reserved_node_count, got: %v", diags)
+	}
+}
+
+func TestValidateKafkaInstanceConfiguration_UsageBasedMissingInstanceTypes(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			PricingMode:       types.StringValue("UsageBased"),
+			DeployType:        types.StringValue("IAAS"),
+			ReservedNodeCount: types.Int64Value(5),
+			InstanceTypes:     types.ListNull(types.StringType),
+			Networks: []models.NetworkModel{{
+				Zone:    types.StringValue("us-east-1a"),
+				Subnets: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
+			}},
+		},
+		Features: &models.FeaturesModel{WalMode: types.StringValue("EBSWAL")},
+	}
+
+	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
+	if !diags.HasError() {
+		t.Fatalf("expected error when instance_types is missing for UsageBased pricing")
+	}
+	found := false
+	for _, d := range diags {
+		if strings.Contains(d.Detail(), "instance_types") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected error mentioning instance_types, got: %v", diags)
+	}
+}
+
+func TestValidateKafkaInstanceConfiguration_UsageBasedK8SAllowsMissingInstanceTypes(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			PricingMode:         types.StringValue("UsageBased"),
+			DeployType:          types.StringValue("K8S"),
+			ReservedNodeCount:   types.Int64Value(5),
+			InstanceTypes:       types.ListNull(types.StringType),
+			KubernetesClusterID: types.StringValue("cluster-1"),
+			KubernetesNodeGroups: []models.NodeGroupModel{{
+				ID: types.StringValue("ng-1"),
+			}},
+		},
+		Features: &models.FeaturesModel{WalMode: types.StringValue("EBSWAL")},
+	}
+
+	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics when instance_types is omitted for UsageBased K8S: %v", diags)
+	}
+}
+
+func TestValidateKafkaInstanceConfiguration_CommittedMissingAku(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			PricingMode: types.StringValue("SubscriptionBased"),
+			ReservedAku: types.Int64Null(),
+			Networks: []models.NetworkModel{{
+				Zone:    types.StringValue("us-east-1a"),
+				Subnets: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
+			}},
+		},
+		Features: &models.FeaturesModel{WalMode: types.StringValue("EBSWAL")},
+	}
+
+	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
+	if !diags.HasError() {
+		t.Fatalf("expected error when reserved_aku is missing for SubscriptionBased pricing")
+	}
+	found := false
+	for _, d := range diags {
+		if strings.Contains(d.Detail(), "reserved_aku") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected error mentioning reserved_aku, got: %v", diags)
+	}
+}
+
+func TestValidateKafkaInstanceConfiguration_UsageBasedValid(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			PricingMode:       types.StringValue("UsageBased"),
+			ReservedNodeCount: types.Int64Value(5),
+			InstanceTypes:     types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.xlarge")}),
+			Networks: []models.NetworkModel{{
+				Zone:    types.StringValue("us-east-1a"),
+				Subnets: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
+			}},
+		},
+		Features: &models.FeaturesModel{WalMode: types.StringValue("EBSWAL")},
+	}
+
+	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics for valid UsageBased config: %v", diags)
+	}
+}
+
+func TestImmutableAttributesHaveRequiresReplace_PricingMode(t *testing.T) {
+	s := getKafkaInstanceResourceSchema(t)
+	computeAttr, ok := s.Attributes["compute_specs"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("compute_specs has unexpected type %T", s.Attributes["compute_specs"])
+	}
+
+	pricingModeAttr, ok := computeAttr.Attributes["pricing_mode"].(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("pricing_mode has unexpected type %T", computeAttr.Attributes["pricing_mode"])
+	}
+	if !hasStringRequiresReplace(pricingModeAttr.PlanModifiers) {
+		t.Fatalf("expected pricing_mode to require replacement")
+	}
+}
+
+func TestImmutableAttributesHaveRequiresReplace_InstanceTypes(t *testing.T) {
+	s := getKafkaInstanceResourceSchema(t)
+	computeAttr, ok := s.Attributes["compute_specs"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("compute_specs has unexpected type %T", s.Attributes["compute_specs"])
+	}
+
+	instanceTypesAttr, ok := computeAttr.Attributes["instance_types"].(schema.ListAttribute)
+	if !ok {
+		t.Fatalf("instance_types has unexpected type %T", computeAttr.Attributes["instance_types"])
+	}
+	if !hasListRequiresReplace(instanceTypesAttr.PlanModifiers) {
+		t.Fatalf("expected instance_types to require replacement")
+	}
+}
+
+func TestPricingModeSchemaValidator(t *testing.T) {
+	s := getKafkaInstanceResourceSchema(t)
+	computeAttr, ok := s.Attributes["compute_specs"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("compute_specs has unexpected type %T", s.Attributes["compute_specs"])
+	}
+
+	pricingModeAttr, ok := computeAttr.Attributes["pricing_mode"].(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("pricing_mode has unexpected type %T", computeAttr.Attributes["pricing_mode"])
+	}
+
+	// pricing_mode should be Optional+Computed with a default.
+	if !pricingModeAttr.IsOptional() {
+		t.Fatalf("expected pricing_mode to be optional")
+	}
+	if !pricingModeAttr.IsComputed() {
+		t.Fatalf("expected pricing_mode to be computed")
+	}
+
+	// Should have validators
+	if len(pricingModeAttr.Validators) == 0 {
+		t.Fatalf("expected pricing_mode to have validators")
+	}
+}
+
+func TestInstanceTypesSchemaValidator(t *testing.T) {
+	s := getKafkaInstanceResourceSchema(t)
+	computeAttr, ok := s.Attributes["compute_specs"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("compute_specs has unexpected type %T", s.Attributes["compute_specs"])
+	}
+
+	instanceTypesAttr, ok := computeAttr.Attributes["instance_types"].(schema.ListAttribute)
+	if !ok {
+		t.Fatalf("instance_types has unexpected type %T", computeAttr.Attributes["instance_types"])
+	}
+
+	if !instanceTypesAttr.IsOptional() {
+		t.Fatalf("expected instance_types to be optional")
+	}
+	if instanceTypesAttr.IsComputed() {
+		t.Fatalf("expected instance_types not to be computed")
+	}
+
+	// Should have size validators (at most 1, at least 1)
+	if len(instanceTypesAttr.Validators) < 2 {
+		t.Fatalf("expected instance_types to have at least 2 validators, got %d", len(instanceTypesAttr.Validators))
+	}
+}
+
+func TestReservedNodeCountSchema(t *testing.T) {
+	s := getKafkaInstanceResourceSchema(t)
+	computeAttr, ok := s.Attributes["compute_specs"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("compute_specs has unexpected type %T", s.Attributes["compute_specs"])
+	}
+
+	nodeCountAttr, ok := computeAttr.Attributes["reserved_node_count"].(schema.Int64Attribute)
+	if !ok {
+		t.Fatalf("reserved_node_count has unexpected type %T", computeAttr.Attributes["reserved_node_count"])
+	}
+
+	if !nodeCountAttr.IsOptional() {
+		t.Fatalf("expected reserved_node_count to be optional")
+	}
+
+	// Should have range validator (3-100)
+	if len(nodeCountAttr.Validators) == 0 {
+		t.Fatalf("expected reserved_node_count to have validators")
+	}
+}
