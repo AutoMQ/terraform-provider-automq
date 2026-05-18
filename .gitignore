@@ -43,3 +43,5 @@ acc.config
 
 # Temporary files
 tmp/
+
+terraform-provider-automq
