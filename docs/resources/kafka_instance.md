@@ -237,6 +237,14 @@ Optional:
 
 
 
+<a id="nestedatt--features--schema_registry"></a>
+### Nested Schema for `features.schema_registry`
+
+Optional:
+
+- `enabled` (Boolean) Whether to enable Schema Registry for this Kafka instance.
+
+
 <a id="nestedatt--features--table_topic"></a>
 ### Nested Schema for `features.table_topic`
 
@@ -254,13 +262,6 @@ Optional:
 - `metastore_uri` (String) Hive Metastore endpoint. Required when `catalog_type` is `hive`. Format: `thrift://<host>:<port>`.
 - `user_principal` (String) Kerberos user principal for authentication, e.g. `username@REALM`. Required when `hive_auth_mode` is `KERBEROS`.
 
-
-<a id="nestedatt--features--schema_registry"></a>
-### Nested Schema for `features.schema_registry`
-
-Optional:
-
-- `enabled` (Boolean) Whether to enable Schema Registry for this Kafka instance.
 
 
 <a id="nestedblock--timeouts"></a>
