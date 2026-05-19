@@ -49,3 +49,4 @@ tmp/
 
 # Manual test directory
 test-connector/
+terraform-provider-automq

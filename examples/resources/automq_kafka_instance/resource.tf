@@ -11,6 +11,7 @@ resource "automq_kafka_instance" "example" {
 
   compute_specs = {
     reserved_aku = 6
+    pricing_mode = "SubscriptionBased"
     deploy_type  = "IAAS"
 
     networks = [
