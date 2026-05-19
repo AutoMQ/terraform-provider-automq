@@ -131,7 +131,8 @@ func TestFlattenConnector_RetainsSensitiveConfig(t *testing.T) {
 
 	diags = FlattenConnector(&client.ConnectorVO{Id: connStrPtr("conn-1")}, state)
 	assert.False(t, diags.HasError())
-	got := state.ConnectorConfigSensitive.Elements()["database.password"].(types.String)
+	got, ok := state.ConnectorConfigSensitive.Elements()["database.password"].(types.String)
+	assert.True(t, ok)
 	assert.Equal(t, "secret", got.ValueString())
 }
 
