@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"terraform-provider-automq/client"
 	"testing"
 	"time"
@@ -10,9 +11,10 @@ import (
 )
 
 func TestExpandConnectClusterCreate(t *testing.T) {
-	workerConfig, diags := types.MapValueFrom(t.Context(), types.StringType, map[string]string{"offset.flush.interval.ms": "10000"})
+	ctx := context.Background()
+	workerConfig, diags := types.MapValueFrom(ctx, types.StringType, map[string]string{"offset.flush.interval.ms": "10000"})
 	assert.False(t, diags.HasError())
-	tags, diags := types.MapValueFrom(t.Context(), types.StringType, map[string]string{"team": "data"})
+	tags, diags := types.MapValueFrom(ctx, types.StringType, map[string]string{"team": "data"})
 	assert.False(t, diags.HasError())
 
 	plan := ConnectClusterResourceModel{

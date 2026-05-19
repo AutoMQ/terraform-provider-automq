@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"terraform-provider-automq/client"
 	"testing"
 	"time"
@@ -13,13 +14,14 @@ func connStrPtr(s string) *string { return &s }
 func connInt32Ptr(i int32) *int32 { return &i }
 
 func TestExpandConnectorCreate(t *testing.T) {
-	sensitive, diags := types.MapValueFrom(t.Context(), types.StringType, map[string]string{"database.password": "secret"})
+	ctx := context.Background()
+	sensitive, diags := types.MapValueFrom(ctx, types.StringType, map[string]string{"database.password": "secret"})
 	assert.False(t, diags.HasError())
-	config, diags := types.MapValueFrom(t.Context(), types.StringType, map[string]string{"topics": "orders"})
+	config, diags := types.MapValueFrom(ctx, types.StringType, map[string]string{"topics": "orders"})
 	assert.False(t, diags.HasError())
-	partition, diags := types.MapValueFrom(t.Context(), types.StringType, map[string]string{"server": "server_01"})
+	partition, diags := types.MapValueFrom(ctx, types.StringType, map[string]string{"server": "server_01"})
 	assert.False(t, diags.HasError())
-	offset, diags := types.MapValueFrom(t.Context(), types.StringType, map[string]string{"file": "mysql-bin.000001", "pos": "123"})
+	offset, diags := types.MapValueFrom(ctx, types.StringType, map[string]string{"file": "mysql-bin.000001", "pos": "123"})
 	assert.False(t, diags.HasError())
 
 	plan := ConnectorResourceModel{
@@ -59,7 +61,7 @@ func TestExpandConnectorCreate(t *testing.T) {
 }
 
 func TestExpandConnectorUpdate(t *testing.T) {
-	config, diags := types.MapValueFrom(t.Context(), types.StringType, map[string]string{"topics": "orders-updated"})
+	config, diags := types.MapValueFrom(context.Background(), types.StringType, map[string]string{"topics": "orders-updated"})
 	assert.False(t, diags.HasError())
 
 	plan := ConnectorResourceModel{
@@ -123,7 +125,7 @@ func TestFlattenConnector(t *testing.T) {
 }
 
 func TestFlattenConnector_RetainsSensitiveConfig(t *testing.T) {
-	existing, diags := types.MapValueFrom(t.Context(), types.StringType, map[string]string{"database.password": "secret"})
+	existing, diags := types.MapValueFrom(context.Background(), types.StringType, map[string]string{"database.password": "secret"})
 	assert.False(t, diags.HasError())
 	state := &ConnectorResourceModel{ConnectorConfigSensitive: existing}
 
