@@ -230,6 +230,10 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 							"krb5conf_file":      schema.StringAttribute{Computed: true, Sensitive: true, MarkdownDescription: "Kerberos krb5.conf file content."},
 						},
 					},
+					"schema_registry_enabled": schema.BoolAttribute{
+						Computed:            true,
+						MarkdownDescription: "Whether Schema Registry is enabled for this Kafka instance.",
+					},
 					"security": schema.SingleNestedAttribute{
 						Computed:            true,
 						MarkdownDescription: "Security configuration for the Kafka instance.",

@@ -70,9 +70,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 						Warehouse:   types.StringValue("warehouse-1"),
 						CatalogType: types.StringValue("HIVE"),
 					},
-					SchemaRegistry: &SchemaRegistryModel{
-						Enabled: types.BoolValue(true),
-					},
+					SchemaRegistryEnabled: types.BoolValue(true),
 				},
 			},
 			expected: client.InstanceCreateParam{
@@ -123,9 +121,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 						Warehouse:   "warehouse-1",
 						CatalogType: "HIVE",
 					},
-					SchemaRegistry: &client.SchemaRegistryParam{
-						Enabled: boolPtr(true),
-					},
+					SchemaRegistryEnabled: boolPtr(true),
 				},
 			},
 		},
@@ -521,28 +517,24 @@ func TestFlattenKafkaInstanceModel_RemovesMetricsExporterWhenAPIEmitsNone(t *tes
 	}
 }
 
-func TestFlattenKafkaInstanceModel_SchemaRegistry(t *testing.T) {
+func TestFlattenKafkaInstanceModel_SchemaRegistryEnabled(t *testing.T) {
 	resource := &KafkaInstanceResourceModel{
 		Features: &FeaturesModel{
-			SchemaRegistry: &SchemaRegistryModel{
-				Enabled: types.BoolValue(false),
-			},
+			SchemaRegistryEnabled: types.BoolValue(false),
 		},
 	}
 	instance := &client.InstanceVO{
 		InstanceId: strPtr("test-instance"),
 		Features: &client.InstanceFeatureVO{
-			WalMode: strPtr("EBSWAL"),
-			SchemaRegistry: &client.SchemaRegistryVO{
-				Enabled: true,
-			},
+			WalMode:               strPtr("EBSWAL"),
+			SchemaRegistryEnabled: boolPtr(true),
 		},
 	}
 
 	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
 	assert.False(t, diags.HasError())
-	if assert.NotNil(t, resource.Features) && assert.NotNil(t, resource.Features.SchemaRegistry) {
-		assert.Equal(t, types.BoolValue(true), resource.Features.SchemaRegistry.Enabled)
+	if assert.NotNil(t, resource.Features) {
+		assert.Equal(t, types.BoolValue(true), resource.Features.SchemaRegistryEnabled)
 	}
 }
 

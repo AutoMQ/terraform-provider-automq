@@ -26,9 +26,7 @@ func TestInstanceCreateParamMarshalMatchesNewContract(t *testing.T) {
 				Warehouse:   "warehouse",
 				CatalogType: "HIVE",
 			},
-			SchemaRegistry: &SchemaRegistryParam{
-				Enabled: boolPtr(true),
-			},
+			SchemaRegistryEnabled: boolPtr(true),
 		},
 	}
 
@@ -77,17 +75,11 @@ func TestInstanceCreateParamMarshalMatchesNewContract(t *testing.T) {
 		}
 	}
 
-	schemaRegistry, ok := features["schemaRegistry"].(map[string]any)
-	if !ok {
-		t.Fatalf("schemaRegistry missing or wrong type")
+	if features["schemaRegistryEnabled"] != true {
+		t.Fatalf("expected schemaRegistryEnabled=true, got %v", features["schemaRegistryEnabled"])
 	}
-	if schemaRegistry["enabled"] != true {
-		t.Fatalf("expected schemaRegistry.enabled=true, got %v", schemaRegistry["enabled"])
-	}
-	for _, key := range []string{"type", "runtime", "extraEnv"} {
-		if _, ok := schemaRegistry[key]; ok {
-			t.Fatalf("schemaRegistry.%s should not be exposed in API payload", key)
-		}
+	if _, ok := features["schemaRegistry"]; ok {
+		t.Fatalf("schemaRegistry object should not be exposed in API payload")
 	}
 }
 

@@ -81,15 +81,15 @@ type KubernetesNodeGroupParam struct {
 }
 
 type InstanceFeatureParam struct {
-	WalMode         *string                       `json:"walMode,omitempty"`
-	Security        *InstanceSecurityParam        `json:"security,omitempty"`
-	InstanceConfigs []ConfigItemParam             `json:"instanceConfigs,omitempty"`
-	S3Failover      *InstanceFailoverParam        `json:"s3Failover,omitempty"`
-	MetricsExporter *InstanceMetricsExporterParam `json:"metricsExporter,omitempty"`
-	TableTopic      *TableTopicParam              `json:"tableTopic,omitempty"`
-	SchemaRegistry  *SchemaRegistryParam          `json:"schemaRegistry,omitempty"`
-	InboundRules    []InboundRuleParam            `json:"inboundRules,omitempty"`
-	ExtendListeners []InstanceListenerParam       `json:"extendListeners,omitempty"`
+	WalMode               *string                       `json:"walMode,omitempty"`
+	Security              *InstanceSecurityParam        `json:"security,omitempty"`
+	InstanceConfigs       []ConfigItemParam             `json:"instanceConfigs,omitempty"`
+	S3Failover            *InstanceFailoverParam        `json:"s3Failover,omitempty"`
+	MetricsExporter       *InstanceMetricsExporterParam `json:"metricsExporter,omitempty"`
+	TableTopic            *TableTopicParam              `json:"tableTopic,omitempty"`
+	SchemaRegistryEnabled *bool                         `json:"schemaRegistryEnabled,omitempty"`
+	InboundRules          []InboundRuleParam            `json:"inboundRules,omitempty"`
+	ExtendListeners       []InstanceListenerParam       `json:"extendListeners,omitempty"`
 }
 
 type InstanceSecurityParam struct {
@@ -144,10 +144,6 @@ type TableTopicParam struct {
 	UserPrincipal     *string `json:"userPrincipal,omitempty"`
 	KeytabFile        *string `json:"keytabFile,omitempty"`
 	Krb5ConfFile      *string `json:"krb5confFile,omitempty"`
-}
-
-type SchemaRegistryParam struct {
-	Enabled *bool `json:"enabled,omitempty"`
 }
 
 type InboundRuleParam struct {
@@ -276,14 +272,14 @@ type FileSystemVO struct {
 }
 
 type InstanceFeatureVO struct {
-	WalMode         *string                    `json:"walMode,omitempty"`
-	Security        *InstanceSecurityConfigVO  `json:"security,omitempty"`
-	S3Failover      *InstanceFailoverVO        `json:"s3Failover,omitempty"`
-	MetricsExporter *InstanceMetricsExporterVO `json:"metricsExporter,omitempty"`
-	TableTopic      *TableTopicVO              `json:"tableTopic,omitempty"`
-	SchemaRegistry  *SchemaRegistryVO          `json:"schemaRegistry,omitempty"`
-	ExtendListeners []InstanceListenerVO       `json:"extendListeners,omitempty"`
-	InboundRules    []InstanceInboundRuleVO    `json:"inboundRules,omitempty"`
+	WalMode               *string                    `json:"walMode,omitempty"`
+	Security              *InstanceSecurityConfigVO  `json:"security,omitempty"`
+	S3Failover            *InstanceFailoverVO        `json:"s3Failover,omitempty"`
+	MetricsExporter       *InstanceMetricsExporterVO `json:"metricsExporter,omitempty"`
+	TableTopic            *TableTopicVO              `json:"tableTopic,omitempty"`
+	SchemaRegistryEnabled *bool                      `json:"schemaRegistryEnabled,omitempty"`
+	ExtendListeners       []InstanceListenerVO       `json:"extendListeners,omitempty"`
+	InboundRules          []InstanceInboundRuleVO    `json:"inboundRules,omitempty"`
 }
 
 type InstanceSecurityConfigVO struct {
@@ -332,10 +328,6 @@ type TableTopicVO struct {
 	UserPrincipal     *string `json:"userPrincipal,omitempty"`
 	KeytabFile        *string `json:"keytabFile,omitempty"`
 	Krb5ConfFile      *string `json:"krb5confFile,omitempty"`
-}
-
-type SchemaRegistryVO struct {
-	Enabled bool `json:"enabled"`
 }
 
 type InstanceListenerVO struct {

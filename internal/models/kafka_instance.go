@@ -145,21 +145,21 @@ func coalesceBoolAttr(apiValue *bool, previous *types.Bool) types.Bool {
 }
 
 type FeaturesModel struct {
-	WalMode         types.String          `tfsdk:"wal_mode"`
-	InstanceConfigs types.Map             `tfsdk:"instance_configs"`
-	Security        *SecurityModel        `tfsdk:"security"`
-	MetricsExporter *MetricsExporterModel `tfsdk:"metrics_exporter"`
-	TableTopic      *TableTopicModel      `tfsdk:"table_topic"`
-	SchemaRegistry  *SchemaRegistryModel  `tfsdk:"schema_registry"`
+	WalMode               types.String          `tfsdk:"wal_mode"`
+	InstanceConfigs       types.Map             `tfsdk:"instance_configs"`
+	Security              *SecurityModel        `tfsdk:"security"`
+	MetricsExporter       *MetricsExporterModel `tfsdk:"metrics_exporter"`
+	TableTopic            *TableTopicModel      `tfsdk:"table_topic"`
+	SchemaRegistryEnabled types.Bool            `tfsdk:"schema_registry_enabled"`
 }
 
 type FeaturesSummaryModel struct {
-	WalMode         types.String          `tfsdk:"wal_mode"`
-	InstanceConfigs types.Map             `tfsdk:"instance_configs"`
-	Security        *SecuritySummaryModel `tfsdk:"security"`
-	MetricsExporter *MetricsExporterModel `tfsdk:"metrics_exporter"`
-	TableTopic      *TableTopicModel      `tfsdk:"table_topic"`
-	SchemaRegistry  *SchemaRegistryModel  `tfsdk:"schema_registry"`
+	WalMode               types.String          `tfsdk:"wal_mode"`
+	InstanceConfigs       types.Map             `tfsdk:"instance_configs"`
+	Security              *SecuritySummaryModel `tfsdk:"security"`
+	MetricsExporter       *MetricsExporterModel `tfsdk:"metrics_exporter"`
+	TableTopic            *TableTopicModel      `tfsdk:"table_topic"`
+	SchemaRegistryEnabled types.Bool            `tfsdk:"schema_registry_enabled"`
 }
 
 type SecurityModel struct {
@@ -221,10 +221,6 @@ type TableTopicModel struct {
 	UserPrincipal     types.String `tfsdk:"user_principal"`
 	KeytabFile        types.String `tfsdk:"keytab_file"`
 	Krb5ConfFile      types.String `tfsdk:"krb5conf_file"`
-}
-
-type SchemaRegistryModel struct {
-	Enabled types.Bool `tfsdk:"enabled"`
 }
 
 // ExpandKafkaInstanceResource converts a KafkaInstanceResourceModel to a client.InstanceCreateParam.
@@ -584,13 +580,9 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 		}
 
 		// Schema Registry
-		if instance.Features.SchemaRegistry != nil {
-			if !instance.Features.SchemaRegistry.Enabled.IsNull() && !instance.Features.SchemaRegistry.Enabled.IsUnknown() {
-				enabled := instance.Features.SchemaRegistry.Enabled.ValueBool()
-				schemaRegistry := &client.SchemaRegistryParam{}
-				schemaRegistry.Enabled = &enabled
-				request.Features.SchemaRegistry = schemaRegistry
-			}
+		if !instance.Features.SchemaRegistryEnabled.IsNull() && !instance.Features.SchemaRegistryEnabled.IsUnknown() {
+			enabled := instance.Features.SchemaRegistryEnabled.ValueBool()
+			request.Features.SchemaRegistryEnabled = &enabled
 		}
 
 		// Instance Configs
@@ -617,11 +609,11 @@ func ConvertKafkaInstanceModel(resource *KafkaInstanceResourceModel, model *Kafk
 	model.ComputeSpecs = resource.ComputeSpecs
 	if resource.Features != nil {
 		features := &FeaturesSummaryModel{
-			WalMode:         resource.Features.WalMode,
-			InstanceConfigs: resource.Features.InstanceConfigs,
-			MetricsExporter: resource.Features.MetricsExporter,
-			TableTopic:      resource.Features.TableTopic,
-			SchemaRegistry:  resource.Features.SchemaRegistry,
+			WalMode:               resource.Features.WalMode,
+			InstanceConfigs:       resource.Features.InstanceConfigs,
+			MetricsExporter:       resource.Features.MetricsExporter,
+			TableTopic:            resource.Features.TableTopic,
+			SchemaRegistryEnabled: resource.Features.SchemaRegistryEnabled,
 		}
 		if resource.Features.Security != nil {
 			features.Security = &SecuritySummaryModel{
@@ -1015,11 +1007,14 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 		resource.Features.TableTopic = flattenTableTopicVO(instance.Features.TableTopic, previousTableTopic)
 
 		// Schema Registry
-		var previousSchemaRegistry *SchemaRegistryModel
+		var previousSchemaRegistryEnabled *types.Bool
 		if previousFeatures != nil {
-			previousSchemaRegistry = previousFeatures.SchemaRegistry
+			previousSchemaRegistryEnabled = &previousFeatures.SchemaRegistryEnabled
 		}
-		resource.Features.SchemaRegistry = flattenSchemaRegistryVO(instance.Features.SchemaRegistry, previousSchemaRegistry)
+		resource.Features.SchemaRegistryEnabled = flattenSchemaRegistryEnabled(
+			instance.Features.SchemaRegistryEnabled,
+			previousSchemaRegistryEnabled,
+		)
 
 	}
 
@@ -1167,19 +1162,17 @@ func flattenTableTopicVO(vo *client.TableTopicVO, previous *TableTopicModel) *Ta
 	return &topic
 }
 
-func flattenSchemaRegistryVO(vo *client.SchemaRegistryVO, previous *SchemaRegistryModel) *SchemaRegistryModel {
-	if vo == nil {
-		return nil
+func flattenSchemaRegistryEnabled(enabled *bool, previous *types.Bool) types.Bool {
+	if enabled == nil {
+		if previous != nil {
+			return *previous
+		}
+		return types.BoolNull()
 	}
-
-	schemaRegistry := SchemaRegistryModel{
-		Enabled: types.BoolValue(vo.Enabled),
+	if previous != nil && !previous.IsNull() && !previous.IsUnknown() && *enabled == previous.ValueBool() {
+		return *previous
 	}
-	if previous != nil && vo.Enabled == previous.Enabled.ValueBool() {
-		schemaRegistry = *previous
-	}
-	schemaRegistry.Enabled = types.BoolValue(vo.Enabled)
-	return &schemaRegistry
+	return types.BoolValue(*enabled)
 }
 
 func retainString(api *string, previous types.String) types.String {

@@ -151,25 +151,15 @@ func TestSchemaRegistrySchema(t *testing.T) {
 	if !ok {
 		t.Fatalf("features attribute has unexpected type %T", s.Attributes["features"])
 	}
-	schemaRegistryAttrRaw, ok := featuresAttrRaw.Attributes["schema_registry"].(schema.SingleNestedAttribute)
+	schemaRegistryEnabledAttrRaw, ok := featuresAttrRaw.Attributes["schema_registry_enabled"].(schema.BoolAttribute)
 	if !ok {
-		t.Fatalf("schema_registry attribute has unexpected type %T", featuresAttrRaw.Attributes["schema_registry"])
+		t.Fatalf("schema_registry_enabled attribute has unexpected type %T", featuresAttrRaw.Attributes["schema_registry_enabled"])
 	}
-	enabledAttrRaw, ok := schemaRegistryAttrRaw.Attributes["enabled"].(schema.BoolAttribute)
-	if !ok {
-		t.Fatalf("schema_registry.enabled attribute has unexpected type %T", schemaRegistryAttrRaw.Attributes["enabled"])
+	if !schemaRegistryEnabledAttrRaw.Optional || !schemaRegistryEnabledAttrRaw.Computed {
+		t.Fatalf("schema_registry_enabled should be optional and computed")
 	}
-	if !schemaRegistryAttrRaw.Optional || !schemaRegistryAttrRaw.Computed {
-		t.Fatalf("schema_registry should be optional and computed")
-	}
-	if !enabledAttrRaw.Optional || !enabledAttrRaw.Computed {
-		t.Fatalf("schema_registry.enabled should be optional and computed")
-	}
-	if _, ok := schemaRegistryAttrRaw.Attributes["type"]; ok {
-		t.Fatalf("schema_registry.type should not be exposed")
-	}
-	if _, ok := schemaRegistryAttrRaw.Attributes["runtime"]; ok {
-		t.Fatalf("schema_registry.runtime should not be exposed")
+	if _, ok := featuresAttrRaw.Attributes["schema_registry"]; ok {
+		t.Fatalf("schema_registry nested object should not be exposed")
 	}
 }
 
@@ -191,19 +181,17 @@ func TestValidateKafkaInstanceConfiguration_TableTopicRequiresSchemaRegistryEnab
 				Warehouse:   types.StringValue("warehouse"),
 				CatalogType: types.StringValue("HIVE"),
 			},
-			SchemaRegistry: &models.SchemaRegistryModel{
-				Enabled: types.BoolValue(false),
-			},
+			SchemaRegistryEnabled: types.BoolValue(false),
 		},
 	}
 
 	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
 	if !diags.HasError() {
-		t.Fatalf("expected diagnostics when table_topic is configured with schema_registry.enabled=false")
+		t.Fatalf("expected diagnostics when table_topic is configured with schema_registry_enabled=false")
 	}
 	found := false
 	for _, d := range diags {
-		if strings.Contains(d.Detail(), "schema_registry.enabled cannot be false") {
+		if strings.Contains(d.Detail(), "schema_registry_enabled cannot be false") {
 			found = true
 			break
 		}
