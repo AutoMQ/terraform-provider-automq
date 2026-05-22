@@ -135,6 +135,7 @@ type MetricsLabelParam struct {
 }
 
 type TableTopicParam struct {
+	Enabled           *bool   `json:"enabled,omitempty"`
 	IntegrationId     *string `json:"integrationId,omitempty"`
 	Warehouse         string  `json:"warehouse"`
 	CatalogType       string  `json:"catalogType"`

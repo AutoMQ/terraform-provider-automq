@@ -164,6 +164,49 @@ func TestSchemaRegistrySchema(t *testing.T) {
 }
 
 func TestValidateKafkaInstanceConfiguration_TableTopicRequiresSchemaRegistryEnabled(t *testing.T) {
+	validBase := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			ReservedAku: types.Int64Value(6),
+			DeployType:  types.StringValue("IAAS"),
+			Networks: []models.NetworkModel{{
+				Zone: types.StringValue("cn-test-1"),
+				Subnets: types.ListValueMust(types.StringType, []attr.Value{
+					types.StringValue("subnet-1"),
+				}),
+			}},
+		},
+		Features: &models.FeaturesModel{
+			WalMode: types.StringValue("EBSWAL"),
+			TableTopic: &models.TableTopicModel{
+				Warehouse:   types.StringValue("warehouse"),
+				CatalogType: types.StringValue("HIVE"),
+			},
+			SchemaRegistryEnabled: types.BoolValue(true),
+		},
+	}
+	if diags := validateKafkaInstanceConfiguration(context.Background(), validBase, nil); diags.HasError() {
+		t.Fatalf("unexpected diagnostics for explicit schema_registry_enabled=true: %v", diags)
+	}
+
+	missingSchemaRegistry := *validBase
+	missingFeatures := *validBase.Features
+	missingFeatures.SchemaRegistryEnabled = types.BoolNull()
+	missingSchemaRegistry.Features = &missingFeatures
+	diags := validateKafkaInstanceConfiguration(context.Background(), &missingSchemaRegistry, nil)
+	if !diags.HasError() {
+		t.Fatalf("expected diagnostics when table_topic is configured without schema_registry_enabled=true")
+	}
+	found := false
+	for _, d := range diags {
+		if strings.Contains(d.Detail(), "schema_registry_enabled must be explicitly set to true") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected explicit schema registry dependency error, got: %v", diags)
+	}
+
 	plan := &models.KafkaInstanceResourceModel{
 		ComputeSpecs: &models.ComputeSpecsModel{
 			ReservedAku: types.Int64Value(6),
@@ -185,19 +228,57 @@ func TestValidateKafkaInstanceConfiguration_TableTopicRequiresSchemaRegistryEnab
 		},
 	}
 
-	diags := validateKafkaInstanceConfiguration(context.Background(), plan, nil)
+	diags = validateKafkaInstanceConfiguration(context.Background(), plan, nil)
 	if !diags.HasError() {
 		t.Fatalf("expected diagnostics when table_topic is configured with schema_registry_enabled=false")
 	}
-	found := false
+	found = false
 	for _, d := range diags {
-		if strings.Contains(d.Detail(), "schema_registry_enabled cannot be false") {
+		if strings.Contains(d.Detail(), "schema_registry_enabled must be explicitly set to true") {
 			found = true
 			break
 		}
 	}
 	if !found {
 		t.Fatalf("expected schema registry dependency error, got: %v", diags)
+	}
+}
+
+func TestValidateKafkaInstanceConfiguration_TableTopicRemovalRejected(t *testing.T) {
+	state := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			ReservedAku: types.Int64Value(6),
+		},
+		Features: &models.FeaturesModel{
+			TableTopic: &models.TableTopicModel{
+				Warehouse:   types.StringValue("warehouse"),
+				CatalogType: types.StringValue("HIVE"),
+			},
+			SchemaRegistryEnabled: types.BoolValue(true),
+		},
+	}
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			ReservedAku: types.Int64Value(6),
+		},
+		Features: &models.FeaturesModel{
+			SchemaRegistryEnabled: types.BoolValue(true),
+		},
+	}
+
+	diags := validateKafkaInstanceConfiguration(context.Background(), plan, state)
+	if !diags.HasError() {
+		t.Fatalf("expected diagnostics when table_topic is removed from an enabled instance")
+	}
+	found := false
+	for _, d := range diags {
+		if strings.Contains(d.Detail(), "Removing features.table_topic") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected unsupported table_topic removal error, got: %v", diags)
 	}
 }
 
@@ -261,8 +342,8 @@ func TestImmutableAttributesHaveRequiresReplace(t *testing.T) {
 		t.Fatalf("table_topic attribute has unexpected type %T", featuresAttr.Attributes["table_topic"])
 	}
 	tableTopicAttr := tableTopicAttrRaw
-	if !hasObjectRequiresReplace(tableTopicAttr.PlanModifiers) {
-		t.Fatalf("expected table_topic to require replacement, modifiers: %v", tableTopicAttr.PlanModifiers)
+	if hasObjectRequiresReplace(tableTopicAttr.PlanModifiers) {
+		t.Fatalf("table_topic must support in-place enable and should not require replacement, modifiers: %v", tableTopicAttr.PlanModifiers)
 	}
 	// compute_specs.instance_role
 	instanceRoleAttrRaw, ok := computeAttr.Attributes["instance_role"].(schema.StringAttribute)

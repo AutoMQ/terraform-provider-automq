@@ -133,9 +133,9 @@ Read-Only:
 
 - `instance_configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
 - `metrics_exporter` (Attributes) Prometheus Remote Write metrics exporter configuration. (see [below for nested schema](#nestedatt--features--metrics_exporter))
-- `schema_registry_enabled` (Boolean) Whether Schema Registry is enabled for this Kafka instance.
+- `schema_registry_enabled` (Boolean) Whether Schema Registry is enabled for this Kafka instance. Table Topic requires this value to be enabled.
 - `security` (Attributes) Security configuration for the Kafka instance. (see [below for nested schema](#nestedatt--features--security))
-- `table_topic` (Attributes) Table topic configuration (warehouse/catalog settings). (see [below for nested schema](#nestedatt--features--table_topic))
+- `table_topic` (Attributes) Table Topic configuration (warehouse/catalog settings). Presence in readback means Table Topic is enabled for the instance. (see [below for nested schema](#nestedatt--features--table_topic))
 - `wal_mode` (String) Write-Ahead Logging mode: EBSWAL (using EBS as write buffer), S3WAL (using object storage as write buffer), or FSWAL (using file system as write buffer). Defaults to EBSWAL.
 
 <a id="nestedatt--features--metrics_exporter"></a>
@@ -173,6 +173,8 @@ Read-Only:
 
 <a id="nestedatt--features--table_topic"></a>
 ### Nested Schema for `features.table_topic`
+
+Readback exposes this block when Table Topic is enabled. The Catalog configuration is immutable after enablement.
 
 Read-Only:
 

@@ -118,6 +118,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 						},
 					},
 					TableTopic: &client.TableTopicParam{
+						Enabled:     boolPtr(true),
 						Warehouse:   "warehouse-1",
 						CatalogType: "HIVE",
 					},

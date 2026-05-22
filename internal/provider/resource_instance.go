@@ -24,7 +24,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
@@ -492,7 +491,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					},
 					"table_topic": schema.SingleNestedAttribute{
 						Optional:            true,
-						MarkdownDescription: "Inline table topic (Iceberg/Hive) configuration replacing legacy integration references.",
+						MarkdownDescription: "Inline table topic (Iceberg/Hive) configuration. Presence of this block enables Table Topic; removing it from an enabled instance is not supported.",
 						Attributes: map[string]schema.Attribute{
 							"warehouse": schema.StringAttribute{
 								Required:            true,
@@ -527,9 +526,6 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 								Optional:            true,
 								MarkdownDescription: "Base64-encoded Kerberos krb5.conf file content. Required when `hive_auth_mode` is `KERBEROS`.",
 							},
-						},
-						PlanModifiers: []planmodifier.Object{
-							objectplanmodifier.RequiresReplace(),
 						},
 					},
 					"schema_registry_enabled": schema.BoolAttribute{
@@ -712,12 +708,26 @@ func validateKafkaInstanceConfiguration(ctx context.Context, plan *models.KafkaI
 		}
 	}
 
-	if plan.Features != nil && plan.Features.TableTopic != nil {
+	var stateTableTopic *models.TableTopicModel
+	if state != nil && state.Features != nil {
+		stateTableTopic = state.Features.TableTopic
+	}
+	var planTableTopic *models.TableTopicModel
+	if plan.Features != nil {
+		planTableTopic = plan.Features.TableTopic
+	}
+	if stateTableTopic != nil && planTableTopic == nil {
+		diagnostics.AddError(
+			"Unsupported Configuration",
+			"Removing features.table_topic from configuration would disable Table Topic, which is not supported. Keep the block in configuration for instances where Table Topic is already enabled.",
+		)
+	}
+	if planTableTopic != nil {
 		enabled := plan.Features.SchemaRegistryEnabled
-		if !enabled.IsNull() && !enabled.IsUnknown() && !enabled.ValueBool() {
+		if enabled.IsNull() || enabled.IsUnknown() || !enabled.ValueBool() {
 			diagnostics.AddError(
 				"Invalid Configuration",
-				"features.schema_registry_enabled cannot be false when features.table_topic is configured.",
+				"features.schema_registry_enabled must be explicitly set to true when features.table_topic is configured.",
 			)
 		}
 	}
@@ -1087,6 +1097,31 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 				hasUpdate = true
 				shouldWait = true
 			}
+		}
+	}
+
+	if plan.Features != nil {
+		var stateTableTopic *models.TableTopicModel
+		if state.Features != nil {
+			stateTableTopic = state.Features.TableTopic
+		}
+		if tableTopicChanged(plan.Features.TableTopic, stateTableTopic) {
+			if plan.Features.TableTopic == nil {
+				resp.Diagnostics.AddError(
+					"Unsupported Configuration",
+					"Removing features.table_topic from configuration would disable Table Topic, which is not supported. Keep the block in configuration for instances where Table Topic is already enabled.",
+				)
+				return
+			}
+			tableTopic, err := buildTableTopicParam(plan.Features.TableTopic)
+			if err != nil {
+				resp.Diagnostics.AddError("Invalid Configuration", err.Error())
+				return
+			}
+			features := ensureFeatures()
+			features.TableTopic = tableTopic
+			hasUpdate = true
+			shouldWait = true
 		}
 	}
 
@@ -1472,6 +1507,66 @@ func schemaRegistryEnabledChanged(plan, state types.Bool) bool {
 		return false
 	}
 	return !boolAttrEqual(plan, state)
+}
+
+func tableTopicChanged(plan, state *models.TableTopicModel) bool {
+	if plan == nil {
+		return state != nil
+	}
+	if state == nil {
+		return true
+	}
+	return !stringAttrEqual(plan.Warehouse, state.Warehouse) ||
+		!stringAttrEqual(plan.CatalogType, state.CatalogType) ||
+		!stringAttrEqual(plan.MetastoreURI, state.MetastoreURI) ||
+		!stringAttrEqual(plan.HiveAuthMode, state.HiveAuthMode) ||
+		!stringAttrEqual(plan.KerberosPrincipal, state.KerberosPrincipal) ||
+		!stringAttrEqual(plan.UserPrincipal, state.UserPrincipal) ||
+		!stringAttrEqual(plan.KeytabFile, state.KeytabFile) ||
+		!stringAttrEqual(plan.Krb5ConfFile, state.Krb5ConfFile)
+}
+
+func buildTableTopicParam(model *models.TableTopicModel) (*client.TableTopicParam, error) {
+	if model == nil {
+		return nil, nil
+	}
+	if model.Warehouse.IsNull() || model.Warehouse.IsUnknown() {
+		return nil, fmt.Errorf("features.table_topic.warehouse is required when table_topic is set")
+	}
+	if model.CatalogType.IsNull() || model.CatalogType.IsUnknown() {
+		return nil, fmt.Errorf("features.table_topic.catalog_type is required when table_topic is set")
+	}
+	enabled := true
+	topic := &client.TableTopicParam{
+		Enabled:     &enabled,
+		Warehouse:   model.Warehouse.ValueString(),
+		CatalogType: model.CatalogType.ValueString(),
+	}
+	if !model.MetastoreURI.IsNull() && !model.MetastoreURI.IsUnknown() {
+		uri := model.MetastoreURI.ValueString()
+		topic.MetastoreUri = &uri
+	}
+	if !model.HiveAuthMode.IsNull() && !model.HiveAuthMode.IsUnknown() {
+		mode := model.HiveAuthMode.ValueString()
+		topic.HiveAuthMode = &mode
+	}
+	if !model.KerberosPrincipal.IsNull() && !model.KerberosPrincipal.IsUnknown() {
+		principal := model.KerberosPrincipal.ValueString()
+		topic.KerberosPrincipal = &principal
+	}
+	if !model.UserPrincipal.IsNull() && !model.UserPrincipal.IsUnknown() {
+		principal := model.UserPrincipal.ValueString()
+		topic.UserPrincipal = &principal
+	}
+	if !model.KeytabFile.IsNull() && !model.KeytabFile.IsUnknown() {
+		keytab := model.KeytabFile.ValueString()
+		topic.KeytabFile = &keytab
+	}
+	if !model.Krb5ConfFile.IsNull() && !model.Krb5ConfFile.IsUnknown() {
+		conf := model.Krb5ConfFile.ValueString()
+		topic.Krb5ConfFile = &conf
+	}
+	return topic, nil
 }
 
 func stringAttrEqual(plan, state types.String) bool {

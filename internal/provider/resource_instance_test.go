@@ -1049,6 +1049,7 @@ func renderKafkaInstanceConfig(env accConfig, cfg accInstanceConfig) string {
 	}
 
 	if cfg.TableTopic != nil {
+		b.WriteString("    schema_registry_enabled = true\n")
 		b.WriteString("    table_topic = {\n")
 		fmt.Fprintf(&b, "      warehouse = %q\n", cfg.TableTopic.Warehouse)
 		fmt.Fprintf(&b, "      catalog_type = %q\n", cfg.TableTopic.CatalogType)

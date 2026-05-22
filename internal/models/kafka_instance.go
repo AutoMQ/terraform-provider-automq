@@ -552,6 +552,8 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 				Warehouse:   topicModel.Warehouse.ValueString(),
 				CatalogType: topicModel.CatalogType.ValueString(),
 			}
+			enabled := true
+			topic.Enabled = &enabled
 			if !topicModel.MetastoreURI.IsNull() && !topicModel.MetastoreURI.IsUnknown() {
 				uri := topicModel.MetastoreURI.ValueString()
 				topic.MetastoreUri = &uri

@@ -23,6 +23,7 @@ func TestInstanceCreateParamMarshalMatchesNewContract(t *testing.T) {
 				},
 			},
 			TableTopic: &TableTopicParam{
+				Enabled:     boolPtr(true),
 				Warehouse:   "warehouse",
 				CatalogType: "HIVE",
 			},
@@ -69,10 +70,13 @@ func TestInstanceCreateParamMarshalMatchesNewContract(t *testing.T) {
 	if !ok {
 		t.Fatalf("tableTopic missing or wrong type")
 	}
-	for _, key := range []string{"warehouse", "catalogType"} {
+	for _, key := range []string{"enabled", "warehouse", "catalogType"} {
 		if _, ok := tableTopic[key]; !ok {
 			t.Errorf("expected tableTopic.%s to be present", key)
 		}
+	}
+	if tableTopic["enabled"] != true {
+		t.Fatalf("expected tableTopic.enabled=true, got %v", tableTopic["enabled"])
 	}
 
 	if features["schemaRegistryEnabled"] != true {

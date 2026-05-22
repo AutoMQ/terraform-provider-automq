@@ -57,6 +57,14 @@ resource "automq_kafka_instance" "example" {
       transit_encryption_modes = ["plaintext"]
     }
     schema_registry_enabled = true
+
+    # Optional. Adding this block enables Table Topic in-place on eligible instances.
+    # Keep schema_registry_enabled explicitly true because Table Topic depends on Schema Registry.
+    # Removing this block from an already-enabled instance is not supported.
+    table_topic = {
+      catalog_type = "glue"
+      warehouse    = "s3://automq-table-topic-warehouse"
+    }
   }
 }
 
@@ -174,8 +182,8 @@ Optional:
 
 - `instance_configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
 - `metrics_exporter` (Attributes) Configure Prometheus Remote Write metrics exporter. (see [below for nested schema](#nestedatt--features--metrics_exporter))
-- `schema_registry_enabled` (Boolean) Whether to enable Schema Registry for this Kafka instance.
-- `table_topic` (Attributes) Inline table topic (Iceberg/Hive) configuration replacing legacy integration references. (see [below for nested schema](#nestedatt--features--table_topic))
+- `schema_registry_enabled` (Boolean) Whether to enable Schema Registry for this Kafka instance. Must be explicitly set to `true` when `table_topic` is configured.
+- `table_topic` (Attributes) Inline table topic (Iceberg/Hive) configuration. Presence of this block enables Table Topic and may trigger a rolling restart. Removing this block from an already-enabled instance is not supported. (see [below for nested schema](#nestedatt--features--table_topic))
 
 <a id="nestedatt--features--security"></a>
 ### Nested Schema for `features.security`
@@ -237,6 +245,8 @@ Optional:
 
 <a id="nestedatt--features--table_topic"></a>
 ### Nested Schema for `features.table_topic`
+
+Presence of this block enables Table Topic. It can be added to an eligible existing instance as an in-place update, but Table Topic is open-only: removing the block or trying to close Table Topic after enablement is not supported. Keep `features.schema_registry_enabled = true` in the same configuration.
 
 Required:
 
