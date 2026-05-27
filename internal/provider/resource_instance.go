@@ -15,7 +15,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -1079,16 +1078,8 @@ func (r *KafkaInstanceResource) ImportState(ctx context.Context, req resource.Im
 	environmentId := idParts[0]
 	instanceId := idParts[1]
 
-	// Set the default value for instance_configs to an empty map
-
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("environment_id"), environmentId)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), instanceId)...)
-
-	config := types.MapValueMust(types.StringType, map[string]attr.Value{})
-	features := models.FeaturesModel{
-		InstanceConfigs: config,
-	}
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("features"), features)...)
 }
 
 func shouldRefreshInstanceEndpoints(instance *client.InstanceVO) bool {
@@ -1120,11 +1111,6 @@ func refreshKafkaInstanceState(ctx context.Context, r *KafkaInstanceResource, in
 		diags.Append(models.FlattenKafkaInstanceModelWithEndpoints(endpoints, state)...)
 	}
 	return instance, true, diags
-}
-
-func ReadKafkaInstance(ctx context.Context, r *KafkaInstanceResource, instanceId string, state *models.KafkaInstanceResourceModel) diag.Diagnostics {
-	_, _, diags := refreshKafkaInstanceState(ctx, r, instanceId, state)
-	return diags
 }
 
 type instanceUpdatePlan struct {
