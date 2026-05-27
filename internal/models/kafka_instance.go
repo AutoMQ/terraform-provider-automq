@@ -245,9 +245,7 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 	// Compute Specs
 	if instance.ComputeSpecs != nil {
 		// Reserved AKU
-		request.Spec = client.SpecificationParam{
-			NodeConfig: &client.NodeConfigParam{},
-		}
+		request.Spec = client.SpecificationParam{}
 		if !instance.ComputeSpecs.ReservedAku.IsNull() && !instance.ComputeSpecs.ReservedAku.IsUnknown() {
 			request.Spec.ReservedAku = int32(instance.ComputeSpecs.ReservedAku.ValueInt64())
 		}
@@ -272,6 +270,9 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 				return fmt.Errorf("failed to parse instance_types: %v", diags)
 			}
 			if len(instanceTypes) > 0 {
+				if request.Spec.NodeConfig == nil {
+					request.Spec.NodeConfig = &client.NodeConfigParam{}
+				}
 				request.Spec.NodeConfig.InstanceTypes = instanceTypes
 			}
 		}
@@ -300,9 +301,6 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 			role := instance.ComputeSpecs.InstanceRole.ValueString()
 			request.Spec.InstanceRole = &role
 		}
-		// ignore Node Configs
-
-		// Networks
 		// Kubernetes Node Groups
 		if len(instance.ComputeSpecs.KubernetesNodeGroups) > 0 {
 			nodeGroups := make([]client.KubernetesNodeGroupParam, 0, len(instance.ComputeSpecs.KubernetesNodeGroups))
@@ -317,22 +315,22 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 		if len(instance.ComputeSpecs.Networks) > 0 {
 			networks := make([]client.InstanceNetworkParam, 0, len(instance.ComputeSpecs.Networks))
 			for _, network := range instance.ComputeSpecs.Networks {
-				subnet := ""
+				var subnet *string
 				if !network.Subnets.IsNull() {
 					subnets := ExpandStringValueList(network.Subnets)
 					if len(subnets) > 0 {
-						subnet = subnets[0]
+						subnet = &subnets[0]
 					}
 				}
 				networks = append(networks, client.InstanceNetworkParam{
 					Zone:   network.Zone.ValueString(),
-					Subnet: &subnet,
+					Subnet: subnet,
 				})
 			}
 			request.Spec.Networks = networks
 		}
 		if !instance.ComputeSpecs.DataBuckets.IsNull() && !instance.ComputeSpecs.DataBuckets.IsUnknown() {
-			dataBucketModels, dataBucketDiags := DataBucketListToModels(context.TODO(), instance.ComputeSpecs.DataBuckets)
+			dataBucketModels, dataBucketDiags := DataBucketListToModels(ctx, instance.ComputeSpecs.DataBuckets)
 			if dataBucketDiags.HasError() {
 				return fmt.Errorf("failed to parse compute_specs.data_buckets: %v", dataBucketDiags.Errors())
 			}
@@ -424,7 +422,7 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 
 			if !instance.Features.Security.AuthenticationMethods.IsNull() {
 				var authMethods []string
-				diags := instance.Features.Security.AuthenticationMethods.ElementsAs(context.TODO(), &authMethods, false)
+				diags := instance.Features.Security.AuthenticationMethods.ElementsAs(ctx, &authMethods, false)
 				if diags.HasError() {
 					return fmt.Errorf("failed to parse authentication methods: %v", diags)
 				}
@@ -436,7 +434,7 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 
 			if !instance.Features.Security.TransitEncryptionModes.IsNull() {
 				var encryptionModes []string
-				diags := instance.Features.Security.TransitEncryptionModes.ElementsAs(context.TODO(), &encryptionModes, false)
+				diags := instance.Features.Security.TransitEncryptionModes.ElementsAs(ctx, &encryptionModes, false)
 				if diags.HasError() {
 					return fmt.Errorf("failed to parse transit encryption modes: %v", diags)
 				}
@@ -801,7 +799,6 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 				}
 			}
 			resource.ComputeSpecs.KubernetesNodeGroups = nodeGroups
-			// Networks
 		}
 		if instance.Spec.Networks != nil {
 			networks, networkDiags := flattenNetworks(instance.Spec.Networks)
@@ -814,7 +811,7 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 
 		var previousDataBuckets []DataBucketModel
 		if previousSpecs != nil {
-			prevBuckets, prevDiags := DataBucketListToModels(context.TODO(), previousSpecs.DataBuckets)
+			prevBuckets, prevDiags := DataBucketListToModels(ctx, previousSpecs.DataBuckets)
 			if prevDiags.HasError() {
 				diags.Append(prevDiags...)
 			}
@@ -836,7 +833,7 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 				}
 				dataBuckets = append(dataBuckets, base)
 			}
-			listValue, listDiags := DataBucketModelsToList(context.TODO(), dataBuckets)
+			listValue, listDiags := DataBucketModelsToList(ctx, dataBuckets)
 			if listDiags.HasError() {
 				diags.Append(listDiags...)
 			} else {

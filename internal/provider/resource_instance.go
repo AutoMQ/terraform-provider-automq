@@ -62,7 +62,6 @@ type kafkaInstanceAPI interface {
 	DeleteKafkaInstance(ctx context.Context, instanceId string) error
 	UpdateKafkaInstance(ctx context.Context, instanceId string, param client.InstanceUpdateParam) error
 	GetInstanceEndpoints(ctx context.Context, instanceId string) ([]client.InstanceAccessInfoVO, error)
-	GetInstanceConfigs(ctx context.Context, instanceId string) ([]client.ConfigItemParam, error)
 }
 
 type defaultKafkaInstanceAPI struct {
@@ -93,10 +92,6 @@ func (a defaultKafkaInstanceAPI) UpdateKafkaInstance(ctx context.Context, instan
 
 func (a defaultKafkaInstanceAPI) GetInstanceEndpoints(ctx context.Context, instanceId string) ([]client.InstanceAccessInfoVO, error) {
 	return a.client.GetInstanceEndpoints(ctx, instanceId)
-}
-
-func (a defaultKafkaInstanceAPI) GetInstanceConfigs(ctx context.Context, instanceId string) ([]client.ConfigItemParam, error) {
-	return a.client.GetInstanceConfigs(ctx, instanceId)
 }
 
 func (r *KafkaInstanceResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -1456,19 +1451,6 @@ func stringAttrEqual(plan, state types.String) bool {
 		return false
 	}
 	return plan.ValueString() == state.ValueString()
-}
-
-func listAttrEqual(plan, state types.List) bool {
-	if plan.IsUnknown() {
-		return true
-	}
-	if plan.IsNull() {
-		return state.IsNull() || state.IsUnknown()
-	}
-	if state.IsNull() || state.IsUnknown() {
-		return false
-	}
-	return plan.Equal(state)
 }
 
 func mapAttrEqual(plan, state types.Map) bool {
