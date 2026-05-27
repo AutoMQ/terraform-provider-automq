@@ -507,6 +507,36 @@ func TestFlattenKafkaInstanceModel_RemovesMetricsExporterWhenAPIEmitsNone(t *tes
 	}
 }
 
+func TestFlattenKafkaInstanceModel_PreservesCertificateFieldsWhenAPIOmitsThem(t *testing.T) {
+	resource := &KafkaInstanceResourceModel{
+		Features: &FeaturesModel{
+			Security: &SecurityModel{
+				CertificateAuthority: types.StringValue("ca-pem"),
+				CertificateChain:     types.StringValue("chain-pem"),
+				PrivateKey:           types.StringValue("key-pem"),
+			},
+		},
+	}
+	instance := &client.InstanceVO{
+		InstanceId: strPtr("test-instance"),
+		Features: &client.InstanceFeatureVO{
+			WalMode: strPtr("EBSWAL"),
+			Security: &client.InstanceSecurityConfigVO{
+				DataEncryptionMode: strPtr("NONE"),
+			},
+		},
+	}
+
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+	assert.False(t, diags.HasError())
+	if resource.Features == nil || resource.Features.Security == nil {
+		t.Fatalf("security unexpectedly nil")
+	}
+	assert.Equal(t, types.StringValue("ca-pem"), resource.Features.Security.CertificateAuthority)
+	assert.Equal(t, types.StringValue("chain-pem"), resource.Features.Security.CertificateChain)
+	assert.Equal(t, types.StringValue("key-pem"), resource.Features.Security.PrivateKey)
+}
+
 func TestFlattenKafkaInstanceModel_FSWAL(t *testing.T) {
 	tests := []struct {
 		name     string
