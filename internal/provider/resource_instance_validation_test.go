@@ -12,7 +12,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 
 	"terraform-provider-automq/internal/models"
 )
@@ -217,6 +219,32 @@ func TestImmutableAttributesHaveRequiresReplace(t *testing.T) {
 	if !hasStringRequiresReplace(instanceRoleAttr.PlanModifiers) {
 		t.Fatalf("expected instance_role to require replacement, modifiers: %v", instanceRoleAttr.PlanModifiers)
 	}
+	requireConfiguredOnlyStringReplacement(t, instanceRoleAttr.PlanModifiers)
+}
+
+func TestGeneratedStringAttributesOnlyReplaceWhenConfigured(t *testing.T) {
+	s := getKafkaInstanceResourceSchema(t)
+	computeAttrRaw, ok := s.Attributes["compute_specs"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("compute_specs attribute has unexpected type %T", s.Attributes["compute_specs"])
+	}
+	computeAttr := computeAttrRaw
+
+	dnsZoneAttrRaw, ok := computeAttr.Attributes["dns_zone"].(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("dns_zone attribute has unexpected type %T", computeAttr.Attributes["dns_zone"])
+	}
+	dnsZoneAttr := dnsZoneAttrRaw
+	if !dnsZoneAttr.Optional {
+		t.Fatalf("dns_zone should be optional")
+	}
+	if !dnsZoneAttr.Computed {
+		t.Fatalf("dns_zone should be computed")
+	}
+	if !hasStringRequiresReplace(dnsZoneAttr.PlanModifiers) {
+		t.Fatalf("expected dns_zone to require replacement, modifiers: %v", dnsZoneAttr.PlanModifiers)
+	}
+	requireConfiguredOnlyStringReplacement(t, dnsZoneAttr.PlanModifiers)
 }
 
 func getKafkaInstanceResourceSchema(t *testing.T) schema.Schema {
@@ -252,6 +280,55 @@ func hasStringRequiresReplace(mods []planmodifier.String) bool {
 	return false
 }
 
+func requireConfiguredOnlyStringReplacement(t *testing.T, mods []planmodifier.String) {
+	t.Helper()
+	var replaceModifier planmodifier.String
+	for _, m := range mods {
+		if strings.Contains(strings.ToLower(reflect.TypeOf(m).String()), "requiresreplace") {
+			replaceModifier = m
+			break
+		}
+	}
+	if replaceModifier == nil {
+		t.Fatalf("requires replace modifier missing")
+	}
+
+	nonNullPlan := tfsdk.Plan{Raw: tftypes.NewValue(tftypes.String, "plan")}
+	nonNullState := tfsdk.State{Raw: tftypes.NewValue(tftypes.String, "state")}
+
+	unconfiguredReq := planmodifier.StringRequest{
+		ConfigValue: types.StringNull(),
+		Plan:        nonNullPlan,
+		PlanValue:   types.StringUnknown(),
+		State:       nonNullState,
+		StateValue:  types.StringValue("state-value"),
+	}
+	unconfiguredResp := planmodifier.StringResponse{}
+	replaceModifier.PlanModifyString(context.Background(), unconfiguredReq, &unconfiguredResp)
+	if unconfiguredResp.Diagnostics.HasError() {
+		t.Fatalf("unexpected diagnostics for unconfigured string attribute: %v", unconfiguredResp.Diagnostics)
+	}
+	if unconfiguredResp.RequiresReplace {
+		t.Fatalf("unconfigured computed string attribute must not require replacement")
+	}
+
+	configuredReq := planmodifier.StringRequest{
+		ConfigValue: types.StringValue("plan-value"),
+		Plan:        nonNullPlan,
+		PlanValue:   types.StringValue("plan-value"),
+		State:       nonNullState,
+		StateValue:  types.StringValue("state-value"),
+	}
+	configuredResp := planmodifier.StringResponse{}
+	replaceModifier.PlanModifyString(context.Background(), configuredReq, &configuredResp)
+	if configuredResp.Diagnostics.HasError() {
+		t.Fatalf("unexpected diagnostics for configured string attribute: %v", configuredResp.Diagnostics)
+	}
+	if !configuredResp.RequiresReplace {
+		t.Fatalf("configured changed string attribute must require replacement")
+	}
+}
+
 func hasListRequiresReplace(mods []planmodifier.List) bool {
 	for _, m := range mods {
 		if strings.Contains(strings.ToLower(reflect.TypeOf(m).String()), "requiresreplace") {
@@ -259,6 +336,57 @@ func hasListRequiresReplace(mods []planmodifier.List) bool {
 		}
 	}
 	return false
+}
+
+func requireConfiguredOnlyListReplacement(t *testing.T, mods []planmodifier.List) {
+	t.Helper()
+	var replaceModifier planmodifier.List
+	for _, m := range mods {
+		if strings.Contains(strings.ToLower(reflect.TypeOf(m).String()), "requiresreplace") {
+			replaceModifier = m
+			break
+		}
+	}
+	if replaceModifier == nil {
+		t.Fatalf("requires replace modifier missing")
+	}
+
+	stateValue := types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-state")})
+	planValue := types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-plan")})
+	nonNullPlan := tfsdk.Plan{Raw: tftypes.NewValue(tftypes.String, "plan")}
+	nonNullState := tfsdk.State{Raw: tftypes.NewValue(tftypes.String, "state")}
+
+	unconfiguredReq := planmodifier.ListRequest{
+		ConfigValue: types.ListNull(types.StringType),
+		Plan:        nonNullPlan,
+		PlanValue:   types.ListUnknown(types.StringType),
+		State:       nonNullState,
+		StateValue:  stateValue,
+	}
+	unconfiguredResp := planmodifier.ListResponse{}
+	replaceModifier.PlanModifyList(context.Background(), unconfiguredReq, &unconfiguredResp)
+	if unconfiguredResp.Diagnostics.HasError() {
+		t.Fatalf("unexpected diagnostics for unconfigured security_groups: %v", unconfiguredResp.Diagnostics)
+	}
+	if unconfiguredResp.RequiresReplace {
+		t.Fatalf("unconfigured computed security_groups must not require replacement")
+	}
+
+	configuredReq := planmodifier.ListRequest{
+		ConfigValue: planValue,
+		Plan:        nonNullPlan,
+		PlanValue:   planValue,
+		State:       nonNullState,
+		StateValue:  stateValue,
+	}
+	configuredResp := planmodifier.ListResponse{}
+	replaceModifier.PlanModifyList(context.Background(), configuredReq, &configuredResp)
+	if configuredResp.Diagnostics.HasError() {
+		t.Fatalf("unexpected diagnostics for configured security_groups: %v", configuredResp.Diagnostics)
+	}
+	if !configuredResp.RequiresReplace {
+		t.Fatalf("configured changed security_groups must require replacement")
+	}
 }
 
 func TestValidateKafkaInstanceConfiguration_FSWALMissingFileSystem(t *testing.T) {
@@ -595,6 +723,7 @@ func TestFileSystemParamValidators(t *testing.T) {
 	if !hasListRequiresReplace(securityGroupsAttr.PlanModifiers) {
 		t.Fatalf("expected security_groups to require replacement, modifiers: %v", securityGroupsAttr.PlanModifiers)
 	}
+	requireConfiguredOnlyListReplacement(t, securityGroupsAttr.PlanModifiers)
 }
 func TestSecurityGroupsValidator(t *testing.T) {
 	s := getKafkaInstanceResourceSchema(t)
@@ -788,6 +917,7 @@ func TestComputeSpecsSecurityGroupsValidator(t *testing.T) {
 	if !hasListRequiresReplace(securityGroupsAttr.PlanModifiers) {
 		t.Fatalf("expected security_groups to require replacement, modifiers: %v", securityGroupsAttr.PlanModifiers)
 	}
+	requireConfiguredOnlyListReplacement(t, securityGroupsAttr.PlanModifiers)
 	if len(securityGroupsAttr.Validators) == 0 {
 		t.Fatalf("security_groups validators missing")
 	}

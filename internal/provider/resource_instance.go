@@ -38,6 +38,7 @@ import (
 var _ resource.Resource = &KafkaInstanceResource{}
 var _ resource.ResourceWithConfigure = &KafkaInstanceResource{}
 var _ resource.ResourceWithImportState = &KafkaInstanceResource{}
+var _ resource.ResourceWithValidateConfig = &KafkaInstanceResource{}
 
 func NewKafkaInstanceResource() resource.Resource {
 	r := &KafkaInstanceResource{}
@@ -196,10 +197,10 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					"dns_zone": schema.StringAttribute{
 						Optional:            true,
 						Computed:            true,
-						MarkdownDescription: "DNS zone used when creating custom records.",
+						MarkdownDescription: "DNS zone used when creating custom records. Changing a configured DNS zone requires instance replacement.",
 						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplaceIfConfigured(),
 							stringplanmodifier.UseStateForUnknown(),
-							stringplanmodifier.RequiresReplace(),
 						},
 					},
 					"networks": schema.ListNestedAttribute{
@@ -290,9 +291,9 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					"instance_role": schema.StringAttribute{
 						Computed:            true,
 						Optional:            true,
-						MarkdownDescription: "IAM role ARN for the Kafka instance. If not specified, the backend will auto-generate an appropriate role. Format: `arn:aws:iam::<account-id>:role/<role-name>`.",
+						MarkdownDescription: "IAM role ARN for the Kafka instance. If not specified, the backend will auto-generate an appropriate role. Format: `arn:aws:iam::<account-id>:role/<role-name>`. Changing a configured instance role requires instance replacement.",
 						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.RequiresReplace(),
+							stringplanmodifier.RequiresReplaceIfConfigured(),
 							stringplanmodifier.UseStateForUnknown(),
 						},
 					},
@@ -300,9 +301,9 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						ElementType:         types.StringType,
 						Optional:            true,
 						Computed:            true,
-						MarkdownDescription: "Security groups for the instance. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group.",
+						MarkdownDescription: "Security groups for the instance. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group. Changing configured security groups requires instance replacement.",
 						PlanModifiers: []planmodifier.List{
-							listplanmodifier.RequiresReplace(),
+							listplanmodifier.RequiresReplaceIfConfigured(),
 							listplanmodifier.UseStateForUnknown(),
 						},
 						Validators: []validator.List{
@@ -341,9 +342,9 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 								ElementType:         types.StringType,
 								Optional:            true,
 								Computed:            true,
-								MarkdownDescription: "Security groups for file systems. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group.",
+								MarkdownDescription: "Security groups for file systems. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group. Changing configured security groups requires instance replacement.",
 								PlanModifiers: []planmodifier.List{
-									listplanmodifier.RequiresReplace(),
+									listplanmodifier.RequiresReplaceIfConfigured(),
 									listplanmodifier.UseStateForUnknown(),
 								},
 								Validators: []validator.List{
@@ -821,6 +822,15 @@ func validateKafkaInstanceConfiguration(ctx context.Context, plan *models.KafkaI
 	}
 
 	return diagnostics
+}
+
+func (r *KafkaInstanceResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var config models.KafkaInstanceResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(validateKafkaInstanceConfiguration(ctx, &config, nil)...)
 }
 
 func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
