@@ -859,12 +859,6 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 	}
 	ctx = context.WithValue(ctx, client.EnvIdKey, instance.EnvironmentID.ValueString())
 
-	// network or kubernetes node group must be set
-	if len(instance.ComputeSpecs.Networks) == 0 && len(instance.ComputeSpecs.KubernetesNodeGroups) == 0 {
-		resp.Diagnostics.AddError("Invalid Configuration", "At least one of the network or kubernetes node group must be set.")
-		return
-	}
-
 	// Generate API request body from plan
 	in := client.InstanceCreateParam{}
 	if err := models.ExpandKafkaInstanceResource(ctx, instance, &in); err != nil {
