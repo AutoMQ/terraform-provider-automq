@@ -56,6 +56,14 @@ resource "automq_kafka_instance" "example" {
       authentication_methods   = ["anonymous"]
       transit_encryption_modes = ["plaintext"]
     }
+    schema_registry_enabled = true
+
+    # Optional. Adding this block enables Table Topic in place on eligible instances.
+    # Keep schema_registry_enabled explicitly true because Table Topic depends on Schema Registry.
+    table_topic = {
+      catalog_type = "glue"
+      warehouse    = "s3://automq-table-topic-warehouse"
+    }
   }
 }
 
@@ -173,7 +181,8 @@ Optional:
 
 - `instance_configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
 - `metrics_exporter` (Attributes) Configure Prometheus Remote Write metrics exporter. (see [below for nested schema](#nestedatt--features--metrics_exporter))
-- `table_topic` (Attributes) Inline table topic (Iceberg/Hive) configuration replacing legacy integration references. (see [below for nested schema](#nestedatt--features--table_topic))
+- `schema_registry_enabled` (Boolean) Whether Schema Registry is enabled for this Kafka instance. Set this to `true` when configuring `features.table_topic`.
+- `table_topic` (Attributes) Inline table topic (Iceberg/Hive) configuration. Presence of this block enables Table Topic in place. Removing or changing it after enablement is not supported. (see [below for nested schema](#nestedatt--features--table_topic))
 
 <a id="nestedatt--features--security"></a>
 ### Nested Schema for `features.security`

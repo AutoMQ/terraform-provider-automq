@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -25,13 +26,13 @@ func TestValidateKafkaInstanceConfiguration_K8SMissingCluster(t *testing.T) {
 		ComputeSpecs: &models.ComputeSpecsModel{
 			ReservedAku: types.Int64Value(6),
 			DeployType:  types.StringValue("K8S"),
-			Networks: []models.NetworkModel{{
+			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone:    types.StringValue("cn-test-1"),
 				Subnets: types.ListNull(types.StringType),
-			}},
-			KubernetesNodeGroups: []models.NodeGroupModel{{
+			}}),
+			KubernetesNodeGroups: testNodeGroupList(t, []models.NodeGroupModel{{
 				ID: types.StringValue("ng-1"),
-			}},
+			}}),
 		},
 	}
 
@@ -53,19 +54,80 @@ func TestValidateKafkaInstanceConfiguration_K8SMissingCluster(t *testing.T) {
 	}
 }
 
+func TestValidateConfigAcceptsUnknownNestedValues(t *testing.T) {
+	ctx := context.Background()
+	s := getKafkaInstanceResourceSchema(t)
+	config := tfsdk.Config{
+		Schema: s,
+		Raw: newUnknownNestedInstanceConfigRaw(t, s, models.KafkaInstanceResourceModel{
+			EnvironmentID: types.StringValue("env-1"),
+			Name:          types.StringValue("test-instance"),
+			Version:       types.StringValue("5.4.2"),
+			ComputeSpecs: &models.ComputeSpecsModel{
+				ReservedAku:   types.Int64Value(6),
+				DeployType:    types.StringValue("IAAS"),
+				InstanceTypes: types.ListNull(types.StringType),
+				Networks: testNetworkList(t, []models.NetworkModel{{
+					Zone:    types.StringValue("us-east-1a"),
+					Subnets: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
+				}}),
+				KubernetesNodeGroups: types.ListUnknown(models.NodeGroupObjectType),
+				FileSystemParam:      types.ObjectUnknown(models.FileSystemParamObjectType.AttrTypes),
+				DataBuckets:          types.ListNull(models.DataBucketObjectType),
+				SecurityGroups:       types.ListNull(types.StringType),
+			},
+			Features: &models.FeaturesModel{
+				WalMode:         types.StringValue("EBSWAL"),
+				InstanceConfigs: types.MapNull(types.StringType),
+				Security: testSecurityObject(t, &models.SecurityModel{
+					AuthenticationMethods:  types.SetValueMust(types.StringType, []attr.Value{types.StringValue("anonymous")}),
+					TransitEncryptionModes: types.SetValueMust(types.StringType, []attr.Value{types.StringValue("plaintext")}),
+				}),
+				MetricsExporter: types.ObjectUnknown(models.MetricsExporterObjectType.AttrTypes),
+				TableTopic:      types.ObjectUnknown(models.TableTopicObjectType.AttrTypes),
+			},
+			Tags: types.MapNull(types.StringType),
+			Timeouts: timeouts.Value{Object: types.ObjectNull(map[string]attr.Type{
+				"create": types.StringType,
+				"delete": types.StringType,
+			})},
+			Endpoints: types.ListNull(types.ObjectType{AttrTypes: map[string]attr.Type{
+				"display_name":      types.StringType,
+				"network_type":      types.StringType,
+				"protocol":          types.StringType,
+				"mechanisms":        types.StringType,
+				"bootstrap_servers": types.StringType,
+			}}),
+		}),
+	}
+
+	resIface := NewKafkaInstanceResource()
+	res, ok := resIface.(*KafkaInstanceResource)
+	if !ok {
+		t.Fatalf("NewKafkaInstanceResource returned unexpected type %T", resIface)
+	}
+
+	resp := resource.ValidateConfigResponse{}
+	res.ValidateConfig(ctx, resource.ValidateConfigRequest{Config: config}, &resp)
+
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("ValidateConfig should accept unknown nested values and defer their contract checks, got: %v", resp.Diagnostics)
+	}
+}
+
 func TestValidateKafkaInstanceConfiguration_K8SValid(t *testing.T) {
 	plan := &models.KafkaInstanceResourceModel{
 		ComputeSpecs: &models.ComputeSpecsModel{
 			ReservedAku:          types.Int64Value(6),
 			DeployType:           types.StringValue("K8S"),
 			KubernetesClusterID:  types.StringValue("cluster-1"),
-			KubernetesNodeGroups: []models.NodeGroupModel{{ID: types.StringValue("ng-1")}},
-			Networks: []models.NetworkModel{{
+			KubernetesNodeGroups: testNodeGroupList(t, []models.NodeGroupModel{{ID: types.StringValue("ng-1")}}),
+			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone: types.StringValue("cn-test-1"),
 				Subnets: types.ListValueMust(types.StringType, []attr.Value{
 					types.StringValue("subnet-1"),
 				}),
-			}},
+			}}),
 		},
 		Features: &models.FeaturesModel{WalMode: types.StringValue("EBSWAL")},
 	}
@@ -81,12 +143,12 @@ func TestValidateKafkaInstanceConfiguration_DataBucketsMissingName(t *testing.T)
 		ComputeSpecs: &models.ComputeSpecsModel{
 			ReservedAku: types.Int64Value(6),
 			DeployType:  types.StringValue("IAAS"),
-			Networks: []models.NetworkModel{{
+			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone: types.StringValue("cn-test-1"),
 				Subnets: types.ListValueMust(types.StringType, []attr.Value{
 					types.StringValue("subnet-1"),
 				}),
-			}},
+			}}),
 			DataBuckets: types.ListValueMust(
 				models.DataBucketObjectType,
 				[]attr.Value{
@@ -225,16 +287,16 @@ func TestBuildInstanceUpdateParamOnlyIncludesBackendPatchFields(t *testing.T) {
 		Name:         types.StringValue("old-name"),
 		Description:  types.StringValue("old-description"),
 		Version:      types.StringValue("1.0.0"),
-		ComputeSpecs: buildUpdateTestComputeSpecs(6, 1, "EFS_PROVISIONED", 384, 1, "sg-state", "role-state"),
+		ComputeSpecs: buildUpdateTestComputeSpecs(t, 6, 1, "EFS_PROVISIONED", 384, 1, "sg-state", "role-state"),
 	}
 	plan := models.KafkaInstanceResourceModel{
 		InstanceID:   types.StringValue("inst-1"),
 		Name:         types.StringValue("new-name"),
 		Description:  types.StringValue("new-description"),
 		Version:      types.StringValue("1.1.0"),
-		ComputeSpecs: buildUpdateTestComputeSpecs(12, 2, "ONTAP_V2", 768, 2, "sg-plan", "role-plan"),
+		ComputeSpecs: buildUpdateTestComputeSpecs(t, 12, 2, "ONTAP_V2", 768, 2, "sg-plan", "role-plan"),
 	}
-	updateParam, updatePlan := buildInstanceUpdateParam(plan, state)
+	updateParam, updatePlan := testBuildInstanceUpdateParam(t, plan, state)
 	if !updatePlan.hasUpdate {
 		t.Fatalf("expected update plan to have updates")
 	}
@@ -276,16 +338,16 @@ func TestBuildInstanceUpdateParamUsesStateForReservedAkuDiff(t *testing.T) {
 		Name:         types.StringValue("same-name"),
 		Description:  types.StringValue("same-description"),
 		Version:      types.StringValue("1.0.0"),
-		ComputeSpecs: buildUpdateTestComputeSpecs(6, 1, "EFS_PROVISIONED", 384, 1, "sg-state", "role-state"),
+		ComputeSpecs: buildUpdateTestComputeSpecs(t, 6, 1, "EFS_PROVISIONED", 384, 1, "sg-state", "role-state"),
 	}
 	plan := models.KafkaInstanceResourceModel{
 		InstanceID:   types.StringValue("inst-1"),
 		Name:         types.StringValue("same-name"),
 		Description:  types.StringValue("same-description"),
 		Version:      types.StringValue("1.0.0"),
-		ComputeSpecs: buildUpdateTestComputeSpecs(12, 1, "EFS_PROVISIONED", 384, 1, "sg-state", "role-state"),
+		ComputeSpecs: buildUpdateTestComputeSpecs(t, 12, 1, "EFS_PROVISIONED", 384, 1, "sg-state", "role-state"),
 	}
-	updateParam, updatePlan := buildInstanceUpdateParam(plan, state)
+	updateParam, updatePlan := testBuildInstanceUpdateParam(t, plan, state)
 	if !updatePlan.hasUpdate {
 		t.Fatalf("expected reserved_aku plan/state diff to produce PATCH update")
 	}
@@ -300,16 +362,16 @@ func TestBuildInstanceUpdateParamReturnsNoUpdateForCreateOnlyChanges(t *testing.
 		Name:         types.StringValue("same-name"),
 		Description:  types.StringValue("same-description"),
 		Version:      types.StringValue("1.0.0"),
-		ComputeSpecs: buildUpdateTestComputeSpecs(6, 1, "EFS_PROVISIONED", 384, 1, "sg-state", "role-state"),
+		ComputeSpecs: buildUpdateTestComputeSpecs(t, 6, 1, "EFS_PROVISIONED", 384, 1, "sg-state", "role-state"),
 	}
 	plan := models.KafkaInstanceResourceModel{
 		InstanceID:   types.StringValue("inst-1"),
 		Name:         types.StringValue("same-name"),
 		Description:  types.StringValue("same-description"),
 		Version:      types.StringValue("1.0.0"),
-		ComputeSpecs: buildUpdateTestComputeSpecs(6, 1, "ONTAP_V2", 384, 1, "sg-plan", "role-plan"),
+		ComputeSpecs: buildUpdateTestComputeSpecs(t, 6, 1, "ONTAP_V2", 384, 1, "sg-plan", "role-plan"),
 	}
-	updateParam, updatePlan := buildInstanceUpdateParam(plan, state)
+	updateParam, updatePlan := testBuildInstanceUpdateParam(t, plan, state)
 	if updatePlan.hasUpdate {
 		t.Fatalf("create-only/backend-managed changes must not produce PATCH update: %#v", updateParam)
 	}
@@ -337,7 +399,7 @@ func TestValidateInstanceUpdateContractRejectsInstanceConfigRemoval(t *testing.T
 		},
 	}
 
-	diags := validateInstanceUpdateContract("inst-1", plan, state)
+	diags := testValidateInstanceUpdateContract(plan, state)
 	if !diags.HasError() {
 		t.Fatalf("expected diagnostics when removing an existing instance config key")
 	}
@@ -353,7 +415,7 @@ func TestValidateInstanceUpdateContractRejectsInstanceConfigRemoval(t *testing.T
 	}
 }
 
-func buildUpdateTestComputeSpecs(reservedAKU, reservedNodeCount int64, fileSystemType string, throughput, count int64, securityGroup, instanceRole string) *models.ComputeSpecsModel {
+func buildUpdateTestComputeSpecs(t *testing.T, reservedAKU, reservedNodeCount int64, fileSystemType string, throughput, count int64, securityGroup, instanceRole string) *models.ComputeSpecsModel {
 	return &models.ComputeSpecsModel{
 		ReservedAku:       types.Int64Value(reservedAKU),
 		ReservedNodeCount: types.Int64Value(reservedNodeCount),
@@ -361,14 +423,14 @@ func buildUpdateTestComputeSpecs(reservedAKU, reservedNodeCount int64, fileSyste
 			types.StringValue(securityGroup),
 		}),
 		InstanceRole: types.StringValue(instanceRole),
-		FileSystemParam: &models.FileSystemParamModel{
+		FileSystemParam: testFileSystemObject(t, &models.FileSystemParamModel{
 			FileSystemType:               types.StringValue(fileSystemType),
 			ThroughputMibpsPerFileSystem: types.Int64Value(throughput),
 			FileSystemCount:              types.Int64Value(count),
 			SecurityGroups: types.ListValueMust(types.StringType, []attr.Value{
 				types.StringValue(securityGroup),
 			}),
-		},
+		}),
 	}
 }
 
@@ -494,8 +556,19 @@ func TestImmutableAttributesHaveRequiresReplace(t *testing.T) {
 		t.Fatalf("table_topic attribute has unexpected type %T", featuresAttr.Attributes["table_topic"])
 	}
 	tableTopicAttr := tableTopicAttrRaw
-	if !hasObjectRequiresReplace(tableTopicAttr.PlanModifiers) {
-		t.Fatalf("expected table_topic to require replacement, modifiers: %v", tableTopicAttr.PlanModifiers)
+	if hasObjectRequiresReplace(tableTopicAttr.PlanModifiers) {
+		t.Fatalf("table_topic must not require replacement; it is enabled in place and guarded by update validation, modifiers: %v", tableTopicAttr.PlanModifiers)
+	}
+	if !tableTopicAttr.Optional || tableTopicAttr.Computed {
+		t.Fatalf("table_topic should be optional-only so removing/nulling it after enablement plans an update that provider can reject")
+	}
+	schemaRegistryAttrRaw, ok := featuresAttr.Attributes["schema_registry_enabled"].(schema.BoolAttribute)
+	if !ok {
+		t.Fatalf("schema_registry_enabled attribute has unexpected type %T", featuresAttr.Attributes["schema_registry_enabled"])
+	}
+	schemaRegistryAttr := schemaRegistryAttrRaw
+	if !schemaRegistryAttr.Optional || !schemaRegistryAttr.Computed {
+		t.Fatalf("schema_registry_enabled should be optional and computed")
 	}
 	// compute_specs.instance_role
 	instanceRoleAttrRaw, ok := computeAttr.Attributes["instance_role"].(schema.StringAttribute)
@@ -547,6 +620,16 @@ func getKafkaInstanceResourceSchema(t *testing.T) schema.Schema {
 		t.Fatalf("failed to get schema: %v", resp.Diagnostics)
 	}
 	return resp.Schema
+}
+
+func newUnknownNestedInstanceConfigRaw(t *testing.T, s schema.Schema, config any) tftypes.Value {
+	t.Helper()
+	plan := tfsdk.Plan{Schema: s}
+	diags := plan.Set(context.Background(), config)
+	if diags.HasError() {
+		t.Fatalf("failed to build test config raw value: %v", diags)
+	}
+	return plan.Raw
 }
 
 func hasObjectRequiresReplace(mods []planmodifier.Object) bool {
@@ -681,12 +764,12 @@ func TestValidateKafkaInstanceConfiguration_FSWALMissingFileSystem(t *testing.T)
 		ComputeSpecs: &models.ComputeSpecsModel{
 			ReservedAku: types.Int64Value(6),
 			DeployType:  types.StringValue("IAAS"),
-			Networks: []models.NetworkModel{{
+			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone: types.StringValue("cn-test-1"),
 				Subnets: types.ListValueMust(types.StringType, []attr.Value{
 					types.StringValue("subnet-1"),
 				}),
-			}},
+			}}),
 			// FileSystemParam is intentionally nil
 		},
 		Features: &models.FeaturesModel{
@@ -717,17 +800,17 @@ func TestValidateKafkaInstanceConfiguration_FileSystemWithoutFSWAL(t *testing.T)
 		ComputeSpecs: &models.ComputeSpecsModel{
 			ReservedAku: types.Int64Value(6),
 			DeployType:  types.StringValue("IAAS"),
-			Networks: []models.NetworkModel{{
+			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone: types.StringValue("cn-test-1"),
 				Subnets: types.ListValueMust(types.StringType, []attr.Value{
 					types.StringValue("subnet-1"),
 				}),
-			}},
-			FileSystemParam: &models.FileSystemParamModel{
+			}}),
+			FileSystemParam: testFileSystemObject(t, &models.FileSystemParamModel{
 				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 				FileSystemCount:              types.Int64Value(2),
 				SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-test")}),
-			},
+			}),
 		},
 		Features: &models.FeaturesModel{
 			WalMode: types.StringValue("EBSWAL"), // Not FSWAL
@@ -757,18 +840,18 @@ func TestValidateKafkaInstanceConfiguration_FSWALValid(t *testing.T) {
 		ComputeSpecs: &models.ComputeSpecsModel{
 			ReservedAku: types.Int64Value(6),
 			DeployType:  types.StringValue("IAAS"),
-			Networks: []models.NetworkModel{{
+			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone: types.StringValue("cn-test-1"),
 				Subnets: types.ListValueMust(types.StringType, []attr.Value{
 					types.StringValue("subnet-1"),
 				}),
-			}},
-			FileSystemParam: &models.FileSystemParamModel{
+			}}),
+			FileSystemParam: testFileSystemObject(t, &models.FileSystemParamModel{
 				FileSystemType:               types.StringValue("EFS_PROVISIONED"),
 				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 				FileSystemCount:              types.Int64Value(2),
 				SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-test")}),
-			},
+			}),
 		},
 		Features: &models.FeaturesModel{
 			WalMode: types.StringValue("FSWAL"),
@@ -786,17 +869,17 @@ func TestValidateKafkaInstanceConfiguration_FSWALMissingThroughput(t *testing.T)
 		ComputeSpecs: &models.ComputeSpecsModel{
 			ReservedAku: types.Int64Value(6),
 			DeployType:  types.StringValue("IAAS"),
-			Networks: []models.NetworkModel{{
+			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone: types.StringValue("cn-test-1"),
 				Subnets: types.ListValueMust(types.StringType, []attr.Value{
 					types.StringValue("subnet-1"),
 				}),
-			}},
-			FileSystemParam: &models.FileSystemParamModel{
+			}}),
+			FileSystemParam: testFileSystemObject(t, &models.FileSystemParamModel{
 				ThroughputMibpsPerFileSystem: types.Int64Null(), // Missing required field
 				FileSystemCount:              types.Int64Value(2),
 				SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-test")}),
-			},
+			}),
 		},
 		Features: &models.FeaturesModel{
 			WalMode: types.StringValue("FSWAL"),
@@ -826,17 +909,17 @@ func TestValidateKafkaInstanceConfiguration_FSWALMissingFileSystemCount(t *testi
 		ComputeSpecs: &models.ComputeSpecsModel{
 			ReservedAku: types.Int64Value(6),
 			DeployType:  types.StringValue("IAAS"),
-			Networks: []models.NetworkModel{{
+			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone: types.StringValue("cn-test-1"),
 				Subnets: types.ListValueMust(types.StringType, []attr.Value{
 					types.StringValue("subnet-1"),
 				}),
-			}},
-			FileSystemParam: &models.FileSystemParamModel{
+			}}),
+			FileSystemParam: testFileSystemObject(t, &models.FileSystemParamModel{
 				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 				FileSystemCount:              types.Int64Null(), // Missing required field
 				SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-test")}),
-			},
+			}),
 		},
 		Features: &models.FeaturesModel{
 			WalMode: types.StringValue("FSWAL"),
@@ -866,17 +949,17 @@ func TestValidateKafkaInstanceConfiguration_FileSystemWithoutFeatures(t *testing
 		ComputeSpecs: &models.ComputeSpecsModel{
 			ReservedAku: types.Int64Value(6),
 			DeployType:  types.StringValue("IAAS"),
-			Networks: []models.NetworkModel{{
+			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone: types.StringValue("cn-test-1"),
 				Subnets: types.ListValueMust(types.StringType, []attr.Value{
 					types.StringValue("subnet-1"),
 				}),
-			}},
-			FileSystemParam: &models.FileSystemParamModel{
+			}}),
+			FileSystemParam: testFileSystemObject(t, &models.FileSystemParamModel{
 				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 				FileSystemCount:              types.Int64Value(2),
 				SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-test")}),
-			},
+			}),
 		},
 		// Features is nil
 	}
@@ -1083,17 +1166,17 @@ func TestValidateKafkaInstanceConfiguration_FSWALWithEmptySecurityGroups(t *test
 		ComputeSpecs: &models.ComputeSpecsModel{
 			ReservedAku: types.Int64Value(6),
 			DeployType:  types.StringValue("IAAS"),
-			Networks: []models.NetworkModel{{
+			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone: types.StringValue("cn-test-1"),
 				Subnets: types.ListValueMust(types.StringType, []attr.Value{
 					types.StringValue("subnet-1"),
 				}),
-			}},
-			FileSystemParam: &models.FileSystemParamModel{
+			}}),
+			FileSystemParam: testFileSystemObject(t, &models.FileSystemParamModel{
 				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 				FileSystemCount:              types.Int64Value(2),
 				SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{}), // Empty list
-			},
+			}),
 		},
 		Features: &models.FeaturesModel{
 			WalMode: types.StringValue("FSWAL"),
@@ -1122,18 +1205,18 @@ func TestValidateKafkaInstanceConfiguration_FSWALWithNullSecurityGroups(t *testi
 		ComputeSpecs: &models.ComputeSpecsModel{
 			ReservedAku: types.Int64Value(6),
 			DeployType:  types.StringValue("IAAS"),
-			Networks: []models.NetworkModel{{
+			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone: types.StringValue("cn-test-1"),
 				Subnets: types.ListValueMust(types.StringType, []attr.Value{
 					types.StringValue("subnet-1"),
 				}),
-			}},
-			FileSystemParam: &models.FileSystemParamModel{
+			}}),
+			FileSystemParam: testFileSystemObject(t, &models.FileSystemParamModel{
 				FileSystemType:               types.StringValue("ONTAP_V2"),
 				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 				FileSystemCount:              types.Int64Value(2),
 				SecurityGroups:               types.ListNull(types.StringType), // Null - backend will auto-generate
-			},
+			}),
 		},
 		Features: &models.FeaturesModel{
 			WalMode: types.StringValue("FSWAL"),
@@ -1153,18 +1236,18 @@ func TestValidateKafkaInstanceConfiguration_FSWALWithUnknownSecurityGroups(t *te
 		ComputeSpecs: &models.ComputeSpecsModel{
 			ReservedAku: types.Int64Value(6),
 			DeployType:  types.StringValue("IAAS"),
-			Networks: []models.NetworkModel{{
+			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone: types.StringValue("cn-test-1"),
 				Subnets: types.ListValueMust(types.StringType, []attr.Value{
 					types.StringValue("subnet-1"),
 				}),
-			}},
-			FileSystemParam: &models.FileSystemParamModel{
+			}}),
+			FileSystemParam: testFileSystemObject(t, &models.FileSystemParamModel{
 				FileSystemType:               types.StringValue("EFS_PROVISIONED"),
 				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 				FileSystemCount:              types.Int64Value(2),
 				SecurityGroups:               types.ListUnknown(types.StringType), // Unknown during planning
-			},
+			}),
 		},
 		Features: &models.FeaturesModel{
 			WalMode: types.StringValue("FSWAL"),
@@ -1342,18 +1425,18 @@ func TestValidateKafkaInstanceConfiguration_FSWALMissingFileSystemType(t *testin
 		ComputeSpecs: &models.ComputeSpecsModel{
 			ReservedAku: types.Int64Value(6),
 			DeployType:  types.StringValue("IAAS"),
-			Networks: []models.NetworkModel{{
+			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone: types.StringValue("cn-test-1"),
 				Subnets: types.ListValueMust(types.StringType, []attr.Value{
 					types.StringValue("subnet-1"),
 				}),
-			}},
-			FileSystemParam: &models.FileSystemParamModel{
+			}}),
+			FileSystemParam: testFileSystemObject(t, &models.FileSystemParamModel{
 				FileSystemType:               types.StringNull(), // Missing file_system_type
 				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 				FileSystemCount:              types.Int64Value(2),
 				SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-test")}),
-			},
+			}),
 		},
 		Features: &models.FeaturesModel{
 			WalMode: types.StringValue("FSWAL"),
@@ -1384,10 +1467,10 @@ func TestValidateKafkaInstanceConfiguration_UsageBasedMissingNodeCount(t *testin
 			PricingMode:       types.StringValue("UsageBased"),
 			ReservedNodeCount: types.Int64Null(),
 			InstanceTypes:     types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.xlarge")}),
-			Networks: []models.NetworkModel{{
+			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone:    types.StringValue("us-east-1a"),
 				Subnets: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
-			}},
+			}}),
 		},
 		Features: &models.FeaturesModel{WalMode: types.StringValue("EBSWAL")},
 	}
@@ -1414,10 +1497,10 @@ func TestValidateKafkaInstanceConfiguration_UsageBasedNullNodeCountDoesNotUseSta
 			PricingMode:       types.StringValue("UsageBased"),
 			ReservedNodeCount: types.Int64Null(),
 			InstanceTypes:     types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.xlarge")}),
-			Networks: []models.NetworkModel{{
+			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone:    types.StringValue("us-east-1a"),
 				Subnets: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
-			}},
+			}}),
 		},
 		Features: &models.FeaturesModel{WalMode: types.StringValue("EBSWAL")},
 	}
@@ -1453,10 +1536,10 @@ func TestValidateKafkaInstanceConfiguration_UsageBasedMissingInstanceTypes(t *te
 			DeployType:        types.StringValue("IAAS"),
 			ReservedNodeCount: types.Int64Value(5),
 			InstanceTypes:     types.ListNull(types.StringType),
-			Networks: []models.NetworkModel{{
+			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone:    types.StringValue("us-east-1a"),
 				Subnets: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
-			}},
+			}}),
 		},
 		Features: &models.FeaturesModel{WalMode: types.StringValue("EBSWAL")},
 	}
@@ -1485,9 +1568,9 @@ func TestValidateKafkaInstanceConfiguration_UsageBasedK8SAllowsMissingInstanceTy
 			ReservedNodeCount:   types.Int64Value(5),
 			InstanceTypes:       types.ListNull(types.StringType),
 			KubernetesClusterID: types.StringValue("cluster-1"),
-			KubernetesNodeGroups: []models.NodeGroupModel{{
+			KubernetesNodeGroups: testNodeGroupList(t, []models.NodeGroupModel{{
 				ID: types.StringValue("ng-1"),
-			}},
+			}}),
 		},
 		Features: &models.FeaturesModel{WalMode: types.StringValue("EBSWAL")},
 	}
@@ -1503,10 +1586,10 @@ func TestValidateKafkaInstanceConfiguration_CommittedMissingAku(t *testing.T) {
 		ComputeSpecs: &models.ComputeSpecsModel{
 			PricingMode: types.StringValue("SubscriptionBased"),
 			ReservedAku: types.Int64Null(),
-			Networks: []models.NetworkModel{{
+			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone:    types.StringValue("us-east-1a"),
 				Subnets: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
-			}},
+			}}),
 		},
 		Features: &models.FeaturesModel{WalMode: types.StringValue("EBSWAL")},
 	}
@@ -1533,10 +1616,10 @@ func TestValidateKafkaInstanceConfiguration_UsageBasedValid(t *testing.T) {
 			PricingMode:       types.StringValue("UsageBased"),
 			ReservedNodeCount: types.Int64Value(5),
 			InstanceTypes:     types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.xlarge")}),
-			Networks: []models.NetworkModel{{
+			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone:    types.StringValue("us-east-1a"),
 				Subnets: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
-			}},
+			}}),
 		},
 		Features: &models.FeaturesModel{WalMode: types.StringValue("EBSWAL")},
 	}

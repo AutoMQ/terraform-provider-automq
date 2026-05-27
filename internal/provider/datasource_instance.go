@@ -230,6 +230,10 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 							"krb5conf_file":      schema.StringAttribute{Computed: true, Sensitive: true, MarkdownDescription: "Kerberos krb5.conf file content."},
 						},
 					},
+					"schema_registry_enabled": schema.BoolAttribute{
+						Computed:            true,
+						MarkdownDescription: "Whether Schema Registry is enabled for this Kafka instance.",
+					},
 					"security": schema.SingleNestedAttribute{
 						Computed:            true,
 						MarkdownDescription: "Security configuration for the Kafka instance.",
@@ -401,9 +405,17 @@ func (r *KafkaInstanceDataSource) Read(ctx context.Context, req datasource.ReadR
 		resp.Diagnostics.AddError("Conversion Error", fmt.Sprintf("Failed to convert Kafka instance model: %s", err))
 		return
 	}
-	// Update the model with the configurations
-	model.Features.InstanceConfigs = models.FlattenStringValueMap(configs)
+	// Update the model with the configurations. Some older or partial API
+	// responses may omit features while instance configs are fetched separately.
+	applyInstanceConfigsToDataSourceModel(&model, configs)
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
+}
+
+func applyInstanceConfigsToDataSourceModel(model *models.KafkaInstanceModel, configs []client.ConfigItemParam) {
+	if model.Features == nil {
+		model.Features = &models.FeaturesSummaryModel{}
+	}
+	model.Features.InstanceConfigs = models.FlattenStringValueMap(configs)
 }

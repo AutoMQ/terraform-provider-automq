@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,6 +16,65 @@ import (
 
 func testStringPtr(s string) *string {
 	return &s
+}
+
+func testSecurityObject(t *testing.T, model *models.SecurityModel) types.Object {
+	t.Helper()
+	value, diags := models.SecurityModelToObject(context.Background(), model)
+	require.False(t, diags.HasError(), "failed to build security object: %v", diags)
+	return value
+}
+
+func testMetricsExporterObject(t *testing.T, model *models.MetricsExporterModel) types.Object {
+	t.Helper()
+	value, diags := models.MetricsExporterModelToObject(context.Background(), model)
+	require.False(t, diags.HasError(), "failed to build metrics exporter object: %v", diags)
+	return value
+}
+
+func testTableTopicObject(t *testing.T, model *models.TableTopicModel) types.Object {
+	t.Helper()
+	value, diags := models.TableTopicModelToObject(context.Background(), model)
+	require.False(t, diags.HasError(), "failed to build table topic object: %v", diags)
+	return value
+}
+
+func testFileSystemObject(t *testing.T, model *models.FileSystemParamModel) types.Object {
+	t.Helper()
+	value, diags := models.FileSystemParamModelToObject(context.Background(), model)
+	require.False(t, diags.HasError(), "failed to build file system object: %v", diags)
+	return value
+}
+
+func testNetworkList(t *testing.T, networks []models.NetworkModel) types.List {
+	t.Helper()
+	value, diags := models.NetworkModelsToList(context.Background(), networks)
+	require.False(t, diags.HasError(), "failed to build network list: %v", diags)
+	return value
+}
+
+func testNodeGroupList(t *testing.T, groups []models.NodeGroupModel) types.List {
+	t.Helper()
+	value, diags := models.NodeGroupModelsToList(context.Background(), groups)
+	require.False(t, diags.HasError(), "failed to build node group list: %v", diags)
+	return value
+}
+
+func testValidateInstanceUpdateContract(plan, state models.KafkaInstanceResourceModel) diag.Diagnostics {
+	return validateInstanceUpdateContract(context.Background(), "inst-1", plan, state)
+}
+
+func testBuildInstanceUpdateParam(t *testing.T, plan, state models.KafkaInstanceResourceModel) (client.InstanceUpdateParam, instanceUpdatePlan) {
+	t.Helper()
+	param, updatePlan, diags := buildInstanceUpdateParam(context.Background(), plan, state)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+	return param, updatePlan
+}
+
+func testApplyUpdateStatePreservation(t *testing.T, state *models.KafkaInstanceResourceModel, plan models.KafkaInstanceResourceModel, updatePlan instanceUpdatePlan) {
+	t.Helper()
+	diags := applyUpdateStatePreservation(context.Background(), state, plan, updatePlan)
+	require.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
 }
 
 type stubKafkaInstanceAPI struct {
@@ -64,7 +124,7 @@ func TestInstanceContractValidation(t *testing.T) {
 			ComputeSpecs: &models.ComputeSpecsModel{
 				DeployType:           types.StringValue("K8S"),
 				KubernetesClusterID:  types.StringNull(),
-				KubernetesNodeGroups: nil,
+				KubernetesNodeGroups: types.ListNull(models.NodeGroupObjectType),
 			},
 			Features: &models.FeaturesModel{
 				WalMode: types.StringValue("EBSWAL"),
@@ -126,14 +186,37 @@ func TestInstanceContractValidation(t *testing.T) {
 
 	t.Run("metrics exporter block requires configured prometheus block", func(t *testing.T) {
 		plan := newValidUsageBasedIAASPlan()
-		plan.Features.MetricsExporter = &models.MetricsExporterModel{
+		plan.Features.MetricsExporter = testMetricsExporterObject(t, &models.MetricsExporterModel{
 			Prometheus: &models.PrometheusExporterModel{
 				AuthType: types.StringNull(),
 			},
-		}
+		})
 		diags := validateInstanceContract(context.Background(), &plan)
 		require.True(t, diags.HasError())
 		assert.Len(t, diags.Errors(), 1)
+	})
+
+	t.Run("table topic requires explicit schema registry enablement", func(t *testing.T) {
+		plan := newValidUsageBasedIAASPlan()
+		plan.Features.SchemaRegistryEnabled = types.BoolNull()
+		plan.Features.TableTopic = testTableTopicObject(t, &models.TableTopicModel{
+			Warehouse:   types.StringValue("warehouse"),
+			CatalogType: types.StringValue("glue"),
+		})
+		diags := validateInstanceContract(context.Background(), &plan)
+		require.True(t, diags.HasError())
+		assert.Contains(t, diags.Errors()[0].Detail(), "schema_registry_enabled")
+	})
+
+	t.Run("table topic with schema registry enablement passes", func(t *testing.T) {
+		plan := newValidUsageBasedIAASPlan()
+		plan.Features.SchemaRegistryEnabled = types.BoolValue(true)
+		plan.Features.TableTopic = testTableTopicObject(t, &models.TableTopicModel{
+			Warehouse:   types.StringValue("warehouse"),
+			CatalogType: types.StringValue("glue"),
+		})
+		diags := validateInstanceContract(context.Background(), &plan)
+		assert.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
 	})
 }
 
@@ -141,7 +224,7 @@ func TestInstanceUpdateContractValidation(t *testing.T) {
 	t.Run("removing instance config key is rejected", func(t *testing.T) {
 		plan := newConfigOnlyPlan(map[string]string{"b": "2"})
 		state := newConfigOnlyPlan(map[string]string{"a": "1", "b": "2"})
-		diags := validateInstanceUpdateContract("inst-1", plan, state)
+		diags := testValidateInstanceUpdateContract(plan, state)
 		require.True(t, diags.HasError())
 		assert.Len(t, diags.Errors(), 1)
 	})
@@ -149,7 +232,7 @@ func TestInstanceUpdateContractValidation(t *testing.T) {
 	t.Run("updating instance config value is allowed", func(t *testing.T) {
 		plan := newConfigOnlyPlan(map[string]string{"a": "2"})
 		state := newConfigOnlyPlan(map[string]string{"a": "1"})
-		diags := validateInstanceUpdateContract("inst-1", plan, state)
+		diags := testValidateInstanceUpdateContract(plan, state)
 		assert.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
 	})
 
@@ -160,8 +243,36 @@ func TestInstanceUpdateContractValidation(t *testing.T) {
 				InstanceConfigs: types.MapNull(types.StringType),
 			},
 		}
-		diags := validateInstanceUpdateContract("inst-1", plan, state)
+		diags := testValidateInstanceUpdateContract(plan, state)
 		assert.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+	})
+
+	t.Run("null table topic plan is rejected after enablement", func(t *testing.T) {
+		plan := newValidUsageBasedIAASPlan()
+		state := newValidUsageBasedIAASPlan()
+		state.Features.TableTopic = testTableTopicObject(t, &models.TableTopicModel{
+			Warehouse:   types.StringValue("warehouse"),
+			CatalogType: types.StringValue("glue"),
+		})
+		diags := testValidateInstanceUpdateContract(plan, state)
+		require.True(t, diags.HasError())
+		assert.Contains(t, diags.Errors()[0].Detail(), "cannot be disabled")
+	})
+
+	t.Run("changing enabled table topic is rejected", func(t *testing.T) {
+		plan := newValidUsageBasedIAASPlan()
+		state := newValidUsageBasedIAASPlan()
+		plan.Features.TableTopic = testTableTopicObject(t, &models.TableTopicModel{
+			Warehouse:   types.StringValue("new-warehouse"),
+			CatalogType: types.StringValue("glue"),
+		})
+		state.Features.TableTopic = testTableTopicObject(t, &models.TableTopicModel{
+			Warehouse:   types.StringValue("old-warehouse"),
+			CatalogType: types.StringValue("glue"),
+		})
+		diags := testValidateInstanceUpdateContract(plan, state)
+		require.True(t, diags.HasError())
+		assert.Contains(t, diags.Errors()[0].Detail(), "cannot be changed")
 	})
 }
 
@@ -170,7 +281,7 @@ func TestInstanceUpdateParamBuilder(t *testing.T) {
 		plan := newValidUsageBasedIAASPlan()
 		state := newValidUsageBasedIAASPlan()
 
-		param, updatePlan := buildInstanceUpdateParam(plan, state)
+		param, updatePlan := testBuildInstanceUpdateParam(t, plan, state)
 		assert.False(t, updatePlan.hasUpdate)
 		assert.Equal(t, client.InstanceUpdateParam{}, param)
 	})
@@ -178,18 +289,18 @@ func TestInstanceUpdateParamBuilder(t *testing.T) {
 	t.Run("certificate change builds security patch and wait plan", func(t *testing.T) {
 		plan := newValidUsageBasedIAASPlan()
 		state := newValidUsageBasedIAASPlan()
-		plan.Features.Security = &models.SecurityModel{
+		plan.Features.Security = testSecurityObject(t, &models.SecurityModel{
 			CertificateAuthority: types.StringValue("new-ca"),
 			CertificateChain:     types.StringValue("new-chain"),
 			PrivateKey:           types.StringValue("new-key"),
-		}
-		state.Features.Security = &models.SecurityModel{
+		})
+		state.Features.Security = testSecurityObject(t, &models.SecurityModel{
 			CertificateAuthority: types.StringValue("old-ca"),
 			CertificateChain:     types.StringValue("old-chain"),
 			PrivateKey:           types.StringValue("old-key"),
-		}
+		})
 
-		param, updatePlan := buildInstanceUpdateParam(plan, state)
+		param, updatePlan := testBuildInstanceUpdateParam(t, plan, state)
 		require.True(t, updatePlan.hasUpdate)
 		assert.True(t, updatePlan.shouldWait)
 		assert.True(t, updatePlan.certificateChanged)
@@ -205,7 +316,7 @@ func TestInstanceUpdateParamBuilder(t *testing.T) {
 		plan := newConfigOnlyPlan(map[string]string{"auto.create.topics.enable": "false"})
 		state := newConfigOnlyPlan(map[string]string{"auto.create.topics.enable": "true"})
 
-		param, updatePlan := buildInstanceUpdateParam(plan, state)
+		param, updatePlan := testBuildInstanceUpdateParam(t, plan, state)
 		require.True(t, updatePlan.hasUpdate)
 		assert.True(t, updatePlan.shouldWait)
 		assert.True(t, updatePlan.instanceConfigsChanged)
@@ -218,14 +329,14 @@ func TestInstanceUpdateParamBuilder(t *testing.T) {
 	t.Run("metrics exporter disable sends enabled false patch", func(t *testing.T) {
 		plan := newValidUsageBasedIAASPlan()
 		state := newValidUsageBasedIAASPlan()
-		plan.Features.MetricsExporter = nil
-		state.Features.MetricsExporter = &models.MetricsExporterModel{
+		plan.Features.MetricsExporter = types.ObjectNull(models.MetricsExporterObjectType.AttrTypes)
+		state.Features.MetricsExporter = testMetricsExporterObject(t, &models.MetricsExporterModel{
 			Prometheus: &models.PrometheusExporterModel{
 				AuthType: types.StringValue("noauth"),
 			},
-		}
+		})
 
-		param, updatePlan := buildInstanceUpdateParam(plan, state)
+		param, updatePlan := testBuildInstanceUpdateParam(t, plan, state)
 		require.True(t, updatePlan.hasUpdate)
 		assert.True(t, updatePlan.shouldWait)
 		require.NotNil(t, param.Features)
@@ -238,16 +349,16 @@ func TestInstanceUpdateParamBuilder(t *testing.T) {
 	t.Run("file system throughput change builds spec patch", func(t *testing.T) {
 		plan := newValidUsageBasedIAASPlan()
 		state := newValidUsageBasedIAASPlan()
-		plan.ComputeSpecs.FileSystemParam = &models.FileSystemParamModel{
+		plan.ComputeSpecs.FileSystemParam = testFileSystemObject(t, &models.FileSystemParamModel{
 			ThroughputMibpsPerFileSystem: types.Int64Value(512),
 			FileSystemCount:              types.Int64Value(2),
-		}
-		state.ComputeSpecs.FileSystemParam = &models.FileSystemParamModel{
+		})
+		state.ComputeSpecs.FileSystemParam = testFileSystemObject(t, &models.FileSystemParamModel{
 			ThroughputMibpsPerFileSystem: types.Int64Value(256),
 			FileSystemCount:              types.Int64Value(2),
-		}
+		})
 
-		param, updatePlan := buildInstanceUpdateParam(plan, state)
+		param, updatePlan := testBuildInstanceUpdateParam(t, plan, state)
 		require.True(t, updatePlan.hasUpdate)
 		assert.True(t, updatePlan.shouldWait)
 		require.NotNil(t, param.Spec)
@@ -263,7 +374,7 @@ func TestInstanceUpdateParamBuilder(t *testing.T) {
 		plan.Description = types.StringValue("updated-description")
 		state.Description = types.StringValue("old-description")
 
-		param, updatePlan := buildInstanceUpdateParam(plan, state)
+		param, updatePlan := testBuildInstanceUpdateParam(t, plan, state)
 		require.True(t, updatePlan.hasUpdate)
 		require.NotNil(t, param.Name)
 		require.NotNil(t, param.Description)
@@ -277,7 +388,7 @@ func TestInstanceUpdateParamBuilder(t *testing.T) {
 		state := newValidUsageBasedIAASPlan()
 		plan.Version = types.StringValue("2.0.0")
 
-		param, updatePlan := buildInstanceUpdateParam(plan, state)
+		param, updatePlan := testBuildInstanceUpdateParam(t, plan, state)
 		require.True(t, updatePlan.hasUpdate)
 		assert.True(t, updatePlan.shouldWait)
 		require.NotNil(t, param.Version)
@@ -290,7 +401,7 @@ func TestInstanceUpdateParamBuilder(t *testing.T) {
 		plan.ComputeSpecs.ReservedAku = types.Int64Value(8)
 		state.ComputeSpecs.ReservedAku = types.Int64Value(6)
 
-		param, updatePlan := buildInstanceUpdateParam(plan, state)
+		param, updatePlan := testBuildInstanceUpdateParam(t, plan, state)
 		require.True(t, updatePlan.hasUpdate)
 		assert.True(t, updatePlan.shouldWait)
 		require.NotNil(t, param.Spec)
@@ -304,12 +415,48 @@ func TestInstanceUpdateParamBuilder(t *testing.T) {
 		plan.ComputeSpecs.ReservedNodeCount = types.Int64Value(5)
 		state.ComputeSpecs.ReservedNodeCount = types.Int64Value(3)
 
-		param, updatePlan := buildInstanceUpdateParam(plan, state)
+		param, updatePlan := testBuildInstanceUpdateParam(t, plan, state)
 		require.True(t, updatePlan.hasUpdate)
 		assert.True(t, updatePlan.shouldWait)
 		require.NotNil(t, param.Spec)
 		require.NotNil(t, param.Spec.ReservedNodeCount)
 		assert.Equal(t, int32(5), *param.Spec.ReservedNodeCount)
+	})
+
+	t.Run("schema registry enablement builds feature patch", func(t *testing.T) {
+		plan := newValidUsageBasedIAASPlan()
+		state := newValidUsageBasedIAASPlan()
+		plan.Features.SchemaRegistryEnabled = types.BoolValue(true)
+		state.Features.SchemaRegistryEnabled = types.BoolValue(false)
+
+		param, updatePlan := testBuildInstanceUpdateParam(t, plan, state)
+		require.True(t, updatePlan.hasUpdate)
+		assert.True(t, updatePlan.shouldWait)
+		require.NotNil(t, param.Features)
+		require.NotNil(t, param.Features.SchemaRegistryEnabled)
+		assert.True(t, *param.Features.SchemaRegistryEnabled)
+	})
+
+	t.Run("adding table topic builds enable patch", func(t *testing.T) {
+		plan := newValidUsageBasedIAASPlan()
+		state := newValidUsageBasedIAASPlan()
+		plan.Features.SchemaRegistryEnabled = types.BoolValue(true)
+		state.Features.SchemaRegistryEnabled = types.BoolValue(true)
+		plan.Features.TableTopic = testTableTopicObject(t, &models.TableTopicModel{
+			Warehouse:   types.StringValue("warehouse"),
+			CatalogType: types.StringValue("glue"),
+		})
+
+		param, updatePlan := testBuildInstanceUpdateParam(t, plan, state)
+		require.True(t, updatePlan.hasUpdate)
+		assert.True(t, updatePlan.shouldWait)
+		assert.True(t, updatePlan.tableTopicChanged)
+		require.NotNil(t, param.Features)
+		require.NotNil(t, param.Features.TableTopic)
+		require.NotNil(t, param.Features.TableTopic.Enabled)
+		assert.True(t, *param.Features.TableTopic.Enabled)
+		assert.Equal(t, "warehouse", param.Features.TableTopic.Warehouse)
+		assert.Equal(t, "glue", param.Features.TableTopic.CatalogType)
 	})
 }
 
@@ -319,25 +466,29 @@ func TestInstanceUpdateStatePreservation(t *testing.T) {
 		plan := models.KafkaInstanceResourceModel{
 			Features: &models.FeaturesModel{
 				InstanceConfigs: mustStringMap(map[string]string{"a": "1"}),
-				Security: &models.SecurityModel{
+				Security: testSecurityObject(t, &models.SecurityModel{
 					CertificateAuthority: types.StringValue("ca"),
 					CertificateChain:     types.StringValue("chain"),
 					PrivateKey:           types.StringValue("key"),
-				},
+				}),
 			},
 		}
 
-		applyUpdateStatePreservation(&state, plan, instanceUpdatePlan{
+		testApplyUpdateStatePreservation(t, &state, plan, instanceUpdatePlan{
 			instanceConfigsChanged: true,
 			certificateChanged:     true,
 		})
 
 		require.NotNil(t, state.Features)
 		assert.True(t, state.Features.InstanceConfigs.Equal(plan.Features.InstanceConfigs))
-		require.NotNil(t, state.Features.Security)
-		assert.Equal(t, plan.Features.Security.CertificateAuthority, state.Features.Security.CertificateAuthority)
-		assert.Equal(t, plan.Features.Security.CertificateChain, state.Features.Security.CertificateChain)
-		assert.Equal(t, plan.Features.Security.PrivateKey, state.Features.Security.PrivateKey)
+		stateSecurity, stateSecurityDiags := models.SecurityObjectToModel(context.Background(), state.Features.Security)
+		require.False(t, stateSecurityDiags.HasError())
+		planSecurity, planSecurityDiags := models.SecurityObjectToModel(context.Background(), plan.Features.Security)
+		require.False(t, planSecurityDiags.HasError())
+		require.NotNil(t, stateSecurity)
+		assert.Equal(t, planSecurity.CertificateAuthority, stateSecurity.CertificateAuthority)
+		assert.Equal(t, planSecurity.CertificateChain, stateSecurity.CertificateChain)
+		assert.Equal(t, planSecurity.PrivateKey, stateSecurity.PrivateKey)
 	})
 
 	t.Run("preserves only instance configs when certificate flag is false", func(t *testing.T) {
@@ -345,41 +496,72 @@ func TestInstanceUpdateStatePreservation(t *testing.T) {
 		plan := models.KafkaInstanceResourceModel{
 			Features: &models.FeaturesModel{
 				InstanceConfigs: mustStringMap(map[string]string{"a": "1"}),
-				Security: &models.SecurityModel{
+				Security: testSecurityObject(t, &models.SecurityModel{
 					CertificateAuthority: types.StringValue("ca"),
-				},
+				}),
 			},
 		}
 
-		applyUpdateStatePreservation(&state, plan, instanceUpdatePlan{
+		testApplyUpdateStatePreservation(t, &state, plan, instanceUpdatePlan{
 			instanceConfigsChanged: true,
 		})
 
 		require.NotNil(t, state.Features)
 		assert.True(t, state.Features.InstanceConfigs.Equal(plan.Features.InstanceConfigs))
-		assert.Nil(t, state.Features.Security)
+		assert.True(t, state.Features.Security.IsNull())
 	})
 
 	t.Run("preserves only certificates when config flag is false", func(t *testing.T) {
 		state := models.KafkaInstanceResourceModel{}
 		plan := models.KafkaInstanceResourceModel{
 			Features: &models.FeaturesModel{
-				Security: &models.SecurityModel{
+				Security: testSecurityObject(t, &models.SecurityModel{
 					CertificateAuthority: types.StringValue("ca"),
 					CertificateChain:     types.StringValue("chain"),
 					PrivateKey:           types.StringValue("key"),
-				},
+				}),
 			},
 		}
 
-		applyUpdateStatePreservation(&state, plan, instanceUpdatePlan{
+		testApplyUpdateStatePreservation(t, &state, plan, instanceUpdatePlan{
 			certificateChanged: true,
 		})
 
 		require.NotNil(t, state.Features)
-		require.NotNil(t, state.Features.Security)
-		assert.Equal(t, plan.Features.Security.CertificateAuthority, state.Features.Security.CertificateAuthority)
+		stateSecurity, stateSecurityDiags := models.SecurityObjectToModel(context.Background(), state.Features.Security)
+		require.False(t, stateSecurityDiags.HasError())
+		planSecurity, planSecurityDiags := models.SecurityObjectToModel(context.Background(), plan.Features.Security)
+		require.False(t, planSecurityDiags.HasError())
+		require.NotNil(t, stateSecurity)
+		assert.Equal(t, planSecurity.CertificateAuthority, stateSecurity.CertificateAuthority)
 		assert.True(t, state.Features.InstanceConfigs.IsNull())
+	})
+
+	t.Run("preserves table topic while readback may omit sensitive fields", func(t *testing.T) {
+		state := models.KafkaInstanceResourceModel{}
+		plan := models.KafkaInstanceResourceModel{
+			Features: &models.FeaturesModel{
+				TableTopic: testTableTopicObject(t, &models.TableTopicModel{
+					Warehouse:    types.StringValue("warehouse"),
+					CatalogType:  types.StringValue("hive"),
+					KeytabFile:   types.StringValue("keytab"),
+					Krb5ConfFile: types.StringValue("krb5"),
+				}),
+			},
+		}
+
+		testApplyUpdateStatePreservation(t, &state, plan, instanceUpdatePlan{
+			tableTopicChanged: true,
+		})
+
+		require.NotNil(t, state.Features)
+		stateTopic, stateTopicDiags := models.TableTopicObjectToModel(context.Background(), state.Features.TableTopic)
+		require.False(t, stateTopicDiags.HasError())
+		planTopic, planTopicDiags := models.TableTopicObjectToModel(context.Background(), plan.Features.TableTopic)
+		require.False(t, planTopicDiags.HasError())
+		require.NotNil(t, stateTopic)
+		assert.Equal(t, planTopic.KeytabFile, stateTopic.KeytabFile)
+		assert.Equal(t, planTopic.Krb5ConfFile, stateTopic.Krb5ConfFile)
 	})
 }
 
@@ -472,7 +654,7 @@ func newValidUsageBasedIAASPlan() models.KafkaInstanceResourceModel {
 		Features: &models.FeaturesModel{
 			WalMode:         types.StringValue("EBSWAL"),
 			InstanceConfigs: types.MapNull(types.StringType),
-			Security:        &models.SecurityModel{},
+			Security:        types.ObjectNull(models.SecurityObjectType.AttrTypes),
 		},
 	}
 }
@@ -490,7 +672,7 @@ func newValidSubscriptionPlan() models.KafkaInstanceResourceModel {
 		Features: &models.FeaturesModel{
 			WalMode:         types.StringValue("EBSWAL"),
 			InstanceConfigs: types.MapNull(types.StringType),
-			Security:        &models.SecurityModel{},
+			Security:        types.ObjectNull(models.SecurityObjectType.AttrTypes),
 		},
 	}
 }

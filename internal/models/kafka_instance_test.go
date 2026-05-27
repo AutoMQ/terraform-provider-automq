@@ -1,17 +1,70 @@
 package models
 
 import (
+	"context"
 	"terraform-provider-automq/client"
 	"testing"
 	"time"
-
-	"context"
 
 	"github.com/hashicorp/terraform-plugin-framework-timetypes/timetypes"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
 )
+
+func testNetworkList(t *testing.T, networks []NetworkModel) types.List {
+	t.Helper()
+	value, diags := NetworkModelsToList(context.Background(), networks)
+	if diags.HasError() {
+		t.Fatalf("failed to build network list: %v", diags)
+	}
+	return value
+}
+
+func testNodeGroupList(t *testing.T, groups []NodeGroupModel) types.List {
+	t.Helper()
+	value, diags := NodeGroupModelsToList(context.Background(), groups)
+	if diags.HasError() {
+		t.Fatalf("failed to build node group list: %v", diags)
+	}
+	return value
+}
+
+func testFileSystemObject(t *testing.T, model *FileSystemParamModel) types.Object {
+	t.Helper()
+	value, diags := FileSystemParamModelToObject(context.Background(), model)
+	if diags.HasError() {
+		t.Fatalf("failed to build file system object: %v", diags)
+	}
+	return value
+}
+
+func testSecurityObject(t *testing.T, model *SecurityModel) types.Object {
+	t.Helper()
+	value, diags := SecurityModelToObject(context.Background(), model)
+	if diags.HasError() {
+		t.Fatalf("failed to build security object: %v", diags)
+	}
+	return value
+}
+
+func testMetricsExporterObject(t *testing.T, model *MetricsExporterModel) types.Object {
+	t.Helper()
+	value, diags := MetricsExporterModelToObject(context.Background(), model)
+	if diags.HasError() {
+		t.Fatalf("failed to build metrics exporter object: %v", diags)
+	}
+	return value
+}
+
+func testTableTopicObject(t *testing.T, model *TableTopicModel) types.Object {
+	t.Helper()
+	value, diags := TableTopicModelToObject(context.Background(), model)
+	if diags.HasError() {
+		t.Fatalf("failed to build table topic object: %v", diags)
+	}
+	return value
+}
 
 func testExpandKafkaInstanceResourceScenarios(t *testing.T) {
 	tests := []struct {
@@ -39,37 +92,38 @@ func testExpandKafkaInstanceResourceScenarios(t *testing.T) {
 							),
 						},
 					),
-					Networks: []NetworkModel{
+					Networks: testNetworkList(t, []NetworkModel{
 						{
 							Zone:    types.StringValue("zone-1"),
 							Subnets: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
 						},
-					},
+					}),
 				},
 				Features: &FeaturesModel{
 					WalMode: types.StringValue("wal-mode-1"),
-					Security: &SecurityModel{
+					Security: testSecurityObject(t, &SecurityModel{
 						DataEncryptionMode:           types.StringValue("encryption-mode-1"),
 						CertificateAuthority:         types.StringValue("ca-1"),
 						CertificateChain:             types.StringValue("chain-1"),
 						PrivateKey:                   types.StringValue("key-1"),
 						TlsHostnameValidationEnabled: types.BoolValue(true),
-					},
+					}),
 					InstanceConfigs: types.MapValueMust(types.StringType, map[string]attr.Value{
 						"config-key": types.StringValue("config-value"),
 					}),
-					MetricsExporter: &MetricsExporterModel{
+					MetricsExporter: testMetricsExporterObject(t, &MetricsExporterModel{
 						Prometheus: &PrometheusExporterModel{
 							EndPoint: types.StringValue("http://prometheus"),
 							Labels: types.MapValueMust(types.StringType, map[string]attr.Value{
 								"env": types.StringValue("test"),
 							}),
 						},
-					},
-					TableTopic: &TableTopicModel{
+					}),
+					TableTopic: testTableTopicObject(t, &TableTopicModel{
 						Warehouse:   types.StringValue("warehouse-1"),
 						CatalogType: types.StringValue("HIVE"),
-					},
+					}),
+					SchemaRegistryEnabled: types.BoolValue(true),
 				},
 			},
 			expected: client.InstanceCreateParam{
@@ -116,9 +170,11 @@ func testExpandKafkaInstanceResourceScenarios(t *testing.T) {
 						},
 					},
 					TableTopic: &client.TableTopicParam{
+						Enabled:     boolPtr(true),
 						Warehouse:   "warehouse-1",
 						CatalogType: "HIVE",
 					},
+					SchemaRegistryEnabled: boolPtr(true),
 				},
 			},
 		},
@@ -146,8 +202,8 @@ func testExpandKafkaInstanceResourceScenarios(t *testing.T) {
 				Version: types.StringValue("1.0.0"),
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku:          types.Int64Value(2),
-					Networks:             []NetworkModel{},
-					KubernetesNodeGroups: []NodeGroupModel{},
+					Networks:             testNetworkList(t, []NetworkModel{}),
+					KubernetesNodeGroups: testNodeGroupList(t, []NodeGroupModel{}),
 				},
 				Features: &FeaturesModel{
 					WalMode:         types.StringValue(""),
@@ -194,12 +250,12 @@ func testExpandKafkaInstanceResourceScenarios(t *testing.T) {
 				Version: types.StringValue("1.0.0"),
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku: types.Int64Value(4),
-					FileSystemParam: &FileSystemParamModel{
+					FileSystemParam: testFileSystemObject(t, &FileSystemParamModel{
 						FileSystemType:               types.StringValue("EFS_PROVISIONED"),
 						ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 						FileSystemCount:              types.Int64Value(2),
 						SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-12345")}),
-					},
+					}),
 				},
 				Features: &FeaturesModel{
 					WalMode: types.StringValue("FSWAL"),
@@ -229,12 +285,12 @@ func testExpandKafkaInstanceResourceScenarios(t *testing.T) {
 				Version: types.StringValue("1.0.0"),
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku: types.Int64Value(4),
-					FileSystemParam: &FileSystemParamModel{
+					FileSystemParam: testFileSystemObject(t, &FileSystemParamModel{
 						FileSystemType:               types.StringValue("ONTAP_V2"),
 						ThroughputMibpsPerFileSystem: types.Int64Value(500),
 						FileSystemCount:              types.Int64Value(1),
 						SecurityGroups:               types.ListNull(types.StringType),
-					},
+					}),
 				},
 				Features: &FeaturesModel{
 					WalMode: types.StringValue("FSWAL"),
@@ -514,12 +570,12 @@ func testFlattenKafkaInstanceModelRemovesMetricsExporterWhenAPIEmitsNone(t *test
 		t.Run(tt.name, func(t *testing.T) {
 			resource := &KafkaInstanceResourceModel{
 				Features: &FeaturesModel{
-					MetricsExporter: &MetricsExporterModel{
+					MetricsExporter: testMetricsExporterObject(t, &MetricsExporterModel{
 						Prometheus: &PrometheusExporterModel{
 							AuthType: types.StringValue("noauth"),
 							EndPoint: types.StringValue("https://previous.example.com"),
 						},
-					},
+					}),
 				},
 			}
 			instance := &client.InstanceVO{
@@ -535,7 +591,7 @@ func testFlattenKafkaInstanceModelRemovesMetricsExporterWhenAPIEmitsNone(t *test
 			if resource.Features == nil {
 				t.Fatalf("features unexpectedly nil")
 			}
-			assert.Nil(t, resource.Features.MetricsExporter)
+			assert.True(t, resource.Features.MetricsExporter.IsNull())
 		})
 	}
 }
@@ -543,11 +599,11 @@ func testFlattenKafkaInstanceModelRemovesMetricsExporterWhenAPIEmitsNone(t *test
 func testFlattenKafkaInstanceModelPreservesCertificateFieldsWhenAPIOmitsThem(t *testing.T) {
 	resource := &KafkaInstanceResourceModel{
 		Features: &FeaturesModel{
-			Security: &SecurityModel{
+			Security: testSecurityObject(t, &SecurityModel{
 				CertificateAuthority: types.StringValue("ca-pem"),
 				CertificateChain:     types.StringValue("chain-pem"),
 				PrivateKey:           types.StringValue("key-pem"),
-			},
+			}),
 		},
 	}
 	instance := &client.InstanceVO{
@@ -562,12 +618,14 @@ func testFlattenKafkaInstanceModelPreservesCertificateFieldsWhenAPIOmitsThem(t *
 
 	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
 	assert.False(t, diags.HasError())
-	if resource.Features == nil || resource.Features.Security == nil {
+	security, securityDiags := SecurityObjectToModel(context.Background(), resource.Features.Security)
+	assert.False(t, securityDiags.HasError())
+	if resource.Features == nil || security == nil {
 		t.Fatalf("security unexpectedly nil")
 	}
-	assert.Equal(t, types.StringValue("ca-pem"), resource.Features.Security.CertificateAuthority)
-	assert.Equal(t, types.StringValue("chain-pem"), resource.Features.Security.CertificateChain)
-	assert.Equal(t, types.StringValue("key-pem"), resource.Features.Security.PrivateKey)
+	assert.Equal(t, types.StringValue("ca-pem"), security.CertificateAuthority)
+	assert.Equal(t, types.StringValue("chain-pem"), security.CertificateChain)
+	assert.Equal(t, types.StringValue("key-pem"), security.PrivateKey)
 }
 
 func testFlattenKafkaInstanceModelFSWAL(t *testing.T) {
@@ -605,12 +663,12 @@ func testFlattenKafkaInstanceModelFSWAL(t *testing.T) {
 				InstanceStatus: types.StringValue("Running"),
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku: types.Int64Value(4),
-					FileSystemParam: &FileSystemParamModel{
+					FileSystemParam: testFileSystemObject(t, &FileSystemParamModel{
 						FileSystemType:               types.StringValue("EFS_PROVISIONED"),
 						ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 						FileSystemCount:              types.Int64Value(2),
 						SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-12345")}),
-					},
+					}),
 				},
 				Features: &FeaturesModel{
 					WalMode: types.StringValue("FSWAL"),
@@ -646,12 +704,12 @@ func testFlattenKafkaInstanceModelFSWAL(t *testing.T) {
 				InstanceStatus: types.StringValue("Running"),
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku: types.Int64Value(2),
-					FileSystemParam: &FileSystemParamModel{
+					FileSystemParam: testFileSystemObject(t, &FileSystemParamModel{
 						FileSystemType:               types.StringValue("ONTAP_V2"),
 						ThroughputMibpsPerFileSystem: types.Int64Value(500),
 						FileSystemCount:              types.Int64Value(1),
 						SecurityGroups:               types.ListNull(types.StringType),
-					},
+					}),
 				},
 				Features: &FeaturesModel{
 					WalMode: types.StringValue("FSWAL"),
@@ -682,7 +740,7 @@ func testFlattenKafkaInstanceModelFSWAL(t *testing.T) {
 				InstanceStatus: types.StringValue("Running"),
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku:     types.Int64Value(4),
-					FileSystemParam: nil, // Should be nil for non-FSWAL
+					FileSystemParam: types.ObjectNull(FileSystemParamObjectType.AttrTypes), // Should be null for non-FSWAL
 				},
 				Features: &FeaturesModel{
 					WalMode: types.StringValue("EBSWAL"),
@@ -713,16 +771,20 @@ func testFlattenKafkaInstanceModelFSWAL(t *testing.T) {
 				assert.Equal(t, tt.expected.ComputeSpecs.ReservedAku, resource.ComputeSpecs.ReservedAku)
 
 				// Check file system parameters
-				if tt.expected.ComputeSpecs.FileSystemParam == nil {
-					assert.Nil(t, resource.ComputeSpecs.FileSystemParam)
+				expectedFileSystem, expectedDiags := FileSystemParamObjectToModel(context.Background(), tt.expected.ComputeSpecs.FileSystemParam)
+				assert.False(t, expectedDiags.HasError())
+				actualFileSystem, actualDiags := FileSystemParamObjectToModel(context.Background(), resource.ComputeSpecs.FileSystemParam)
+				assert.False(t, actualDiags.HasError())
+				if expectedFileSystem == nil {
+					assert.Nil(t, actualFileSystem)
 				} else {
-					assert.NotNil(t, resource.ComputeSpecs.FileSystemParam)
-					assert.Equal(t, tt.expected.ComputeSpecs.FileSystemParam.ThroughputMibpsPerFileSystem,
-						resource.ComputeSpecs.FileSystemParam.ThroughputMibpsPerFileSystem)
-					assert.Equal(t, tt.expected.ComputeSpecs.FileSystemParam.FileSystemCount,
-						resource.ComputeSpecs.FileSystemParam.FileSystemCount)
-					assert.Equal(t, tt.expected.ComputeSpecs.FileSystemParam.SecurityGroups,
-						resource.ComputeSpecs.FileSystemParam.SecurityGroups)
+					assert.NotNil(t, actualFileSystem)
+					assert.Equal(t, expectedFileSystem.ThroughputMibpsPerFileSystem,
+						actualFileSystem.ThroughputMibpsPerFileSystem)
+					assert.Equal(t, expectedFileSystem.FileSystemCount,
+						actualFileSystem.FileSystemCount)
+					assert.Equal(t, expectedFileSystem.SecurityGroups,
+						actualFileSystem.SecurityGroups)
 				}
 			}
 
@@ -1082,11 +1144,11 @@ func testExpandKafkaInstanceResourceFSWALNullFileSystemType(t *testing.T) {
 		Version: types.StringValue("1.0.0"),
 		ComputeSpecs: &ComputeSpecsModel{
 			ReservedAku: types.Int64Value(4),
-			FileSystemParam: &FileSystemParamModel{
+			FileSystemParam: testFileSystemObject(t, &FileSystemParamModel{
 				FileSystemType:               types.StringNull(), // null
 				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 				FileSystemCount:              types.Int64Value(2),
-			},
+			}),
 		},
 	}
 
@@ -1104,11 +1166,11 @@ func testExpandKafkaInstanceResourceFSWALUnknownFileSystemType(t *testing.T) {
 		Version: types.StringValue("1.0.0"),
 		ComputeSpecs: &ComputeSpecsModel{
 			ReservedAku: types.Int64Value(4),
-			FileSystemParam: &FileSystemParamModel{
+			FileSystemParam: testFileSystemObject(t, &FileSystemParamModel{
 				FileSystemType:               types.StringUnknown(), // unknown
 				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 				FileSystemCount:              types.Int64Value(2),
-			},
+			}),
 		},
 	}
 
@@ -1160,8 +1222,10 @@ func testFlattenKafkaInstanceModelFileSystemTypeDeserialization(t *testing.T) {
 			diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
 			assert.False(t, diags.HasError())
 			assert.NotNil(t, resource.ComputeSpecs)
-			assert.NotNil(t, resource.ComputeSpecs.FileSystemParam)
-			assert.Equal(t, tt.expectedValue, resource.ComputeSpecs.FileSystemParam.FileSystemType)
+			fileSystem, fsDiags := FileSystemParamObjectToModel(context.Background(), resource.ComputeSpecs.FileSystemParam)
+			assert.False(t, fsDiags.HasError())
+			assert.NotNil(t, fileSystem)
+			assert.Equal(t, tt.expectedValue, fileSystem.FileSystemType)
 		})
 	}
 }
@@ -1171,11 +1235,11 @@ func testFlattenKafkaInstanceModelFileSystemTypeStatePreservation(t *testing.T) 
 	// Create a resource with existing file_system_type in state
 	previousResource := &KafkaInstanceResourceModel{
 		ComputeSpecs: &ComputeSpecsModel{
-			FileSystemParam: &FileSystemParamModel{
+			FileSystemParam: testFileSystemObject(t, &FileSystemParamModel{
 				FileSystemType:               types.StringValue("EFS_PROVISIONED"),
 				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 				FileSystemCount:              types.Int64Value(2),
-			},
+			}),
 		},
 	}
 
@@ -1199,9 +1263,11 @@ func testFlattenKafkaInstanceModelFileSystemTypeStatePreservation(t *testing.T) 
 
 	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
 	assert.False(t, diags.HasError())
-	assert.NotNil(t, resource.ComputeSpecs.FileSystemParam)
+	fileSystem, fsDiags := FileSystemParamObjectToModel(context.Background(), resource.ComputeSpecs.FileSystemParam)
+	assert.False(t, fsDiags.HasError())
+	assert.NotNil(t, fileSystem)
 	// State should be preserved when API doesn't return the value
-	assert.Equal(t, types.StringValue("EFS_PROVISIONED"), resource.ComputeSpecs.FileSystemParam.FileSystemType)
+	assert.Equal(t, types.StringValue("EFS_PROVISIONED"), fileSystem.FileSystemType)
 }
 
 // TestExpandKafkaInstanceResource_FileSystemTypeVariations tests different file_system_type values
@@ -1240,11 +1306,11 @@ func testExpandKafkaInstanceResourceFileSystemTypeVariations(t *testing.T) {
 				Version: types.StringValue("1.0.0"),
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku: types.Int64Value(4),
-					FileSystemParam: &FileSystemParamModel{
+					FileSystemParam: testFileSystemObject(t, &FileSystemParamModel{
 						FileSystemType:               tt.fileSystemType,
 						ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 						FileSystemCount:              types.Int64Value(2),
-					},
+					}),
 				},
 			}
 
@@ -1271,12 +1337,12 @@ func testExpandKafkaInstanceResourceUsageBasedPricing(t *testing.T) {
 			PricingMode:       types.StringValue("UsageBased"),
 			ReservedNodeCount: types.Int64Value(5),
 			InstanceTypes:     types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.xlarge")}),
-			Networks: []NetworkModel{
+			Networks: testNetworkList(t, []NetworkModel{
 				{
 					Zone:    types.StringValue("us-east-1a"),
 					Subnets: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-abc")}),
 				},
-			},
+			}),
 		},
 		Features: &FeaturesModel{
 			WalMode: types.StringValue("EBSWAL"),

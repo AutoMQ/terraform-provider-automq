@@ -86,14 +86,15 @@ type KubernetesNodeGroupParam struct {
 }
 
 type InstanceFeatureParam struct {
-	WalMode         *string                       `json:"walMode,omitempty"`
-	Security        *InstanceSecurityParam        `json:"security,omitempty"`
-	InstanceConfigs []ConfigItemParam             `json:"instanceConfigs,omitempty"`
-	S3Failover      *InstanceFailoverParam        `json:"s3Failover,omitempty"`
-	MetricsExporter *InstanceMetricsExporterParam `json:"metricsExporter,omitempty"`
-	TableTopic      *TableTopicParam              `json:"tableTopic,omitempty"`
-	InboundRules    []InboundRuleParam            `json:"inboundRules,omitempty"`
-	ExtendListeners []InstanceListenerParam       `json:"extendListeners,omitempty"`
+	WalMode               *string                       `json:"walMode,omitempty"`
+	Security              *InstanceSecurityParam        `json:"security,omitempty"`
+	InstanceConfigs       []ConfigItemParam             `json:"instanceConfigs,omitempty"`
+	S3Failover            *InstanceFailoverParam        `json:"s3Failover,omitempty"`
+	MetricsExporter       *InstanceMetricsExporterParam `json:"metricsExporter,omitempty"`
+	TableTopic            *TableTopicParam              `json:"tableTopic,omitempty"`
+	SchemaRegistryEnabled *bool                         `json:"schemaRegistryEnabled,omitempty"`
+	InboundRules          []InboundRuleParam            `json:"inboundRules,omitempty"`
+	ExtendListeners       []InstanceListenerParam       `json:"extendListeners,omitempty"`
 }
 
 type InstanceSecurityParam struct {
@@ -139,7 +140,7 @@ type MetricsLabelParam struct {
 }
 
 type TableTopicParam struct {
-	IntegrationId     *string `json:"integrationId,omitempty"`
+	Enabled           *bool   `json:"enabled,omitempty"`
 	Warehouse         string  `json:"warehouse"`
 	CatalogType       string  `json:"catalogType"`
 	MetastoreUri      *string `json:"metastoreUri,omitempty"`
@@ -276,13 +277,14 @@ type FileSystemVO struct {
 }
 
 type InstanceFeatureVO struct {
-	WalMode         *string                    `json:"walMode,omitempty"`
-	Security        *InstanceSecurityConfigVO  `json:"security,omitempty"`
-	S3Failover      *InstanceFailoverVO        `json:"s3Failover,omitempty"`
-	MetricsExporter *InstanceMetricsExporterVO `json:"metricsExporter,omitempty"`
-	TableTopic      *TableTopicVO              `json:"tableTopic,omitempty"`
-	ExtendListeners []InstanceListenerVO       `json:"extendListeners,omitempty"`
-	InboundRules    []InstanceInboundRuleVO    `json:"inboundRules,omitempty"`
+	WalMode               *string                    `json:"walMode,omitempty"`
+	Security              *InstanceSecurityConfigVO  `json:"security,omitempty"`
+	S3Failover            *InstanceFailoverVO        `json:"s3Failover,omitempty"`
+	MetricsExporter       *InstanceMetricsExporterVO `json:"metricsExporter,omitempty"`
+	TableTopic            *TableTopicVO              `json:"tableTopic,omitempty"`
+	SchemaRegistryEnabled *bool                      `json:"schemaRegistryEnabled,omitempty"`
+	ExtendListeners       []InstanceListenerVO       `json:"extendListeners,omitempty"`
+	InboundRules          []InstanceInboundRuleVO    `json:"inboundRules,omitempty"`
 }
 
 type InstanceSecurityConfigVO struct {
