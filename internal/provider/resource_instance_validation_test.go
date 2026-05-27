@@ -402,6 +402,38 @@ func TestMetricsExporterAuthTypeSchema(t *testing.T) {
 	}
 }
 
+func TestMetricsExporterSensitiveSchema(t *testing.T) {
+	s := getKafkaInstanceResourceSchema(t)
+	featuresAttr, ok := s.Attributes["features"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("features attribute has unexpected type %T", s.Attributes["features"])
+	}
+	metricsAttr, ok := featuresAttr.Attributes["metrics_exporter"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("metrics_exporter attribute has unexpected type %T", featuresAttr.Attributes["metrics_exporter"])
+	}
+	prometheusAttr, ok := metricsAttr.Attributes["prometheus"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("prometheus attribute has unexpected type %T", metricsAttr.Attributes["prometheus"])
+	}
+
+	passwordAttr, ok := prometheusAttr.Attributes["password"].(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("password attribute has unexpected type %T", prometheusAttr.Attributes["password"])
+	}
+	if !passwordAttr.Sensitive {
+		t.Fatalf("password should be sensitive")
+	}
+
+	tokenAttr, ok := prometheusAttr.Attributes["token"].(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("token attribute has unexpected type %T", prometheusAttr.Attributes["token"])
+	}
+	if !tokenAttr.Sensitive {
+		t.Fatalf("token should be sensitive")
+	}
+}
+
 func TestWalModeValidatorRejectsUnsupportedValue(t *testing.T) {
 	s := getKafkaInstanceResourceSchema(t)
 	featuresAttrRaw, ok := s.Attributes["features"].(schema.SingleNestedAttribute)

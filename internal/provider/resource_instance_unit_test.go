@@ -255,6 +255,62 @@ func TestInstanceUpdateParamBuilder(t *testing.T) {
 		assert.Equal(t, int32(512), param.Spec.FileSystem.ThroughputMiBpsPerFileSystem)
 		assert.Equal(t, int32(2), param.Spec.FileSystem.FileSystemCount)
 	})
+
+	t.Run("name and description changes build top level patch", func(t *testing.T) {
+		plan := newValidUsageBasedIAASPlan()
+		state := newValidUsageBasedIAASPlan()
+		plan.Name = types.StringValue("updated-name")
+		plan.Description = types.StringValue("updated-description")
+		state.Description = types.StringValue("old-description")
+
+		param, updatePlan := buildInstanceUpdateParam(plan, state)
+		require.True(t, updatePlan.hasUpdate)
+		require.NotNil(t, param.Name)
+		require.NotNil(t, param.Description)
+		assert.Equal(t, "updated-name", *param.Name)
+		assert.Equal(t, "updated-description", *param.Description)
+		assert.False(t, updatePlan.shouldWait)
+	})
+
+	t.Run("version change builds wait patch", func(t *testing.T) {
+		plan := newValidUsageBasedIAASPlan()
+		state := newValidUsageBasedIAASPlan()
+		plan.Version = types.StringValue("2.0.0")
+
+		param, updatePlan := buildInstanceUpdateParam(plan, state)
+		require.True(t, updatePlan.hasUpdate)
+		assert.True(t, updatePlan.shouldWait)
+		require.NotNil(t, param.Version)
+		assert.Equal(t, "2.0.0", *param.Version)
+	})
+
+	t.Run("reserved aku change builds spec patch", func(t *testing.T) {
+		plan := newValidSubscriptionPlan()
+		state := newValidSubscriptionPlan()
+		plan.ComputeSpecs.ReservedAku = types.Int64Value(8)
+		state.ComputeSpecs.ReservedAku = types.Int64Value(6)
+
+		param, updatePlan := buildInstanceUpdateParam(plan, state)
+		require.True(t, updatePlan.hasUpdate)
+		assert.True(t, updatePlan.shouldWait)
+		require.NotNil(t, param.Spec)
+		require.NotNil(t, param.Spec.ReservedAku)
+		assert.Equal(t, int32(8), *param.Spec.ReservedAku)
+	})
+
+	t.Run("reserved node count change builds spec patch", func(t *testing.T) {
+		plan := newValidUsageBasedIAASPlan()
+		state := newValidUsageBasedIAASPlan()
+		plan.ComputeSpecs.ReservedNodeCount = types.Int64Value(5)
+		state.ComputeSpecs.ReservedNodeCount = types.Int64Value(3)
+
+		param, updatePlan := buildInstanceUpdateParam(plan, state)
+		require.True(t, updatePlan.hasUpdate)
+		assert.True(t, updatePlan.shouldWait)
+		require.NotNil(t, param.Spec)
+		require.NotNil(t, param.Spec.ReservedNodeCount)
+		assert.Equal(t, int32(5), *param.Spec.ReservedNodeCount)
+	})
 }
 
 func TestInstanceUpdateStatePreservation(t *testing.T) {
@@ -282,6 +338,48 @@ func TestInstanceUpdateStatePreservation(t *testing.T) {
 		assert.Equal(t, plan.Features.Security.CertificateAuthority, state.Features.Security.CertificateAuthority)
 		assert.Equal(t, plan.Features.Security.CertificateChain, state.Features.Security.CertificateChain)
 		assert.Equal(t, plan.Features.Security.PrivateKey, state.Features.Security.PrivateKey)
+	})
+
+	t.Run("preserves only instance configs when certificate flag is false", func(t *testing.T) {
+		state := models.KafkaInstanceResourceModel{}
+		plan := models.KafkaInstanceResourceModel{
+			Features: &models.FeaturesModel{
+				InstanceConfigs: mustStringMap(map[string]string{"a": "1"}),
+				Security: &models.SecurityModel{
+					CertificateAuthority: types.StringValue("ca"),
+				},
+			},
+		}
+
+		applyUpdateStatePreservation(&state, plan, instanceUpdatePlan{
+			instanceConfigsChanged: true,
+		})
+
+		require.NotNil(t, state.Features)
+		assert.True(t, state.Features.InstanceConfigs.Equal(plan.Features.InstanceConfigs))
+		assert.Nil(t, state.Features.Security)
+	})
+
+	t.Run("preserves only certificates when config flag is false", func(t *testing.T) {
+		state := models.KafkaInstanceResourceModel{}
+		plan := models.KafkaInstanceResourceModel{
+			Features: &models.FeaturesModel{
+				Security: &models.SecurityModel{
+					CertificateAuthority: types.StringValue("ca"),
+					CertificateChain:     types.StringValue("chain"),
+					PrivateKey:           types.StringValue("key"),
+				},
+			},
+		}
+
+		applyUpdateStatePreservation(&state, plan, instanceUpdatePlan{
+			certificateChanged: true,
+		})
+
+		require.NotNil(t, state.Features)
+		require.NotNil(t, state.Features.Security)
+		assert.Equal(t, plan.Features.Security.CertificateAuthority, state.Features.Security.CertificateAuthority)
+		assert.True(t, state.Features.InstanceConfigs.IsNull())
 	})
 }
 
@@ -361,14 +459,33 @@ func TestInstanceRefreshState(t *testing.T) {
 
 func newValidUsageBasedIAASPlan() models.KafkaInstanceResourceModel {
 	return models.KafkaInstanceResourceModel{
-		Name:    types.StringValue("test-instance"),
-		Version: types.StringValue("1.0.0"),
+		Name:        types.StringValue("test-instance"),
+		Description: types.StringValue("description"),
+		Version:     types.StringValue("1.0.0"),
 		ComputeSpecs: &models.ComputeSpecsModel{
 			DeployType:        types.StringValue("IAAS"),
 			PricingMode:       types.StringValue("UsageBased"),
 			ReservedNodeCount: types.Int64Value(3),
 			ReservedAku:       types.Int64Value(0),
 			InstanceTypes:     mustStringList("m5.large"),
+		},
+		Features: &models.FeaturesModel{
+			WalMode:         types.StringValue("EBSWAL"),
+			InstanceConfigs: types.MapNull(types.StringType),
+			Security:        &models.SecurityModel{},
+		},
+	}
+}
+
+func newValidSubscriptionPlan() models.KafkaInstanceResourceModel {
+	return models.KafkaInstanceResourceModel{
+		Name:        types.StringValue("test-instance"),
+		Description: types.StringValue("description"),
+		Version:     types.StringValue("1.0.0"),
+		ComputeSpecs: &models.ComputeSpecsModel{
+			DeployType:  types.StringValue("IAAS"),
+			PricingMode: types.StringValue("SubscriptionBased"),
+			ReservedAku: types.Int64Value(6),
 		},
 		Features: &models.FeaturesModel{
 			WalMode:         types.StringValue("EBSWAL"),
