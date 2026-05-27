@@ -404,7 +404,7 @@ func TestInstanceRefreshState(t *testing.T) {
 		resource := &KafkaInstanceResource{api: api}
 		state := models.KafkaInstanceResourceModel{}
 
-		_, found, diags := refreshKafkaInstanceState(context.Background(), resource, "inst-1", &state)
+		found, diags := refreshKafkaInstanceState(context.Background(), resource, "inst-1", &state)
 		if !found {
 			t.Fatalf("expected instance to be found")
 		}
@@ -427,7 +427,7 @@ func TestInstanceRefreshState(t *testing.T) {
 		resource := &KafkaInstanceResource{api: api}
 		state := models.KafkaInstanceResourceModel{}
 
-		_, found, diags := refreshKafkaInstanceState(context.Background(), resource, "inst-2", &state)
+		found, diags := refreshKafkaInstanceState(context.Background(), resource, "inst-2", &state)
 		if !found {
 			t.Fatalf("expected instance to be found")
 		}
@@ -451,7 +451,7 @@ func TestInstanceRefreshState(t *testing.T) {
 			InstanceID: types.StringValue("inst-missing"),
 		}
 
-		_, found, diags := refreshKafkaInstanceState(context.Background(), resource, "inst-missing", &state)
+		found, diags := refreshKafkaInstanceState(context.Background(), resource, "inst-missing", &state)
 		assert.False(t, found)
 		assert.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
 	})

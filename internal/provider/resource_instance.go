@@ -897,7 +897,7 @@ func (r *KafkaInstanceResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	_, found, diags := refreshKafkaInstanceState(ctx, r, instanceId, &state)
+	found, diags := refreshKafkaInstanceState(ctx, r, instanceId, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -921,7 +921,7 @@ func (r *KafkaInstanceResource) Read(ctx context.Context, req resource.ReadReque
 	}
 	ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
 	instanceId := state.InstanceID.ValueString()
-	_, found, diags := refreshKafkaInstanceState(ctx, r, instanceId, &state)
+	found, diags := refreshKafkaInstanceState(ctx, r, instanceId, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -1011,7 +1011,7 @@ func (r *KafkaInstanceResource) Update(ctx context.Context, req resource.UpdateR
 			return
 		}
 	}
-	_, found, diags := refreshKafkaInstanceState(ctx, r, instanceId, &state)
+	found, diags := refreshKafkaInstanceState(ctx, r, instanceId, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -1086,31 +1086,31 @@ func shouldRefreshInstanceEndpoints(instance *client.InstanceVO) bool {
 	return instance != nil && instance.State != nil && *instance.State == models.StateRunning
 }
 
-func refreshKafkaInstanceState(ctx context.Context, r *KafkaInstanceResource, instanceId string, state *models.KafkaInstanceResourceModel) (*client.InstanceVO, bool, diag.Diagnostics) {
+func refreshKafkaInstanceState(ctx context.Context, r *KafkaInstanceResource, instanceId string, state *models.KafkaInstanceResourceModel) (bool, diag.Diagnostics) {
 	instance, err := r.api.GetKafkaInstance(ctx, instanceId)
 	if err != nil {
 		if framework.IsNotFoundError(err) {
-			return nil, false, nil
+			return false, nil
 		}
-		return nil, false, diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", instanceId, err))}
+		return false, diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get Kafka instance %q, got error: %s", instanceId, err))}
 	}
 	if instance == nil {
-		return nil, false, diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Kafka instance %q not found", instanceId))}
+		return false, diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Kafka instance %q not found", instanceId))}
 	}
 
 	diags := diag.Diagnostics{}
 	diags.Append(models.FlattenKafkaInstanceModel(ctx, instance, state)...)
 	if diags.HasError() {
-		return instance, true, diags
+		return true, diags
 	}
 	if shouldRefreshInstanceEndpoints(instance) {
 		endpoints, err := r.api.GetInstanceEndpoints(ctx, instanceId)
 		if err != nil {
-			return instance, true, diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get endpoints for Kafka instance %q, got error: %s", instanceId, err))}
+			return true, diag.Diagnostics{diag.NewErrorDiagnostic("Client Error", fmt.Sprintf("Unable to get endpoints for Kafka instance %q, got error: %s", instanceId, err))}
 		}
 		diags.Append(models.FlattenKafkaInstanceModelWithEndpoints(endpoints, state)...)
 	}
-	return instance, true, diags
+	return true, diags
 }
 
 type instanceUpdatePlan struct {

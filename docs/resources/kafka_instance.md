@@ -98,16 +98,16 @@ Required:
 
 Optional:
 
-- `data_buckets` (Attributes List) Inline bucket configuration replacing legacy bucket profiles. (see [below for nested schema](#nestedatt--compute_specs--data_buckets))
-- `deploy_type` (String) Deployment platform for the instance. `IAAS` deploys on EC2/VM instances; `K8S` deploys on a managed Kubernetes cluster (EKS/GKE/AKS). Supported values: `IAAS`, `K8S`.
+- `data_buckets` (Attributes List) Inline bucket configuration replacing legacy bucket profiles. Omit this field to let backend manage the data bucket. Changing configured data bucket settings requires instance replacement. (see [below for nested schema](#nestedatt--compute_specs--data_buckets))
+- `deploy_type` (String) Deployment platform for the instance. `IAAS` deploys on EC2/VM instances; `K8S` deploys on a managed Kubernetes cluster (EKS/GKE/AKS). Supported values: `IAAS`, `K8S`. Changing deployment type requires instance replacement.
 - `dns_zone` (String) DNS zone used when creating custom records. Changing a configured DNS zone requires instance replacement.
 - `file_system_param` (Attributes) File system configuration for FSWAL mode (see [below for nested schema](#nestedatt--compute_specs--file_system_param))
 - `instance_role` (String) IAM role ARN for the Kafka instance. If not specified, the backend will auto-generate an appropriate role. Format: `arn:aws:iam::<account-id>:role/<role-name>`. Changing a configured instance role requires instance replacement.
 - `instance_types` (List of String) Instance type list for the nodes. Maximum 1 entry. Required when `pricing_mode` is `UsageBased` and `deploy_type` is `IAAS`. Cannot be modified after creation.
-- `kubernetes_cluster_id` (String) Identifier for the target Kubernetes cluster when `deploy_type` is `K8S`.
-- `kubernetes_namespace` (String) Kubernetes namespace for the instance deployment. If not specified, the backend will auto-assign one.
+- `kubernetes_cluster_id` (String) Identifier for the target Kubernetes cluster when `deploy_type` is `K8S`. Changing the Kubernetes cluster requires instance replacement.
+- `kubernetes_namespace` (String) Kubernetes namespace for the instance deployment. If not specified, the backend will auto-assign one. Changing a configured namespace requires instance replacement.
 - `kubernetes_node_groups` (Attributes List) Node groups (or node pools) are units for unified configuration management of physical nodes in Kubernetes. Different Kubernetes providers may use different terms for node groups. Select target node groups that must be created in advance and configured for either single-AZ or three-AZ deployment. The instance node type must meet the requirements specified in the documentation. If you select a single-AZ node group, the AutoMQ instance will be deployed in a single availability zone; if you select a three-AZ node group, the instance will be deployed across three availability zones. (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
-- `kubernetes_service_account` (String) Kubernetes service account for the instance pods. If not specified, the backend will auto-assign one.
+- `kubernetes_service_account` (String) Kubernetes service account for the instance pods. If not specified, the backend will auto-assign one. Changing a configured service account requires instance replacement.
 - `pricing_mode` (String) Pricing mode for the instance. Supported values: `UsageBased` (pay-as-you-go based on actual usage, requires `reserved_node_count`), `SubscriptionBased` (subscription-based pricing, requires `reserved_aku`). Defaults to `SubscriptionBased`. Changes to pricing mode require instance replacement.
 - `reserved_aku` (Number) AKU (AutoMQ Kafka Unit) defines the cluster scale. Each AKU provides up to 30 MiB/s write or 60 MiB/s read throughput. Minimum value is 3; maximum depends on your license quota. Required when `pricing_mode` is `SubscriptionBased`. For sizing guidance, refer to the [billing documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints).
 - `reserved_node_count` (Number) Number of reserved nodes for the instance. Valid range is 3 to 100. Required when `pricing_mode` is `UsageBased`.
