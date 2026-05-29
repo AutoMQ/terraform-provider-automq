@@ -159,7 +159,7 @@ Required:
 
 Required:
 
-- `type` (String) Compute type. Supported values are `k8s` and `asg`; `k8s` requires the `kubernetes` block. Changing it creates a new Connect Cluster.
+- `type` (String) Compute type. Supported value is `k8s`; `k8s` requires the `kubernetes` block. Changing it creates a new Connect Cluster.
 
 Optional:
 

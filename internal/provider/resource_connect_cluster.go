@@ -34,7 +34,7 @@ const (
 var (
 	workerResourceSpecs = []string{"TIER1", "TIER2", "TIER3", "TIER4"}
 	capacityTypes       = []string{"provisioned", "autoscaling"}
-	computeTypes        = []string{"k8s", "asg"}
+	computeTypes        = []string{"k8s"}
 )
 
 var (
@@ -163,7 +163,7 @@ func (r *ConnectClusterResource) Schema(ctx context.Context, _ resource.SchemaRe
 				Required:    true,
 				Description: "Compute backend where Connect workers run.",
 				Attributes: map[string]schema.Attribute{
-					"type": schema.StringAttribute{Required: true, Description: "Compute type. Supported values are `k8s` and `asg`; `k8s` requires the `kubernetes` block. Changing it creates a new Connect Cluster.", Validators: []validator.String{stringvalidator.OneOf(computeTypes...)}, PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+					"type": schema.StringAttribute{Required: true, Description: "Compute type. Supported value is `k8s`; `k8s` requires the `kubernetes` block. Changing it creates a new Connect Cluster.", Validators: []validator.String{stringvalidator.OneOf(computeTypes...)}, PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
 					"kubernetes": schema.SingleNestedAttribute{
 						Optional:    true,
 						Description: "Kubernetes compute settings for worker pods. Required when `compute.type` is `k8s`.",
