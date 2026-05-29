@@ -56,6 +56,14 @@ resource "automq_kafka_instance" "example" {
       authentication_methods   = ["anonymous"]
       transit_encryption_modes = ["plaintext"]
     }
+    schema_registry_enabled = true
+
+    # Optional. Adding this block enables Table Topic in place on eligible instances.
+    # Keep schema_registry_enabled explicitly true because Table Topic depends on Schema Registry.
+    table_topic = {
+      catalog_type = "glue"
+      warehouse    = "s3://automq-table-topic-warehouse"
+    }
   }
 }
 
@@ -98,20 +106,20 @@ Required:
 
 Optional:
 
-- `data_buckets` (Attributes List) Inline bucket configuration replacing legacy bucket profiles. (see [below for nested schema](#nestedatt--compute_specs--data_buckets))
-- `deploy_type` (String) Deployment platform for the instance. `IAAS` deploys on EC2/VM instances; `K8S` deploys on a managed Kubernetes cluster (EKS/GKE/AKS). Supported values: `IAAS`, `K8S`.
-- `dns_zone` (String) DNS zone used when creating custom records.
+- `data_buckets` (Attributes List) Inline bucket configuration replacing legacy bucket profiles. Omit this field to let backend manage the data bucket. Changing configured data bucket settings requires instance replacement. (see [below for nested schema](#nestedatt--compute_specs--data_buckets))
+- `deploy_type` (String) Deployment platform for the instance. `IAAS` deploys on EC2/VM instances; `K8S` deploys on a managed Kubernetes cluster (EKS/GKE/AKS). Supported values: `IAAS`, `K8S`. Changing deployment type requires instance replacement.
+- `dns_zone` (String) DNS zone used when creating custom records. Changing a configured DNS zone requires instance replacement.
 - `file_system_param` (Attributes) File system configuration for FSWAL mode (see [below for nested schema](#nestedatt--compute_specs--file_system_param))
-- `instance_role` (String) IAM role ARN for the Kafka instance. If not specified, the backend will auto-generate an appropriate role. Format: `arn:aws:iam::<account-id>:role/<role-name>`.
+- `instance_role` (String) IAM role ARN for the Kafka instance. If not specified, the backend will auto-generate an appropriate role. Format: `arn:aws:iam::<account-id>:role/<role-name>`. Changing a configured instance role requires instance replacement.
 - `instance_types` (List of String) Instance type list for the nodes. Maximum 1 entry. Required when `pricing_mode` is `UsageBased` and `deploy_type` is `IAAS`. Cannot be modified after creation.
-- `kubernetes_cluster_id` (String) Identifier for the target Kubernetes cluster when `deploy_type` is `K8S`.
-- `kubernetes_namespace` (String) Kubernetes namespace for the instance deployment. If not specified, the backend will auto-assign one.
+- `kubernetes_cluster_id` (String) Identifier for the target Kubernetes cluster when `deploy_type` is `K8S`. Changing the Kubernetes cluster requires instance replacement.
+- `kubernetes_namespace` (String) Kubernetes namespace for the instance deployment. If not specified, the backend will auto-assign one. Changing a configured namespace requires instance replacement.
 - `kubernetes_node_groups` (Attributes List) Node groups (or node pools) are units for unified configuration management of physical nodes in Kubernetes. Different Kubernetes providers may use different terms for node groups. Select target node groups that must be created in advance and configured for either single-AZ or three-AZ deployment. The instance node type must meet the requirements specified in the documentation. If you select a single-AZ node group, the AutoMQ instance will be deployed in a single availability zone; if you select a three-AZ node group, the instance will be deployed across three availability zones. (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
-- `kubernetes_service_account` (String) Kubernetes service account for the instance pods. If not specified, the backend will auto-assign one.
+- `kubernetes_service_account` (String) Kubernetes service account for the instance pods. If not specified, the backend will auto-assign one. Changing a configured service account requires instance replacement.
 - `pricing_mode` (String) Pricing mode for the instance. Supported values: `UsageBased` (pay-as-you-go based on actual usage, requires `reserved_node_count`), `SubscriptionBased` (subscription-based pricing, requires `reserved_aku`). Defaults to `SubscriptionBased`. Changes to pricing mode require instance replacement.
 - `reserved_aku` (Number) AKU (AutoMQ Kafka Unit) defines the cluster scale. Each AKU provides up to 30 MiB/s write or 60 MiB/s read throughput. Minimum value is 3; maximum depends on your license quota. Required when `pricing_mode` is `SubscriptionBased`. For sizing guidance, refer to the [billing documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints).
 - `reserved_node_count` (Number) Number of reserved nodes for the instance. Valid range is 3 to 100. Required when `pricing_mode` is `UsageBased`.
-- `security_groups` (List of String) Security groups for the instance. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group.
+- `security_groups` (List of String) Security groups for the instance. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group. Changing configured security groups requires instance replacement.
 
 <a id="nestedatt--compute_specs--networks"></a>
 ### Nested Schema for `compute_specs.networks`
@@ -149,7 +157,7 @@ Changing this field requires resource replacement.
 
 Optional:
 
-- `security_groups` (List of String) Security groups for file systems. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group.
+- `security_groups` (List of String) Security groups for file systems. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group. Changing configured security groups requires instance replacement.
 
 
 <a id="nestedatt--compute_specs--kubernetes_node_groups"></a>
@@ -173,7 +181,8 @@ Optional:
 
 - `instance_configs` (Map of String) Additional configuration for the Kafka Instance. The currently supported parameters can be set by referring to the [documentation](https://docs.automq.com/automq-cloud/using-automq-for-kafka/restrictions#instance-level-configuration).
 - `metrics_exporter` (Attributes) Configure Prometheus Remote Write metrics exporter. (see [below for nested schema](#nestedatt--features--metrics_exporter))
-- `table_topic` (Attributes) Inline table topic (Iceberg/Hive) configuration replacing legacy integration references. (see [below for nested schema](#nestedatt--features--table_topic))
+- `schema_registry_enabled` (Boolean) Whether Schema Registry is enabled for this Kafka instance. Set this to `true` when configuring `features.table_topic`.
+- `table_topic` (Attributes) Inline table topic (Iceberg/Hive) configuration. Presence of this block enables Table Topic in place. Removing or changing it after enablement is not supported. (see [below for nested schema](#nestedatt--features--table_topic))
 
 <a id="nestedatt--features--security"></a>
 ### Nested Schema for `features.security`

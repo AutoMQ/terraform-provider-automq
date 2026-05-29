@@ -36,6 +36,14 @@ resource "automq_kafka_instance" "example" {
       authentication_methods   = ["anonymous"]
       transit_encryption_modes = ["plaintext"]
     }
+    schema_registry_enabled = true
+
+    # Optional. Adding this block enables Table Topic in place on eligible instances.
+    # Keep schema_registry_enabled explicitly true because Table Topic depends on Schema Registry.
+    table_topic = {
+      catalog_type = "glue"
+      warehouse    = "s3://automq-table-topic-warehouse"
+    }
   }
 }
 

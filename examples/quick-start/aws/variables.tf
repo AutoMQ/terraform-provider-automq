@@ -135,7 +135,7 @@ variable "metrics_exporter" {
 }
 
 variable "table_topic" {
-  description = "Table topic integration configuration"
+  description = "Table topic inline configuration"
   type = object({
     warehouse          = string
     catalog_type       = string
@@ -147,6 +147,12 @@ variable "table_topic" {
     krb5conf_file      = optional(string)
   })
   default = null
+}
+
+variable "schema_registry_enabled" {
+  description = "Whether to enable Schema Registry. Must be true when table_topic is configured."
+  type        = bool
+  default     = false
 }
 
 variable "security_authentication_methods" {

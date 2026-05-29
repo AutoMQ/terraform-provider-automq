@@ -3,10 +3,13 @@ package provider
 import (
 	"context"
 	"fmt"
+	"terraform-provider-automq/client"
+	"terraform-provider-automq/internal/models"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/stretchr/testify/assert"
 )
@@ -273,4 +276,18 @@ func TestKafkaInstanceDataSourceSchema_PricingFields(t *testing.T) {
 		t.Fatalf("instance_types has unexpected type %T", instanceTypes)
 	}
 	assert.True(t, instanceTypesAttr.IsComputed(), "instance_types should be computed")
+}
+
+func TestApplyInstanceConfigsToDataSourceModelInitializesMissingFeatures(t *testing.T) {
+	model := &models.KafkaInstanceModel{}
+	configKey := "auto.create.topics.enable"
+	configValue := "false"
+
+	applyInstanceConfigsToDataSourceModel(model, []client.ConfigItemParam{
+		{Key: &configKey, Value: &configValue},
+	})
+
+	if assert.NotNil(t, model.Features) {
+		assert.Equal(t, types.StringValue(configValue), model.Features.InstanceConfigs.Elements()[configKey])
+	}
 }
