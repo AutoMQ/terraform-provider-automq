@@ -141,6 +141,8 @@ resource "automq_kafka_instance" "k8s" {
 
     metrics_exporter = var.metrics_exporter
 
+    schema_registry_enabled = var.schema_registry_enabled
+
     table_topic = var.table_topic
 
     security = {

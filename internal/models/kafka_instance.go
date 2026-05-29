@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 // Instance states that represent the lifecycle of a Kafka instance
@@ -69,21 +70,21 @@ type NetworkModel struct {
 }
 
 type ComputeSpecsModel struct {
-	ReservedAku           types.Int64           `tfsdk:"reserved_aku"`
-	PricingMode           types.String          `tfsdk:"pricing_mode"`
-	ReservedNodeCount     types.Int64           `tfsdk:"reserved_node_count"`
-	InstanceTypes         types.List            `tfsdk:"instance_types"`
-	Networks              []NetworkModel        `tfsdk:"networks"`
-	KubernetesNodeGroups  []NodeGroupModel      `tfsdk:"kubernetes_node_groups"`
-	DeployType            types.String          `tfsdk:"deploy_type"`
-	DnsZone               types.String          `tfsdk:"dns_zone"`
-	KubernetesClusterID   types.String          `tfsdk:"kubernetes_cluster_id"`
-	KubernetesNamespace   types.String          `tfsdk:"kubernetes_namespace"`
-	KubernetesServiceAcct types.String          `tfsdk:"kubernetes_service_account"`
-	InstanceRole          types.String          `tfsdk:"instance_role"`
-	DataBuckets           types.List            `tfsdk:"data_buckets"`
-	SecurityGroups        types.List            `tfsdk:"security_groups"`
-	FileSystemParam       *FileSystemParamModel `tfsdk:"file_system_param"`
+	ReservedAku           types.Int64  `tfsdk:"reserved_aku"`
+	PricingMode           types.String `tfsdk:"pricing_mode"`
+	ReservedNodeCount     types.Int64  `tfsdk:"reserved_node_count"`
+	InstanceTypes         types.List   `tfsdk:"instance_types"`
+	Networks              types.List   `tfsdk:"networks"`
+	KubernetesNodeGroups  types.List   `tfsdk:"kubernetes_node_groups"`
+	DeployType            types.String `tfsdk:"deploy_type"`
+	DnsZone               types.String `tfsdk:"dns_zone"`
+	KubernetesClusterID   types.String `tfsdk:"kubernetes_cluster_id"`
+	KubernetesNamespace   types.String `tfsdk:"kubernetes_namespace"`
+	KubernetesServiceAcct types.String `tfsdk:"kubernetes_service_account"`
+	InstanceRole          types.String `tfsdk:"instance_role"`
+	DataBuckets           types.List   `tfsdk:"data_buckets"`
+	SecurityGroups        types.List   `tfsdk:"security_groups"`
+	FileSystemParam       types.Object `tfsdk:"file_system_param"`
 }
 
 type NodeGroupModel struct {
@@ -101,10 +102,116 @@ type FileSystemParamModel struct {
 	SecurityGroups               types.List   `tfsdk:"security_groups"`
 }
 
+var NetworkObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"zone":    types.StringType,
+		"subnets": types.ListType{ElemType: types.StringType},
+	},
+}
+
+var NodeGroupObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"id": types.StringType,
+	},
+}
+
 var DataBucketObjectType = types.ObjectType{
 	AttrTypes: map[string]attr.Type{
 		"bucket_name": types.StringType,
 	},
+}
+
+var FileSystemParamObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"file_system_type":                 types.StringType,
+		"throughput_mibps_per_file_system": types.Int64Type,
+		"file_system_count":                types.Int64Type,
+		"security_groups":                  types.ListType{ElemType: types.StringType},
+	},
+}
+
+var SecurityObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"authentication_methods":          types.SetType{ElemType: types.StringType},
+		"transit_encryption_modes":        types.SetType{ElemType: types.StringType},
+		"certificate_authority":           types.StringType,
+		"certificate_chain":               types.StringType,
+		"private_key":                     types.StringType,
+		"data_encryption_mode":            types.StringType,
+		"tls_hostname_validation_enabled": types.BoolType,
+	},
+}
+
+var SecuritySummaryObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"authentication_methods":          types.SetType{ElemType: types.StringType},
+		"transit_encryption_modes":        types.SetType{ElemType: types.StringType},
+		"data_encryption_mode":            types.StringType,
+		"tls_hostname_validation_enabled": types.BoolType,
+	},
+}
+
+var PrometheusExporterObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"auth_type":      types.StringType,
+		"endpoint":       types.StringType,
+		"prometheus_arn": types.StringType,
+		"username":       types.StringType,
+		"password":       types.StringType,
+		"token":          types.StringType,
+		"labels":         types.MapType{ElemType: types.StringType},
+	},
+}
+
+var MetricsExporterObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"prometheus": PrometheusExporterObjectType,
+	},
+}
+
+var TableTopicObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"warehouse":          types.StringType,
+		"catalog_type":       types.StringType,
+		"metastore_uri":      types.StringType,
+		"hive_auth_mode":     types.StringType,
+		"kerberos_principal": types.StringType,
+		"user_principal":     types.StringType,
+		"keytab_file":        types.StringType,
+		"krb5conf_file":      types.StringType,
+	},
+}
+
+func NetworkListToModels(ctx context.Context, list types.List) ([]NetworkModel, diag.Diagnostics) {
+	if list.IsNull() || list.IsUnknown() {
+		return nil, nil
+	}
+	var networks []NetworkModel
+	diags := list.ElementsAs(ctx, &networks, false)
+	return networks, diags
+}
+
+func NetworkModelsToList(ctx context.Context, networks []NetworkModel) (types.List, diag.Diagnostics) {
+	if networks == nil {
+		return types.ListNull(NetworkObjectType), nil
+	}
+	return types.ListValueFrom(ctx, NetworkObjectType, networks)
+}
+
+func NodeGroupListToModels(ctx context.Context, list types.List) ([]NodeGroupModel, diag.Diagnostics) {
+	if list.IsNull() || list.IsUnknown() {
+		return nil, nil
+	}
+	var groups []NodeGroupModel
+	diags := list.ElementsAs(ctx, &groups, false)
+	return groups, diags
+}
+
+func NodeGroupModelsToList(ctx context.Context, groups []NodeGroupModel) (types.List, diag.Diagnostics) {
+	if groups == nil {
+		return types.ListNull(NodeGroupObjectType), nil
+	}
+	return types.ListValueFrom(ctx, NodeGroupObjectType, groups)
 }
 
 func DataBucketListToModels(ctx context.Context, list types.List) ([]DataBucketModel, diag.Diagnostics) {
@@ -122,6 +229,176 @@ func DataBucketModelsToList(ctx context.Context, buckets []DataBucketModel) (typ
 	}
 	listValue, diags := types.ListValueFrom(ctx, DataBucketObjectType, buckets)
 	return listValue, diags
+}
+
+func FileSystemParamObjectToModel(ctx context.Context, object types.Object) (*FileSystemParamModel, diag.Diagnostics) {
+	if object.IsNull() || object.IsUnknown() {
+		return nil, nil
+	}
+	var model FileSystemParamModel
+	diags := object.As(ctx, &model, basetypes.ObjectAsOptions{})
+	return &model, diags
+}
+
+func FileSystemParamModelToObject(ctx context.Context, model *FileSystemParamModel) (types.Object, diag.Diagnostics) {
+	if model == nil {
+		return types.ObjectNull(FileSystemParamObjectType.AttrTypes), nil
+	}
+	normalized := *model
+	if normalized.FileSystemType.IsNull() {
+		normalized.FileSystemType = types.StringNull()
+	}
+	if normalized.ThroughputMibpsPerFileSystem.IsNull() {
+		normalized.ThroughputMibpsPerFileSystem = types.Int64Null()
+	}
+	if normalized.FileSystemCount.IsNull() {
+		normalized.FileSystemCount = types.Int64Null()
+	}
+	if normalized.SecurityGroups.IsNull() {
+		normalized.SecurityGroups = types.ListNull(types.StringType)
+	}
+	return types.ObjectValueFrom(ctx, FileSystemParamObjectType.AttrTypes, normalized)
+}
+
+func SecurityObjectToModel(ctx context.Context, object types.Object) (*SecurityModel, diag.Diagnostics) {
+	if object.IsNull() || object.IsUnknown() {
+		return nil, nil
+	}
+	var model SecurityModel
+	diags := object.As(ctx, &model, basetypes.ObjectAsOptions{})
+	return &model, diags
+}
+
+func SecurityModelToObject(ctx context.Context, model *SecurityModel) (types.Object, diag.Diagnostics) {
+	if model == nil {
+		return types.ObjectNull(SecurityObjectType.AttrTypes), nil
+	}
+	normalized := *model
+	if normalized.AuthenticationMethods.IsNull() {
+		normalized.AuthenticationMethods = types.SetNull(types.StringType)
+	}
+	if normalized.TransitEncryptionModes.IsNull() {
+		normalized.TransitEncryptionModes = types.SetNull(types.StringType)
+	}
+	if normalized.CertificateAuthority.IsNull() {
+		normalized.CertificateAuthority = types.StringNull()
+	}
+	if normalized.CertificateChain.IsNull() {
+		normalized.CertificateChain = types.StringNull()
+	}
+	if normalized.PrivateKey.IsNull() {
+		normalized.PrivateKey = types.StringNull()
+	}
+	if normalized.DataEncryptionMode.IsNull() {
+		normalized.DataEncryptionMode = types.StringNull()
+	}
+	if normalized.TlsHostnameValidationEnabled.IsNull() {
+		normalized.TlsHostnameValidationEnabled = types.BoolNull()
+	}
+	return types.ObjectValueFrom(ctx, SecurityObjectType.AttrTypes, normalized)
+}
+
+func SecuritySummaryModelToObject(ctx context.Context, model *SecuritySummaryModel) (types.Object, diag.Diagnostics) {
+	if model == nil {
+		return types.ObjectNull(SecuritySummaryObjectType.AttrTypes), nil
+	}
+	normalized := *model
+	if normalized.AuthenticationMethods.IsNull() {
+		normalized.AuthenticationMethods = types.SetNull(types.StringType)
+	}
+	if normalized.TransitEncryptionModes.IsNull() {
+		normalized.TransitEncryptionModes = types.SetNull(types.StringType)
+	}
+	if normalized.DataEncryptionMode.IsNull() {
+		normalized.DataEncryptionMode = types.StringNull()
+	}
+	if normalized.TlsHostnameValidationEnabled.IsNull() {
+		normalized.TlsHostnameValidationEnabled = types.BoolNull()
+	}
+	return types.ObjectValueFrom(ctx, SecuritySummaryObjectType.AttrTypes, normalized)
+}
+
+func MetricsExporterObjectToModel(ctx context.Context, object types.Object) (*MetricsExporterModel, diag.Diagnostics) {
+	if object.IsNull() || object.IsUnknown() {
+		return nil, nil
+	}
+	var model MetricsExporterModel
+	diags := object.As(ctx, &model, basetypes.ObjectAsOptions{})
+	return &model, diags
+}
+
+func MetricsExporterModelToObject(ctx context.Context, model *MetricsExporterModel) (types.Object, diag.Diagnostics) {
+	if model == nil {
+		return types.ObjectNull(MetricsExporterObjectType.AttrTypes), nil
+	}
+	normalized := *model
+	if normalized.Prometheus != nil {
+		prom := *normalized.Prometheus
+		if prom.AuthType.IsNull() {
+			prom.AuthType = types.StringNull()
+		}
+		if prom.EndPoint.IsNull() {
+			prom.EndPoint = types.StringNull()
+		}
+		if prom.PrometheusArn.IsNull() {
+			prom.PrometheusArn = types.StringNull()
+		}
+		if prom.Username.IsNull() {
+			prom.Username = types.StringNull()
+		}
+		if prom.Password.IsNull() {
+			prom.Password = types.StringNull()
+		}
+		if prom.Token.IsNull() {
+			prom.Token = types.StringNull()
+		}
+		if prom.Labels.IsNull() {
+			prom.Labels = types.MapNull(types.StringType)
+		}
+		normalized.Prometheus = &prom
+	}
+	return types.ObjectValueFrom(ctx, MetricsExporterObjectType.AttrTypes, normalized)
+}
+
+func TableTopicObjectToModel(ctx context.Context, object types.Object) (*TableTopicModel, diag.Diagnostics) {
+	if object.IsNull() || object.IsUnknown() {
+		return nil, nil
+	}
+	var model TableTopicModel
+	diags := object.As(ctx, &model, basetypes.ObjectAsOptions{})
+	return &model, diags
+}
+
+func TableTopicModelToObject(ctx context.Context, model *TableTopicModel) (types.Object, diag.Diagnostics) {
+	if model == nil {
+		return types.ObjectNull(TableTopicObjectType.AttrTypes), nil
+	}
+	normalized := *model
+	if normalized.Warehouse.IsNull() {
+		normalized.Warehouse = types.StringNull()
+	}
+	if normalized.CatalogType.IsNull() {
+		normalized.CatalogType = types.StringNull()
+	}
+	if normalized.MetastoreURI.IsNull() {
+		normalized.MetastoreURI = types.StringNull()
+	}
+	if normalized.HiveAuthMode.IsNull() {
+		normalized.HiveAuthMode = types.StringNull()
+	}
+	if normalized.KerberosPrincipal.IsNull() {
+		normalized.KerberosPrincipal = types.StringNull()
+	}
+	if normalized.UserPrincipal.IsNull() {
+		normalized.UserPrincipal = types.StringNull()
+	}
+	if normalized.KeytabFile.IsNull() {
+		normalized.KeytabFile = types.StringNull()
+	}
+	if normalized.Krb5ConfFile.IsNull() {
+		normalized.Krb5ConfFile = types.StringNull()
+	}
+	return types.ObjectValueFrom(ctx, TableTopicObjectType.AttrTypes, normalized)
 }
 
 func coalesceStringAttr(apiValue *string, previous *types.String) types.String {
@@ -145,19 +422,21 @@ func coalesceBoolAttr(apiValue *bool, previous *types.Bool) types.Bool {
 }
 
 type FeaturesModel struct {
-	WalMode         types.String          `tfsdk:"wal_mode"`
-	InstanceConfigs types.Map             `tfsdk:"instance_configs"`
-	Security        *SecurityModel        `tfsdk:"security"`
-	MetricsExporter *MetricsExporterModel `tfsdk:"metrics_exporter"`
-	TableTopic      *TableTopicModel      `tfsdk:"table_topic"`
+	WalMode               types.String `tfsdk:"wal_mode"`
+	InstanceConfigs       types.Map    `tfsdk:"instance_configs"`
+	Security              types.Object `tfsdk:"security"`
+	MetricsExporter       types.Object `tfsdk:"metrics_exporter"`
+	TableTopic            types.Object `tfsdk:"table_topic"`
+	SchemaRegistryEnabled types.Bool   `tfsdk:"schema_registry_enabled"`
 }
 
 type FeaturesSummaryModel struct {
-	WalMode         types.String          `tfsdk:"wal_mode"`
-	InstanceConfigs types.Map             `tfsdk:"instance_configs"`
-	Security        *SecuritySummaryModel `tfsdk:"security"`
-	MetricsExporter *MetricsExporterModel `tfsdk:"metrics_exporter"`
-	TableTopic      *TableTopicModel      `tfsdk:"table_topic"`
+	WalMode               types.String `tfsdk:"wal_mode"`
+	InstanceConfigs       types.Map    `tfsdk:"instance_configs"`
+	Security              types.Object `tfsdk:"security"`
+	MetricsExporter       types.Object `tfsdk:"metrics_exporter"`
+	TableTopic            types.Object `tfsdk:"table_topic"`
+	SchemaRegistryEnabled types.Bool   `tfsdk:"schema_registry_enabled"`
 }
 
 type SecurityModel struct {
@@ -207,7 +486,91 @@ func PrometheusExporterHasConfig(model *PrometheusExporterModel) bool {
 	if model == nil {
 		return false
 	}
-	return !model.AuthType.IsNull()
+	return isKnownStringSet(model.AuthType) ||
+		isKnownStringSet(model.EndPoint) ||
+		isKnownStringSet(model.PrometheusArn) ||
+		isKnownStringSet(model.Username) ||
+		isKnownStringSet(model.Password) ||
+		isKnownStringSet(model.Token) ||
+		(!model.Labels.IsNull() && !model.Labels.IsUnknown() && len(model.Labels.Elements()) > 0)
+}
+
+func isKnownStringSet(value types.String) bool {
+	return !value.IsNull() && !value.IsUnknown()
+}
+
+func BuildMetricsExporterParam(model *MetricsExporterModel) (*client.InstanceMetricsExporterParam, bool) {
+	if model == nil {
+		return nil, false
+	}
+	exporter := client.InstanceMetricsExporterParam{}
+	hasConfig := false
+	if model.Prometheus != nil {
+		prom, ok := BuildPrometheusExporterParam(model.Prometheus)
+		if ok {
+			exporter.Prometheus = prom
+			hasConfig = true
+		}
+	}
+	if !hasConfig {
+		return nil, false
+	}
+	return &exporter, true
+}
+
+func BuildPrometheusExporterParam(model *PrometheusExporterModel) (*client.InstancePrometheusExporterParam, bool) {
+	if model == nil {
+		return nil, false
+	}
+	if !PrometheusExporterHasConfig(model) {
+		return nil, false
+	}
+	prom := &client.InstancePrometheusExporterParam{}
+	enabled := true
+	prom.Enabled = &enabled
+	if !model.AuthType.IsNull() && !model.AuthType.IsUnknown() {
+		auth := model.AuthType.ValueString()
+		prom.AuthType = &auth
+	}
+	if !model.EndPoint.IsNull() && !model.EndPoint.IsUnknown() {
+		endpoint := model.EndPoint.ValueString()
+		prom.EndPoint = &endpoint
+	}
+	if !model.PrometheusArn.IsNull() && !model.PrometheusArn.IsUnknown() {
+		arn := model.PrometheusArn.ValueString()
+		prom.PrometheusArn = &arn
+	}
+	if !model.Username.IsNull() && !model.Username.IsUnknown() {
+		username := model.Username.ValueString()
+		prom.Username = &username
+	}
+	if !model.Password.IsNull() && !model.Password.IsUnknown() {
+		password := model.Password.ValueString()
+		prom.Password = &password
+	}
+	if !model.Token.IsNull() && !model.Token.IsUnknown() {
+		token := model.Token.ValueString()
+		prom.Token = &token
+	}
+	if !model.Labels.IsNull() && !model.Labels.IsUnknown() && len(model.Labels.Elements()) > 0 {
+		labels := ExpandStringValueMap(model.Labels)
+		if len(labels) > 0 {
+			promLabels := make([]client.MetricsLabelParam, len(labels))
+			for i, label := range labels {
+				name := ""
+				if label.Key != nil {
+					name = *label.Key
+				}
+				value := ""
+				if label.Value != nil {
+					value = *label.Value
+				}
+				promLabels[i] = client.MetricsLabelParam{Name: name, Value: value}
+			}
+			prom.Labels = promLabels
+		}
+	}
+	return prom, true
 }
 
 type TableTopicModel struct {
@@ -219,6 +582,43 @@ type TableTopicModel struct {
 	UserPrincipal     types.String `tfsdk:"user_principal"`
 	KeytabFile        types.String `tfsdk:"keytab_file"`
 	Krb5ConfFile      types.String `tfsdk:"krb5conf_file"`
+}
+
+func BuildTableTopicParam(model *TableTopicModel) *client.TableTopicParam {
+	if model == nil {
+		return nil
+	}
+	enabled := true
+	topic := &client.TableTopicParam{
+		Enabled:     &enabled,
+		Warehouse:   model.Warehouse.ValueString(),
+		CatalogType: model.CatalogType.ValueString(),
+	}
+	if !model.MetastoreURI.IsNull() && !model.MetastoreURI.IsUnknown() {
+		value := model.MetastoreURI.ValueString()
+		topic.MetastoreUri = &value
+	}
+	if !model.HiveAuthMode.IsNull() && !model.HiveAuthMode.IsUnknown() {
+		value := model.HiveAuthMode.ValueString()
+		topic.HiveAuthMode = &value
+	}
+	if !model.KerberosPrincipal.IsNull() && !model.KerberosPrincipal.IsUnknown() {
+		value := model.KerberosPrincipal.ValueString()
+		topic.KerberosPrincipal = &value
+	}
+	if !model.UserPrincipal.IsNull() && !model.UserPrincipal.IsUnknown() {
+		value := model.UserPrincipal.ValueString()
+		topic.UserPrincipal = &value
+	}
+	if !model.KeytabFile.IsNull() && !model.KeytabFile.IsUnknown() {
+		value := model.KeytabFile.ValueString()
+		topic.KeytabFile = &value
+	}
+	if !model.Krb5ConfFile.IsNull() && !model.Krb5ConfFile.IsUnknown() {
+		value := model.Krb5ConfFile.ValueString()
+		topic.Krb5ConfFile = &value
+	}
+	return topic
 }
 
 // ExpandKafkaInstanceResource converts a KafkaInstanceResourceModel to a client.InstanceCreateParam.
@@ -245,9 +645,7 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 	// Compute Specs
 	if instance.ComputeSpecs != nil {
 		// Reserved AKU
-		request.Spec = client.SpecificationParam{
-			NodeConfig: &client.NodeConfigParam{},
-		}
+		request.Spec = client.SpecificationParam{}
 		if !instance.ComputeSpecs.ReservedAku.IsNull() && !instance.ComputeSpecs.ReservedAku.IsUnknown() {
 			request.Spec.ReservedAku = int32(instance.ComputeSpecs.ReservedAku.ValueInt64())
 		}
@@ -272,6 +670,9 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 				return fmt.Errorf("failed to parse instance_types: %v", diags)
 			}
 			if len(instanceTypes) > 0 {
+				if request.Spec.NodeConfig == nil {
+					request.Spec.NodeConfig = &client.NodeConfigParam{}
+				}
 				request.Spec.NodeConfig.InstanceTypes = instanceTypes
 			}
 		}
@@ -300,13 +701,14 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 			role := instance.ComputeSpecs.InstanceRole.ValueString()
 			request.Spec.InstanceRole = &role
 		}
-		// ignore Node Configs
-
-		// Networks
 		// Kubernetes Node Groups
-		if len(instance.ComputeSpecs.KubernetesNodeGroups) > 0 {
-			nodeGroups := make([]client.KubernetesNodeGroupParam, 0, len(instance.ComputeSpecs.KubernetesNodeGroups))
-			for _, ng := range instance.ComputeSpecs.KubernetesNodeGroups {
+		nodeGroupModels, nodeGroupDiags := NodeGroupListToModels(ctx, instance.ComputeSpecs.KubernetesNodeGroups)
+		if nodeGroupDiags.HasError() {
+			return fmt.Errorf("failed to parse compute_specs.kubernetes_node_groups: %v", nodeGroupDiags.Errors())
+		}
+		if len(nodeGroupModels) > 0 {
+			nodeGroups := make([]client.KubernetesNodeGroupParam, 0, len(nodeGroupModels))
+			for _, ng := range nodeGroupModels {
 				id := ng.ID.ValueString()
 				nodeGroups = append(nodeGroups, client.KubernetesNodeGroupParam{
 					Id: &id,
@@ -314,25 +716,29 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 			}
 			request.Spec.KubernetesNodeGroups = nodeGroups
 		}
-		if len(instance.ComputeSpecs.Networks) > 0 {
-			networks := make([]client.InstanceNetworkParam, 0, len(instance.ComputeSpecs.Networks))
-			for _, network := range instance.ComputeSpecs.Networks {
-				subnet := ""
+		networkModels, networkDiags := NetworkListToModels(ctx, instance.ComputeSpecs.Networks)
+		if networkDiags.HasError() {
+			return fmt.Errorf("failed to parse compute_specs.networks: %v", networkDiags.Errors())
+		}
+		if len(networkModels) > 0 {
+			networks := make([]client.InstanceNetworkParam, 0, len(networkModels))
+			for _, network := range networkModels {
+				var subnet *string
 				if !network.Subnets.IsNull() {
 					subnets := ExpandStringValueList(network.Subnets)
 					if len(subnets) > 0 {
-						subnet = subnets[0]
+						subnet = &subnets[0]
 					}
 				}
 				networks = append(networks, client.InstanceNetworkParam{
 					Zone:   network.Zone.ValueString(),
-					Subnet: &subnet,
+					Subnet: subnet,
 				})
 			}
 			request.Spec.Networks = networks
 		}
 		if !instance.ComputeSpecs.DataBuckets.IsNull() && !instance.ComputeSpecs.DataBuckets.IsUnknown() {
-			dataBucketModels, dataBucketDiags := DataBucketListToModels(context.TODO(), instance.ComputeSpecs.DataBuckets)
+			dataBucketModels, dataBucketDiags := DataBucketListToModels(ctx, instance.ComputeSpecs.DataBuckets)
 			if dataBucketDiags.HasError() {
 				return fmt.Errorf("failed to parse compute_specs.data_buckets: %v", dataBucketDiags.Errors())
 			}
@@ -360,24 +766,28 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 		}
 
 		// File System Parameters for FSWAL
-		if instance.ComputeSpecs.FileSystemParam != nil {
+		fileSystemModel, fileSystemDiags := FileSystemParamObjectToModel(ctx, instance.ComputeSpecs.FileSystemParam)
+		if fileSystemDiags.HasError() {
+			return fmt.Errorf("failed to parse compute_specs.file_system_param: %v", fileSystemDiags.Errors())
+		}
+		if fileSystemModel != nil {
 			fileSystemParam := &client.FileSystemParam{
-				ThroughputMiBpsPerFileSystem: int32(instance.ComputeSpecs.FileSystemParam.ThroughputMibpsPerFileSystem.ValueInt64()),
-				FileSystemCount:              int32(instance.ComputeSpecs.FileSystemParam.FileSystemCount.ValueInt64()),
+				ThroughputMiBpsPerFileSystem: int32(fileSystemModel.ThroughputMibpsPerFileSystem.ValueInt64()),
+				FileSystemCount:              int32(fileSystemModel.FileSystemCount.ValueInt64()),
 			}
 
 			// File system type
-			if !instance.ComputeSpecs.FileSystemParam.FileSystemType.IsNull() &&
-				!instance.ComputeSpecs.FileSystemParam.FileSystemType.IsUnknown() {
-				fsType := instance.ComputeSpecs.FileSystemParam.FileSystemType.ValueString()
+			if !fileSystemModel.FileSystemType.IsNull() &&
+				!fileSystemModel.FileSystemType.IsUnknown() {
+				fsType := fileSystemModel.FileSystemType.ValueString()
 				fileSystemParam.FileSystemType = &fsType
 			}
 
 			// Security groups protection logic: only include if not empty
-			if !instance.ComputeSpecs.FileSystemParam.SecurityGroups.IsNull() &&
-				!instance.ComputeSpecs.FileSystemParam.SecurityGroups.IsUnknown() {
+			if !fileSystemModel.SecurityGroups.IsNull() &&
+				!fileSystemModel.SecurityGroups.IsUnknown() {
 				var securityGroups []string
-				diags := instance.ComputeSpecs.FileSystemParam.SecurityGroups.ElementsAs(ctx, &securityGroups, false)
+				diags := fileSystemModel.SecurityGroups.ElementsAs(ctx, &securityGroups, false)
 				if !diags.HasError() && len(securityGroups) > 0 {
 					fileSystemParam.SecurityGroups = securityGroups
 				}
@@ -414,17 +824,21 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 		}
 
 		// Security
-		if instance.Features.Security != nil {
-			if !instance.Features.Security.DataEncryptionMode.IsNull() {
-				dataEncryptionMode := instance.Features.Security.DataEncryptionMode.ValueString()
+		securityModel, securityDiags := SecurityObjectToModel(ctx, instance.Features.Security)
+		if securityDiags.HasError() {
+			return fmt.Errorf("failed to parse features.security: %v", securityDiags.Errors())
+		}
+		if securityModel != nil {
+			if !securityModel.DataEncryptionMode.IsNull() {
+				dataEncryptionMode := securityModel.DataEncryptionMode.ValueString()
 				request.Features.Security = &client.InstanceSecurityParam{
 					DataEncryptionMode: &dataEncryptionMode,
 				}
 			}
 
-			if !instance.Features.Security.AuthenticationMethods.IsNull() {
+			if !securityModel.AuthenticationMethods.IsNull() {
 				var authMethods []string
-				diags := instance.Features.Security.AuthenticationMethods.ElementsAs(context.TODO(), &authMethods, false)
+				diags := securityModel.AuthenticationMethods.ElementsAs(ctx, &authMethods, false)
 				if diags.HasError() {
 					return fmt.Errorf("failed to parse authentication methods: %v", diags)
 				}
@@ -434,9 +848,9 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 				request.Features.Security.AuthenticationMethods = authMethods
 			}
 
-			if !instance.Features.Security.TransitEncryptionModes.IsNull() {
+			if !securityModel.TransitEncryptionModes.IsNull() {
 				var encryptionModes []string
-				diags := instance.Features.Security.TransitEncryptionModes.ElementsAs(context.TODO(), &encryptionModes, false)
+				diags := securityModel.TransitEncryptionModes.ElementsAs(ctx, &encryptionModes, false)
 				if diags.HasError() {
 					return fmt.Errorf("failed to parse transit encryption modes: %v", diags)
 				}
@@ -446,32 +860,32 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 				request.Features.Security.TransitEncryptionModes = encryptionModes
 			}
 
-			if !instance.Features.Security.CertificateAuthority.IsNull() {
-				certAuth := instance.Features.Security.CertificateAuthority.ValueString()
+			if !securityModel.CertificateAuthority.IsNull() {
+				certAuth := securityModel.CertificateAuthority.ValueString()
 				if request.Features.Security == nil {
 					request.Features.Security = &client.InstanceSecurityParam{}
 				}
 				request.Features.Security.CertificateAuthority = &certAuth
 			}
 
-			if !instance.Features.Security.CertificateChain.IsNull() {
-				certChain := instance.Features.Security.CertificateChain.ValueString()
+			if !securityModel.CertificateChain.IsNull() {
+				certChain := securityModel.CertificateChain.ValueString()
 				if request.Features.Security == nil {
 					request.Features.Security = &client.InstanceSecurityParam{}
 				}
 				request.Features.Security.CertificateChain = &certChain
 			}
 
-			if !instance.Features.Security.PrivateKey.IsNull() {
-				privateKey := instance.Features.Security.PrivateKey.ValueString()
+			if !securityModel.PrivateKey.IsNull() {
+				privateKey := securityModel.PrivateKey.ValueString()
 				if request.Features.Security == nil {
 					request.Features.Security = &client.InstanceSecurityParam{}
 				}
 				request.Features.Security.PrivateKey = &privateKey
 			}
 
-			if !instance.Features.Security.TlsHostnameValidationEnabled.IsNull() && !instance.Features.Security.TlsHostnameValidationEnabled.IsUnknown() {
-				enabled := instance.Features.Security.TlsHostnameValidationEnabled.ValueBool()
+			if !securityModel.TlsHostnameValidationEnabled.IsNull() && !securityModel.TlsHostnameValidationEnabled.IsUnknown() {
+				enabled := securityModel.TlsHostnameValidationEnabled.ValueBool()
 				if request.Features.Security == nil {
 					request.Features.Security = &client.InstanceSecurityParam{}
 				}
@@ -480,101 +894,35 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 		}
 
 		// Metrics exporter
-		if instance.Features.MetricsExporter != nil {
-			exporter := client.InstanceMetricsExporterParam{}
-			hasConfig := false
-			if promConfig := instance.Features.MetricsExporter.Prometheus; promConfig != nil {
-				prom := &client.InstancePrometheusExporterParam{}
-				enabled := true
-				prom.Enabled = &enabled
-				if !promConfig.AuthType.IsNull() && !promConfig.AuthType.IsUnknown() {
-					auth := promConfig.AuthType.ValueString()
-					prom.AuthType = &auth
-				}
-				if !promConfig.EndPoint.IsNull() && !promConfig.EndPoint.IsUnknown() {
-					endpoint := promConfig.EndPoint.ValueString()
-					prom.EndPoint = &endpoint
-				}
-				if !promConfig.PrometheusArn.IsNull() && !promConfig.PrometheusArn.IsUnknown() {
-					arn := promConfig.PrometheusArn.ValueString()
-					prom.PrometheusArn = &arn
-				}
-				if !promConfig.Username.IsNull() && !promConfig.Username.IsUnknown() {
-					username := promConfig.Username.ValueString()
-					prom.Username = &username
-				}
-				if !promConfig.Password.IsNull() && !promConfig.Password.IsUnknown() {
-					password := promConfig.Password.ValueString()
-					prom.Password = &password
-				}
-				if !promConfig.Token.IsNull() && !promConfig.Token.IsUnknown() {
-					token := promConfig.Token.ValueString()
-					prom.Token = &token
-				}
-				if !promConfig.Labels.IsNull() && !promConfig.Labels.IsUnknown() {
-					configs := ExpandStringValueMap(promConfig.Labels)
-					if len(configs) > 0 {
-						labelSlice := make([]client.MetricsLabelParam, len(configs))
-						for i, cfg := range configs {
-							name := ""
-							if cfg.Key != nil {
-								name = *cfg.Key
-							}
-							value := ""
-							if cfg.Value != nil {
-								value = *cfg.Value
-							}
-							labelSlice[i] = client.MetricsLabelParam{Name: name, Value: value}
-						}
-						prom.Labels = labelSlice
-					}
-				}
-				exporter.Prometheus = prom
-				hasConfig = true
-			}
-			if hasConfig {
-				request.Features.MetricsExporter = &exporter
+		metricsModel, metricsDiags := MetricsExporterObjectToModel(ctx, instance.Features.MetricsExporter)
+		if metricsDiags.HasError() {
+			return fmt.Errorf("failed to parse features.metrics_exporter: %v", metricsDiags.Errors())
+		}
+		if metricsModel != nil {
+			if exporter, hasConfig := BuildMetricsExporterParam(metricsModel); hasConfig {
+				request.Features.MetricsExporter = exporter
 			}
 		}
 
 		// Table topic
-		if instance.Features.TableTopic != nil {
-			topicModel := instance.Features.TableTopic
+		topicModel, topicDiags := TableTopicObjectToModel(ctx, instance.Features.TableTopic)
+		if topicDiags.HasError() {
+			return fmt.Errorf("failed to parse features.table_topic: %v", topicDiags.Errors())
+		}
+		if topicModel != nil {
 			if topicModel.Warehouse.IsNull() || topicModel.Warehouse.IsUnknown() {
 				return fmt.Errorf("features.table_topic.warehouse is required when table_topic is set")
 			}
 			if topicModel.CatalogType.IsNull() || topicModel.CatalogType.IsUnknown() {
 				return fmt.Errorf("features.table_topic.catalog_type is required when table_topic is set")
 			}
-			topic := &client.TableTopicParam{
-				Warehouse:   topicModel.Warehouse.ValueString(),
-				CatalogType: topicModel.CatalogType.ValueString(),
-			}
-			if !topicModel.MetastoreURI.IsNull() && !topicModel.MetastoreURI.IsUnknown() {
-				uri := topicModel.MetastoreURI.ValueString()
-				topic.MetastoreUri = &uri
-			}
-			if !topicModel.HiveAuthMode.IsNull() && !topicModel.HiveAuthMode.IsUnknown() {
-				mode := topicModel.HiveAuthMode.ValueString()
-				topic.HiveAuthMode = &mode
-			}
-			if !topicModel.KerberosPrincipal.IsNull() && !topicModel.KerberosPrincipal.IsUnknown() {
-				principal := topicModel.KerberosPrincipal.ValueString()
-				topic.KerberosPrincipal = &principal
-			}
-			if !topicModel.UserPrincipal.IsNull() && !topicModel.UserPrincipal.IsUnknown() {
-				principal := topicModel.UserPrincipal.ValueString()
-				topic.UserPrincipal = &principal
-			}
-			if !topicModel.KeytabFile.IsNull() && !topicModel.KeytabFile.IsUnknown() {
-				keytab := topicModel.KeytabFile.ValueString()
-				topic.KeytabFile = &keytab
-			}
-			if !topicModel.Krb5ConfFile.IsNull() && !topicModel.Krb5ConfFile.IsUnknown() {
-				conf := topicModel.Krb5ConfFile.ValueString()
-				topic.Krb5ConfFile = &conf
-			}
-			request.Features.TableTopic = topic
+			request.Features.TableTopic = BuildTableTopicParam(topicModel)
+		}
+
+		// Schema Registry
+		if !instance.Features.SchemaRegistryEnabled.IsNull() && !instance.Features.SchemaRegistryEnabled.IsUnknown() {
+			enabled := instance.Features.SchemaRegistryEnabled.ValueBool()
+			request.Features.SchemaRegistryEnabled = &enabled
 		}
 
 		// Instance Configs
@@ -601,18 +949,29 @@ func ConvertKafkaInstanceModel(resource *KafkaInstanceResourceModel, model *Kafk
 	model.ComputeSpecs = resource.ComputeSpecs
 	if resource.Features != nil {
 		features := &FeaturesSummaryModel{
-			WalMode:         resource.Features.WalMode,
-			InstanceConfigs: resource.Features.InstanceConfigs,
-			MetricsExporter: resource.Features.MetricsExporter,
-			TableTopic:      resource.Features.TableTopic,
+			WalMode:               resource.Features.WalMode,
+			InstanceConfigs:       resource.Features.InstanceConfigs,
+			MetricsExporter:       resource.Features.MetricsExporter,
+			TableTopic:            resource.Features.TableTopic,
+			SchemaRegistryEnabled: resource.Features.SchemaRegistryEnabled,
+			Security:              types.ObjectNull(SecuritySummaryObjectType.AttrTypes),
 		}
-		if resource.Features.Security != nil {
-			features.Security = &SecuritySummaryModel{
-				AuthenticationMethods:        resource.Features.Security.AuthenticationMethods,
-				TransitEncryptionModes:       resource.Features.Security.TransitEncryptionModes,
-				DataEncryptionMode:           resource.Features.Security.DataEncryptionMode,
-				TlsHostnameValidationEnabled: resource.Features.Security.TlsHostnameValidationEnabled,
+		security, securityDiags := SecurityObjectToModel(context.Background(), resource.Features.Security)
+		if securityDiags.HasError() {
+			return fmt.Errorf("failed to parse features.security: %v", securityDiags.Errors())
+		}
+		if security != nil {
+			summary := &SecuritySummaryModel{
+				AuthenticationMethods:        security.AuthenticationMethods,
+				TransitEncryptionModes:       security.TransitEncryptionModes,
+				DataEncryptionMode:           security.DataEncryptionMode,
+				TlsHostnameValidationEnabled: security.TlsHostnameValidationEnabled,
 			}
+			securityObject, objectDiags := SecuritySummaryModelToObject(context.Background(), summary)
+			if objectDiags.HasError() {
+				return fmt.Errorf("failed to build features.security: %v", objectDiags.Errors())
+			}
+			features.Security = securityObject
 		}
 		model.Features = features
 	} else {
@@ -729,8 +1088,8 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 				PricingMode:           types.StringNull(),
 				ReservedNodeCount:     types.Int64Null(),
 				InstanceTypes:         types.ListNull(types.StringType),
-				Networks:              []NetworkModel{},
-				KubernetesNodeGroups:  []NodeGroupModel{},
+				Networks:              types.ListNull(NetworkObjectType),
+				KubernetesNodeGroups:  types.ListNull(NodeGroupObjectType),
 				DataBuckets:           types.ListNull(DataBucketObjectType),
 				SecurityGroups:        types.ListNull(types.StringType),
 				DeployType:            types.StringNull(),
@@ -739,7 +1098,7 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 				KubernetesNamespace:   types.StringNull(),
 				KubernetesServiceAcct: types.StringNull(),
 				InstanceRole:          types.StringNull(),
-				FileSystemParam:       nil,
+				FileSystemParam:       types.ObjectNull(FileSystemParamObjectType.AttrTypes),
 			}
 		}
 		// Reserved AKU
@@ -800,21 +1159,30 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 					})
 				}
 			}
-			resource.ComputeSpecs.KubernetesNodeGroups = nodeGroups
-			// Networks
+			nodeGroupsValue, nodeGroupDiags := NodeGroupModelsToList(ctx, nodeGroups)
+			if nodeGroupDiags.HasError() {
+				diags.Append(nodeGroupDiags...)
+			} else {
+				resource.ComputeSpecs.KubernetesNodeGroups = nodeGroupsValue
+			}
 		}
 		if instance.Spec.Networks != nil {
 			networks, networkDiags := flattenNetworks(instance.Spec.Networks)
 			if networkDiags.HasError() {
 				diags.Append(networkDiags...)
 			} else {
-				resource.ComputeSpecs.Networks = networks
+				networksValue, valueDiags := NetworkModelsToList(ctx, networks)
+				if valueDiags.HasError() {
+					diags.Append(valueDiags...)
+				} else {
+					resource.ComputeSpecs.Networks = networksValue
+				}
 			}
 		}
 
 		var previousDataBuckets []DataBucketModel
 		if previousSpecs != nil {
-			prevBuckets, prevDiags := DataBucketListToModels(context.TODO(), previousSpecs.DataBuckets)
+			prevBuckets, prevDiags := DataBucketListToModels(ctx, previousSpecs.DataBuckets)
 			if prevDiags.HasError() {
 				diags.Append(prevDiags...)
 			}
@@ -836,7 +1204,7 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 				}
 				dataBuckets = append(dataBuckets, base)
 			}
-			listValue, listDiags := DataBucketModelsToList(context.TODO(), dataBuckets)
+			listValue, listDiags := DataBucketModelsToList(ctx, dataBuckets)
 			if listDiags.HasError() {
 				diags.Append(listDiags...)
 			} else {
@@ -863,7 +1231,11 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 		// File System Parameters for FSWAL
 		var previousFileSystemParam *FileSystemParamModel
 		if previousSpecs != nil {
-			previousFileSystemParam = previousSpecs.FileSystemParam
+			var fsDiags diag.Diagnostics
+			previousFileSystemParam, fsDiags = FileSystemParamObjectToModel(ctx, previousSpecs.FileSystemParam)
+			if fsDiags.HasError() {
+				diags.Append(fsDiags...)
+			}
 		}
 		if instance.Spec.FileSystem != nil {
 			fileSystemParam := &FileSystemParamModel{
@@ -898,12 +1270,17 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 				}
 			}
 
-			resource.ComputeSpecs.FileSystemParam = fileSystemParam
+			fileSystemObject, objectDiags := FileSystemParamModelToObject(ctx, fileSystemParam)
+			if objectDiags.HasError() {
+				diags.Append(objectDiags...)
+			} else {
+				resource.ComputeSpecs.FileSystemParam = fileSystemObject
+			}
 		} else if previousFileSystemParam != nil {
 			// Preserve previous file system parameters if API doesn't return them
-			resource.ComputeSpecs.FileSystemParam = previousFileSystemParam
+			resource.ComputeSpecs.FileSystemParam = previousSpecs.FileSystemParam
 		} else {
-			resource.ComputeSpecs.FileSystemParam = nil
+			resource.ComputeSpecs.FileSystemParam = types.ObjectNull(FileSystemParamObjectType.AttrTypes)
 		}
 
 	}
@@ -928,23 +1305,26 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 		if instance.Features.Security != nil {
 			var previousSecurity *SecurityModel
 			if previousFeatures != nil {
-				previousSecurity = previousFeatures.Security
+				var securityDiags diag.Diagnostics
+				previousSecurity, securityDiags = SecurityObjectToModel(ctx, previousFeatures.Security)
+				if securityDiags.HasError() {
+					diags.Append(securityDiags...)
+				}
 			}
+			security := &SecurityModel{}
 			if previousSecurity != nil {
-				clone := *previousSecurity
-				resource.Features.Security = &clone
-			} else {
-				resource.Features.Security = &SecurityModel{}
+				securityClone := *previousSecurity
+				security = &securityClone
 			}
 
 			if instance.Features.Security.DataEncryptionMode != nil {
-				resource.Features.Security.DataEncryptionMode = types.StringValue(*instance.Features.Security.DataEncryptionMode)
+				security.DataEncryptionMode = types.StringValue(*instance.Features.Security.DataEncryptionMode)
 			}
 			var previousTls *types.Bool
 			if previousSecurity != nil {
 				previousTls = &previousSecurity.TlsHostnameValidationEnabled
 			}
-			resource.Features.Security.TlsHostnameValidationEnabled = coalesceBoolAttr(
+			security.TlsHostnameValidationEnabled = coalesceBoolAttr(
 				instance.Features.Security.TlsHostnameValidationEnabled,
 				previousTls,
 			)
@@ -957,7 +1337,7 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 				}
 				set, listDiags := types.SetValue(types.StringType, values)
 				if !listDiags.HasError() {
-					resource.Features.Security.AuthenticationMethods = set
+					security.AuthenticationMethods = set
 				} else {
 					diags.Append(listDiags...)
 				}
@@ -970,32 +1350,66 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 				}
 				set, listDiags := types.SetValue(types.StringType, values)
 				if !listDiags.HasError() {
-					resource.Features.Security.TransitEncryptionModes = set
+					security.TransitEncryptionModes = set
 				} else {
 					diags.Append(listDiags...)
 				}
+			}
+			securityObject, objectDiags := SecurityModelToObject(ctx, security)
+			if objectDiags.HasError() {
+				diags.Append(objectDiags...)
+			} else {
+				resource.Features.Security = securityObject
 			}
 		}
 
 		// Metrics exporter
 		var previousMetrics *MetricsExporterModel
 		if previousFeatures != nil {
-			previousMetrics = previousFeatures.MetricsExporter
+			var metricsDiags diag.Diagnostics
+			previousMetrics, metricsDiags = MetricsExporterObjectToModel(ctx, previousFeatures.MetricsExporter)
+			if metricsDiags.HasError() {
+				diags.Append(metricsDiags...)
+			}
 		}
 		if instance.Features.MetricsExporter != nil && !isMetricsExporterVOEmpty(instance.Features.MetricsExporter) {
 			metrics, metricsDiags := flattenMetricsExporterVO(instance.Features.MetricsExporter, previousMetrics)
 			diags.Append(metricsDiags...)
-			resource.Features.MetricsExporter = metrics
+			metricsObject, objectDiags := MetricsExporterModelToObject(ctx, metrics)
+			if objectDiags.HasError() {
+				diags.Append(objectDiags...)
+			} else {
+				resource.Features.MetricsExporter = metricsObject
+			}
 		} else {
-			resource.Features.MetricsExporter = nil
+			resource.Features.MetricsExporter = types.ObjectNull(MetricsExporterObjectType.AttrTypes)
 		}
 
 		// Table topic
 		var previousTableTopic *TableTopicModel
 		if previousFeatures != nil {
-			previousTableTopic = previousFeatures.TableTopic
+			var topicDiags diag.Diagnostics
+			previousTableTopic, topicDiags = TableTopicObjectToModel(ctx, previousFeatures.TableTopic)
+			if topicDiags.HasError() {
+				diags.Append(topicDiags...)
+			}
 		}
-		resource.Features.TableTopic = flattenTableTopicVO(instance.Features.TableTopic, previousTableTopic)
+		topic := flattenTableTopicVO(instance.Features.TableTopic, previousTableTopic)
+		topicObject, topicDiags := TableTopicModelToObject(ctx, topic)
+		if topicDiags.HasError() {
+			diags.Append(topicDiags...)
+		} else {
+			resource.Features.TableTopic = topicObject
+		}
+
+		var previousSchemaRegistryEnabled *types.Bool
+		if previousFeatures != nil {
+			previousSchemaRegistryEnabled = &previousFeatures.SchemaRegistryEnabled
+		}
+		resource.Features.SchemaRegistryEnabled = coalesceBoolAttr(
+			instance.Features.SchemaRegistryEnabled,
+			previousSchemaRegistryEnabled,
+		)
 
 	}
 

@@ -65,6 +65,11 @@ type FileSystemParam struct {
 	SecurityGroups               []string `json:"securityGroups,omitempty"`
 }
 
+type FileSystemUpdateParam struct {
+	ThroughputMiBpsPerFileSystem int32 `json:"throughputMiBpsPerFileSystem"`
+	FileSystemCount              int32 `json:"fileSystemCount"`
+}
+
 type NodeConfigParam struct {
 	PaymentType   *string  `json:"paymentType,omitempty"`
 	PaymentPeriod *int32   `json:"paymentPeriod,omitempty"`
@@ -81,14 +86,15 @@ type KubernetesNodeGroupParam struct {
 }
 
 type InstanceFeatureParam struct {
-	WalMode         *string                       `json:"walMode,omitempty"`
-	Security        *InstanceSecurityParam        `json:"security,omitempty"`
-	InstanceConfigs []ConfigItemParam             `json:"instanceConfigs,omitempty"`
-	S3Failover      *InstanceFailoverParam        `json:"s3Failover,omitempty"`
-	MetricsExporter *InstanceMetricsExporterParam `json:"metricsExporter,omitempty"`
-	TableTopic      *TableTopicParam              `json:"tableTopic,omitempty"`
-	InboundRules    []InboundRuleParam            `json:"inboundRules,omitempty"`
-	ExtendListeners []InstanceListenerParam       `json:"extendListeners,omitempty"`
+	WalMode               *string                       `json:"walMode,omitempty"`
+	Security              *InstanceSecurityParam        `json:"security,omitempty"`
+	InstanceConfigs       []ConfigItemParam             `json:"instanceConfigs,omitempty"`
+	S3Failover            *InstanceFailoverParam        `json:"s3Failover,omitempty"`
+	MetricsExporter       *InstanceMetricsExporterParam `json:"metricsExporter,omitempty"`
+	TableTopic            *TableTopicParam              `json:"tableTopic,omitempty"`
+	SchemaRegistryEnabled *bool                         `json:"schemaRegistryEnabled,omitempty"`
+	InboundRules          []InboundRuleParam            `json:"inboundRules,omitempty"`
+	ExtendListeners       []InstanceListenerParam       `json:"extendListeners,omitempty"`
 }
 
 type InstanceSecurityParam struct {
@@ -134,7 +140,7 @@ type MetricsLabelParam struct {
 }
 
 type TableTopicParam struct {
-	IntegrationId     *string `json:"integrationId,omitempty"`
+	Enabled           *bool   `json:"enabled,omitempty"`
 	Warehouse         string  `json:"warehouse"`
 	CatalogType       string  `json:"catalogType"`
 	MetastoreUri      *string `json:"metastoreUri,omitempty"`
@@ -271,13 +277,14 @@ type FileSystemVO struct {
 }
 
 type InstanceFeatureVO struct {
-	WalMode         *string                    `json:"walMode,omitempty"`
-	Security        *InstanceSecurityConfigVO  `json:"security,omitempty"`
-	S3Failover      *InstanceFailoverVO        `json:"s3Failover,omitempty"`
-	MetricsExporter *InstanceMetricsExporterVO `json:"metricsExporter,omitempty"`
-	TableTopic      *TableTopicVO              `json:"tableTopic,omitempty"`
-	ExtendListeners []InstanceListenerVO       `json:"extendListeners,omitempty"`
-	InboundRules    []InstanceInboundRuleVO    `json:"inboundRules,omitempty"`
+	WalMode               *string                    `json:"walMode,omitempty"`
+	Security              *InstanceSecurityConfigVO  `json:"security,omitempty"`
+	S3Failover            *InstanceFailoverVO        `json:"s3Failover,omitempty"`
+	MetricsExporter       *InstanceMetricsExporterVO `json:"metricsExporter,omitempty"`
+	TableTopic            *TableTopicVO              `json:"tableTopic,omitempty"`
+	SchemaRegistryEnabled *bool                      `json:"schemaRegistryEnabled,omitempty"`
+	ExtendListeners       []InstanceListenerVO       `json:"extendListeners,omitempty"`
+	InboundRules          []InstanceInboundRuleVO    `json:"inboundRules,omitempty"`
 }
 
 type InstanceSecurityConfigVO struct {
@@ -371,26 +378,10 @@ type InstanceConfigParam struct {
 }
 
 type SpecificationUpdateParam struct {
-	ReservedAku              *int32                     `json:"reservedAku,omitempty"`
-	PricingMode              *string                    `json:"pricingMode,omitempty"`
-	ReservedNodeCount        *int32                     `json:"reservedNodeCount,omitempty"`
-	NodeConfig               *NodeConfigParam           `json:"nodeConfig,omitempty"`
-	SecurityGroups           []string                   `json:"securityGroups,omitempty"`
-	Template                 *string                    `json:"template,omitempty"`
-	Networks                 []InstanceNetworkParam     `json:"networks,omitempty"`
-	KubernetesNodeGroups     []KubernetesNodeGroupParam `json:"kubernetesNodeGroups,omitempty"`
-	FileSystem               *FileSystemParam           `json:"fileSystemForFsWal,omitempty"`
-	DeployType               *string                    `json:"deployType,omitempty"`
-	Provider                 *string                    `json:"provider,omitempty"`
-	Region                   *string                    `json:"region,omitempty"`
-	Scope                    *string                    `json:"scope,omitempty"`
-	Vpc                      *string                    `json:"vpc,omitempty"`
-	DnsZone                  *string                    `json:"dnsZone,omitempty"`
-	KubernetesClusterId      *string                    `json:"kubernetesClusterId,omitempty"`
-	KubernetesNamespace      *string                    `json:"kubernetesNamespace,omitempty"`
-	KubernetesServiceAccount *string                    `json:"kubernetesServiceAccount,omitempty"`
-	InstanceRole             *string                    `json:"instanceRole,omitempty"`
-	DataBuckets              []BucketProfileParam       `json:"dataBuckets,omitempty"`
+	ReservedAku       *int32                 `json:"reservedAku,omitempty"`
+	ReservedNodeCount *int32                 `json:"reservedNodeCount,omitempty"`
+	NodeConfig        *NodeConfigParam       `json:"nodeConfig,omitempty"`
+	FileSystem        *FileSystemUpdateParam `json:"fileSystemForFsWal,omitempty"`
 }
 
 type KafkaInstanceRequestPaymentPlan struct {
