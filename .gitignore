@@ -41,7 +41,12 @@ dist/
 # Local configuration files
 acc.config
 
+# Local Kiro workspace files
+.kiro/
+
 # Temporary files
 tmp/
 
+# Manual test directory
+test-connector/
 terraform-provider-automq
