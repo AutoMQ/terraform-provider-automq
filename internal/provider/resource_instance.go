@@ -28,6 +28,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -170,13 +171,22 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					"instance_types": schema.ListAttribute{
 						ElementType:         types.StringType,
 						Optional:            true,
-						MarkdownDescription: "Instance type list for the nodes. Maximum 1 entry. Required when `pricing_mode` is `UsageBased` and `deploy_type` is `IAAS`. Cannot be modified after creation.",
+						MarkdownDescription: "Instance type list for the nodes. Maximum 1 entry. Required when `pricing_mode` is `UsageBased` and `deploy_type` is `IAAS`. Can be updated for `IAAS` deployments; ignored for `K8S` deployments.",
 						Validators: []validator.List{
 							listvalidator.SizeAtMost(1),
 							listvalidator.SizeAtLeast(1),
 						},
 						PlanModifiers: []planmodifier.List{
-							listplanmodifier.RequiresReplace(),
+							listplanmodifier.RequiresReplaceIf(
+								func(ctx context.Context, req planmodifier.ListRequest, resp *listplanmodifier.RequiresReplaceIfFuncResponse) {
+									deployType, ok := deployTypeFromPlanOrState(ctx, req.Plan, req.State)
+									if ok && strings.EqualFold(deployType, "K8S") {
+										resp.RequiresReplace = true
+									}
+								},
+								"Requires replacement when instance types change on K8S deployments.",
+								"Requires replacement when instance types change on `K8S` deployments.",
+							),
 						},
 					},
 					"deploy_type": schema.StringAttribute{
@@ -644,6 +654,21 @@ func knownInt64Value(attr types.Int64) (int64, bool) {
 		return 0, false
 	}
 	return attr.ValueInt64(), true
+}
+
+func deployTypeFromPlanOrState(ctx context.Context, plan tfsdk.Plan, state tfsdk.State) (string, bool) {
+	var deployType types.String
+	diags := plan.GetAttribute(ctx, path.Root("compute_specs").AtName("deploy_type"), &deployType)
+	if !diags.HasError() {
+		if value, ok := knownStringValue(deployType); ok {
+			return value, true
+		}
+	}
+	diags = state.GetAttribute(ctx, path.Root("compute_specs").AtName("deploy_type"), &deployType)
+	if !diags.HasError() {
+		return knownStringValue(deployType)
+	}
+	return "", false
 }
 
 func validateInstanceContract(ctx context.Context, plan *models.KafkaInstanceResourceModel) diag.Diagnostics {
@@ -1156,6 +1181,7 @@ type instanceUpdatePlan struct {
 	instanceConfigsChanged bool
 	certificateChanged     bool
 	tableTopicChanged      bool
+	instanceTypesChanged   bool
 }
 
 func validateInstanceUpdateContract(ctx context.Context, instanceId string, plan, state models.KafkaInstanceResourceModel) diag.Diagnostics {
@@ -1246,6 +1272,13 @@ func applyUpdateStatePreservation(ctx context.Context, state *models.KafkaInstan
 			state.Features = &models.FeaturesModel{}
 		}
 		state.Features.TableTopic = plan.Features.TableTopic
+	}
+
+	if updatePlan.instanceTypesChanged && plan.ComputeSpecs != nil {
+		if state.ComputeSpecs == nil {
+			state.ComputeSpecs = &models.ComputeSpecsModel{}
+		}
+		state.ComputeSpecs.InstanceTypes = plan.ComputeSpecs.InstanceTypes
 	}
 
 	return diags
@@ -1429,6 +1462,22 @@ func buildInstanceUpdateParam(ctx context.Context, plan, state models.KafkaInsta
 	}
 
 	if plan.ComputeSpecs != nil {
+		if shouldUpdateInstanceTypes(plan.ComputeSpecs, state.ComputeSpecs) {
+			var instanceTypes []string
+			planDiags := plan.ComputeSpecs.InstanceTypes.ElementsAs(ctx, &instanceTypes, false)
+			diags.Append(planDiags...)
+			if diags.HasError() {
+				return updateParam, updatePlan, diags
+			}
+			spec := ensureSpec()
+			spec.NodeConfig = &client.NodeConfigParam{InstanceTypes: instanceTypes}
+			updatePlan.hasUpdate = true
+			updatePlan.shouldWait = true
+			updatePlan.instanceTypesChanged = true
+		}
+	}
+
+	if plan.ComputeSpecs != nil {
 		var stateFileSystemParam *models.FileSystemParamModel
 		if state.ComputeSpecs != nil {
 			var stateFileSystemDiags diag.Diagnostics
@@ -1457,6 +1506,22 @@ func buildInstanceUpdateParam(ctx context.Context, plan, state models.KafkaInsta
 	}
 
 	return updateParam, updatePlan, diags
+}
+
+func shouldUpdateInstanceTypes(plan, state *models.ComputeSpecsModel) bool {
+	if plan == nil || state == nil {
+		return false
+	}
+	if pricingMode, ok := knownStringValue(plan.PricingMode); !ok || !strings.EqualFold(pricingMode, "UsageBased") {
+		return false
+	}
+	if deployType, ok := knownStringValue(plan.DeployType); !ok || !strings.EqualFold(deployType, "IAAS") {
+		return false
+	}
+	if plan.InstanceTypes.IsNull() || plan.InstanceTypes.IsUnknown() {
+		return false
+	}
+	return !listAttrEqual(plan.InstanceTypes, state.InstanceTypes)
 }
 
 func metricsExporterChanged(plan, state *models.MetricsExporterModel) bool {
@@ -1514,6 +1579,19 @@ func stringAttrEqual(plan, state types.String) bool {
 }
 
 func mapAttrEqual(plan, state types.Map) bool {
+	if plan.IsUnknown() {
+		return true
+	}
+	if plan.IsNull() {
+		return state.IsNull() || state.IsUnknown()
+	}
+	if state.IsNull() || state.IsUnknown() {
+		return false
+	}
+	return plan.Equal(state)
+}
+
+func listAttrEqual(plan, state types.List) bool {
 	if plan.IsUnknown() {
 		return true
 	}

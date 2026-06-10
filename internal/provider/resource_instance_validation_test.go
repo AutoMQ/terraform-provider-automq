@@ -759,6 +759,53 @@ func requireConfiguredOnlyListReplacement(t *testing.T, mods []planmodifier.List
 	}
 }
 
+func requireInstanceTypesReplacementByDeployType(t *testing.T, s schema.Schema, mods []planmodifier.List, deployType string, expected bool) {
+	t.Helper()
+	var replaceModifier planmodifier.List
+	for _, m := range mods {
+		if strings.Contains(strings.ToLower(reflect.TypeOf(m).String()), "requiresreplace") {
+			replaceModifier = m
+			break
+		}
+	}
+	if replaceModifier == nil {
+		t.Fatalf("requires replace modifier missing")
+	}
+
+	planValue := types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.xlarge")})
+	stateValue := types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.large")})
+
+	plan := tfsdk.Plan{Schema: s}
+	plan.Raw = tftypes.NewValue(s.Type().TerraformType(context.Background()), nil)
+	planDiags := plan.SetAttribute(context.Background(), path.Root("compute_specs").AtName("deploy_type"), types.StringValue(deployType))
+	if planDiags.HasError() {
+		t.Fatalf("failed to build plan: %v", planDiags)
+	}
+
+	state := tfsdk.State{Schema: s}
+	state.Raw = tftypes.NewValue(s.Type().TerraformType(context.Background()), nil)
+	stateDiags := state.SetAttribute(context.Background(), path.Root("compute_specs").AtName("deploy_type"), types.StringValue(deployType))
+	if stateDiags.HasError() {
+		t.Fatalf("failed to build state: %v", stateDiags)
+	}
+
+	req := planmodifier.ListRequest{
+		ConfigValue: planValue,
+		Plan:        plan,
+		PlanValue:   planValue,
+		State:       state,
+		StateValue:  stateValue,
+	}
+	resp := planmodifier.ListResponse{}
+	replaceModifier.PlanModifyList(context.Background(), req, &resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("unexpected diagnostics for %s instance_types replacement check: %v", deployType, resp.Diagnostics)
+	}
+	if resp.RequiresReplace != expected {
+		t.Fatalf("expected instance_types requires replace for %s to be %t, got %t", deployType, expected, resp.RequiresReplace)
+	}
+}
+
 func TestValidateKafkaInstanceConfiguration_FSWALMissingFileSystem(t *testing.T) {
 	plan := &models.KafkaInstanceResourceModel{
 		ComputeSpecs: &models.ComputeSpecsModel{
@@ -1646,7 +1693,7 @@ func TestImmutableAttributesHaveRequiresReplace_PricingMode(t *testing.T) {
 	}
 }
 
-func TestImmutableAttributesHaveRequiresReplace_InstanceTypes(t *testing.T) {
+func TestMutableAttributesDoNotRequireReplace_InstanceTypes(t *testing.T) {
 	s := getKafkaInstanceResourceSchema(t)
 	computeAttr, ok := s.Attributes["compute_specs"].(schema.SingleNestedAttribute)
 	if !ok {
@@ -1658,8 +1705,10 @@ func TestImmutableAttributesHaveRequiresReplace_InstanceTypes(t *testing.T) {
 		t.Fatalf("instance_types has unexpected type %T", computeAttr.Attributes["instance_types"])
 	}
 	if !hasListRequiresReplace(instanceTypesAttr.PlanModifiers) {
-		t.Fatalf("expected instance_types to require replacement")
+		t.Fatalf("expected instance_types to keep replacement protection for K8S")
 	}
+	requireInstanceTypesReplacementByDeployType(t, s, instanceTypesAttr.PlanModifiers, "IAAS", false)
+	requireInstanceTypesReplacementByDeployType(t, s, instanceTypesAttr.PlanModifiers, "K8S", true)
 }
 
 func TestCreateOnlyComputeAttributesHaveRequiresReplace(t *testing.T) {
