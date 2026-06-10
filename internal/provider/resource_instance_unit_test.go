@@ -423,6 +423,32 @@ func TestInstanceUpdateParamBuilder(t *testing.T) {
 		assert.Equal(t, int32(5), *param.Spec.ReservedNodeCount)
 	})
 
+	t.Run("iaas instance types change builds node config patch", func(t *testing.T) {
+		plan := newValidUsageBasedIAASPlan()
+		state := newValidUsageBasedIAASPlan()
+		plan.ComputeSpecs.InstanceTypes = mustStringList("m5.xlarge")
+		state.ComputeSpecs.InstanceTypes = mustStringList("m5.large")
+
+		param, updatePlan := testBuildInstanceUpdateParam(t, plan, state)
+		require.True(t, updatePlan.hasUpdate)
+		assert.True(t, updatePlan.shouldWait)
+		assert.True(t, updatePlan.instanceTypesChanged)
+		require.NotNil(t, param.Spec)
+		require.NotNil(t, param.Spec.NodeConfig)
+		assert.Equal(t, []string{"m5.xlarge"}, param.Spec.NodeConfig.InstanceTypes)
+	})
+
+	t.Run("k8s instance types change is ignored", func(t *testing.T) {
+		plan := newValidUsageBasedK8SPlan()
+		state := newValidUsageBasedK8SPlan()
+		plan.ComputeSpecs.InstanceTypes = mustStringList("m5.xlarge")
+		state.ComputeSpecs.InstanceTypes = mustStringList("m5.large")
+
+		param, updatePlan := testBuildInstanceUpdateParam(t, plan, state)
+		assert.False(t, updatePlan.instanceTypesChanged)
+		assert.Nil(t, param.Spec)
+	})
+
 	t.Run("schema registry enablement builds feature patch", func(t *testing.T) {
 		plan := newValidUsageBasedIAASPlan()
 		state := newValidUsageBasedIAASPlan()
@@ -659,6 +685,27 @@ func newValidUsageBasedIAASPlan() models.KafkaInstanceResourceModel {
 	}
 }
 
+func newValidUsageBasedK8SPlan() models.KafkaInstanceResourceModel {
+	return models.KafkaInstanceResourceModel{
+		Name:        types.StringValue("test-instance"),
+		Description: types.StringValue("description"),
+		Version:     types.StringValue("1.0.0"),
+		ComputeSpecs: &models.ComputeSpecsModel{
+			DeployType:           types.StringValue("K8S"),
+			PricingMode:          types.StringValue("UsageBased"),
+			ReservedNodeCount:    types.Int64Value(3),
+			InstanceTypes:        types.ListNull(types.StringType),
+			KubernetesClusterID:  types.StringValue("cluster-1"),
+			KubernetesNodeGroups: testNodeGroupListForPlan("ng-1"),
+		},
+		Features: &models.FeaturesModel{
+			WalMode:         types.StringValue("EBSWAL"),
+			InstanceConfigs: types.MapNull(types.StringType),
+			Security:        types.ObjectNull(models.SecurityObjectType.AttrTypes),
+		},
+	}
+}
+
 func newValidSubscriptionPlan() models.KafkaInstanceResourceModel {
 	return models.KafkaInstanceResourceModel{
 		Name:        types.StringValue("test-instance"),
@@ -683,6 +730,18 @@ func newConfigOnlyPlan(values map[string]string) models.KafkaInstanceResourceMod
 			InstanceConfigs: mustStringMap(values),
 		},
 	}
+}
+
+func testNodeGroupListForPlan(ids ...string) types.List {
+	groups := make([]models.NodeGroupModel, 0, len(ids))
+	for _, id := range ids {
+		groups = append(groups, models.NodeGroupModel{ID: types.StringValue(id)})
+	}
+	value, diags := models.NodeGroupModelsToList(context.Background(), groups)
+	if diags.HasError() {
+		panic("failed to build node group list")
+	}
+	return value
 }
 
 func mustStringList(values ...string) types.List {

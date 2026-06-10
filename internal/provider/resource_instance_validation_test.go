@@ -1581,6 +1581,41 @@ func TestValidateKafkaInstanceConfiguration_UsageBasedK8SAllowsMissingInstanceTy
 	}
 }
 
+func TestValidateKafkaInstanceConfiguration_K8SRejectsInstanceTypes(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			PricingMode:         types.StringValue("UsageBased"),
+			DeployType:          types.StringValue("K8S"),
+			ReservedNodeCount:   types.Int64Value(3),
+			InstanceTypes:       types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.xlarge")}),
+			KubernetesClusterID: types.StringValue("cluster-1"),
+			KubernetesNodeGroups: testNodeGroupList(t, []models.NodeGroupModel{{
+				ID: types.StringValue("ng-1"),
+			}}),
+			Networks: testNetworkList(t, []models.NetworkModel{{
+				Zone:    types.StringValue("cn-test-1"),
+				Subnets: types.ListNull(types.StringType),
+			}}),
+		},
+		Features: &models.FeaturesModel{WalMode: types.StringValue("EBSWAL")},
+	}
+
+	diags := validateInstanceContract(context.Background(), plan)
+	if !diags.HasError() {
+		t.Fatalf("expected diagnostics when instance_types is configured for K8S")
+	}
+	found := false
+	for _, d := range diags {
+		if strings.Contains(d.Detail(), "instance_types") && strings.Contains(d.Detail(), "K8S") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected error mentioning instance_types and K8S, got: %v", diags)
+	}
+}
+
 func TestValidateKafkaInstanceConfiguration_CommittedMissingAku(t *testing.T) {
 	plan := &models.KafkaInstanceResourceModel{
 		ComputeSpecs: &models.ComputeSpecsModel{
@@ -1646,7 +1681,7 @@ func TestImmutableAttributesHaveRequiresReplace_PricingMode(t *testing.T) {
 	}
 }
 
-func TestImmutableAttributesHaveRequiresReplace_InstanceTypes(t *testing.T) {
+func TestMutableAttributesDoNotRequireReplace_InstanceTypes(t *testing.T) {
 	s := getKafkaInstanceResourceSchema(t)
 	computeAttr, ok := s.Attributes["compute_specs"].(schema.SingleNestedAttribute)
 	if !ok {
@@ -1657,8 +1692,8 @@ func TestImmutableAttributesHaveRequiresReplace_InstanceTypes(t *testing.T) {
 	if !ok {
 		t.Fatalf("instance_types has unexpected type %T", computeAttr.Attributes["instance_types"])
 	}
-	if !hasListRequiresReplace(instanceTypesAttr.PlanModifiers) {
-		t.Fatalf("expected instance_types to require replacement")
+	if hasListRequiresReplace(instanceTypesAttr.PlanModifiers) {
+		t.Fatalf("expected instance_types to allow in-place IAAS updates")
 	}
 }
 
