@@ -28,7 +28,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
-	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -171,22 +170,10 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					"instance_types": schema.ListAttribute{
 						ElementType:         types.StringType,
 						Optional:            true,
-						MarkdownDescription: "Instance type list for the nodes. Maximum 1 entry. Required when `pricing_mode` is `UsageBased` and `deploy_type` is `IAAS`. Can be updated for `IAAS` deployments; ignored for `K8S` deployments.",
+						MarkdownDescription: "Instance type list for the nodes. Maximum 1 entry. Required when `pricing_mode` is `UsageBased` and `deploy_type` is `IAAS`. Can be updated for `IAAS` deployments. Do not configure this field for `K8S` deployments.",
 						Validators: []validator.List{
 							listvalidator.SizeAtMost(1),
 							listvalidator.SizeAtLeast(1),
-						},
-						PlanModifiers: []planmodifier.List{
-							listplanmodifier.RequiresReplaceIf(
-								func(ctx context.Context, req planmodifier.ListRequest, resp *listplanmodifier.RequiresReplaceIfFuncResponse) {
-									deployType, ok := deployTypeFromPlanOrState(ctx, req.Plan, req.State)
-									if ok && strings.EqualFold(deployType, "K8S") {
-										resp.RequiresReplace = true
-									}
-								},
-								"Requires replacement when instance types change on K8S deployments.",
-								"Requires replacement when instance types change on `K8S` deployments.",
-							),
 						},
 					},
 					"deploy_type": schema.StringAttribute{
@@ -656,21 +643,6 @@ func knownInt64Value(attr types.Int64) (int64, bool) {
 	return attr.ValueInt64(), true
 }
 
-func deployTypeFromPlanOrState(ctx context.Context, plan tfsdk.Plan, state tfsdk.State) (string, bool) {
-	var deployType types.String
-	diags := plan.GetAttribute(ctx, path.Root("compute_specs").AtName("deploy_type"), &deployType)
-	if !diags.HasError() {
-		if value, ok := knownStringValue(deployType); ok {
-			return value, true
-		}
-	}
-	diags = state.GetAttribute(ctx, path.Root("compute_specs").AtName("deploy_type"), &deployType)
-	if !diags.HasError() {
-		return knownStringValue(deployType)
-	}
-	return "", false
-}
-
 func validateInstanceContract(ctx context.Context, plan *models.KafkaInstanceResourceModel) diag.Diagnostics {
 	var diagnostics diag.Diagnostics
 	if plan == nil {
@@ -692,6 +664,12 @@ func validateDeployTypeContract(ctx context.Context, plan *models.KafkaInstanceR
 		return diagnostics
 	}
 	if deployType, ok := knownStringValue(plan.ComputeSpecs.DeployType); ok && strings.EqualFold(deployType, "K8S") {
+		if !plan.ComputeSpecs.InstanceTypes.IsNull() && !plan.ComputeSpecs.InstanceTypes.IsUnknown() {
+			diagnostics.AddError(
+				"Invalid Configuration",
+				"compute_specs.instance_types is only valid when compute_specs.deploy_type is IAAS. Do not configure it for K8S deployments.",
+			)
+		}
 		if plan.ComputeSpecs.KubernetesNodeGroups.IsUnknown() {
 			return diagnostics
 		}
