@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"terraform-provider-automq/client/signer"
 	"time"
@@ -147,11 +148,11 @@ func (c *Client) Patch(ctx context.Context, path string, body interface{}) ([]by
 }
 
 func buildQueryParams(queryParams map[string]string) string {
-	query := ""
+	query := url.Values{}
 	for key, value := range queryParams {
-		query += key + "=" + value + "&"
+		query.Set(key, value)
 	}
-	return query
+	return query.Encode()
 }
 
 func (c *Client) doRequest(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
