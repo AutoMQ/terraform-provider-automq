@@ -99,3 +99,84 @@ func TestFlattenConnectCluster(t *testing.T) {
 	assert.Equal(t, int64(2), state.Capacity.Provisioned.WorkerCount.ValueInt64())
 	assert.Equal(t, "3.9.0", state.KafkaConnectVersion.ValueString())
 }
+
+func TestFlattenConnectCluster_RetainsEmptyWorkerConfig(t *testing.T) {
+	ctx := context.Background()
+	emptyWorkerConfig, diags := types.MapValueFrom(ctx, types.StringType, map[string]string{})
+	assert.False(t, diags.HasError())
+	state := &ConnectClusterResourceModel{WorkerConfig: emptyWorkerConfig}
+
+	diags = FlattenConnectCluster(&client.ConnectClusterVO{Id: connStrPtr("connect-cluster-1")}, state)
+	assert.False(t, diags.HasError())
+	assert.False(t, state.WorkerConfig.IsNull())
+	assert.Empty(t, state.WorkerConfig.Elements())
+}
+
+func TestConnectClusterSchedulingSpec_NormalizesEquivalentYAML(t *testing.T) {
+	input := "nodeSelector:\n  dedicated: automq-connect\ntolerations:\n- key: dedicated\n  operator: Equal\n  value: automq-connect\n  effect: NoSchedule\n"
+	api := "nodeSelector: {dedicated: automq-connect}\ntolerations:\n  - {key: dedicated, operator: Equal, value: automq-connect, effect: NoSchedule}\n"
+	plan := ConnectClusterResourceModel{
+		Name: types.StringValue("cluster-a"),
+		Plugins: []ConnectClusterPluginModel{
+			{Name: types.StringValue("s3-sink"), Version: types.StringValue("11.1.0")},
+		},
+		KafkaCluster: &ConnectClusterKafkaModel{KafkaInstanceID: types.StringValue("kf-1")},
+		Capacity: &ConnectClusterCapacityModel{
+			Type: types.StringValue("provisioned"),
+			Provisioned: &ConnectClusterProvisionedCapacityModel{
+				WorkerResourceSpec: types.StringValue("TIER1"),
+				WorkerCount:        types.Int64Value(1),
+			},
+		},
+		Compute: &ConnectClusterComputeModel{
+			Type: types.StringValue("k8s"),
+			Kubernetes: &ConnectClusterKubernetesModel{
+				ClusterID:      types.StringValue("eks-1"),
+				Namespace:      types.StringValue("connect"),
+				ServiceAccount: types.StringValue("connect-sa"),
+				SchedulingSpec: types.StringValue(input),
+			},
+		},
+	}
+
+	req, diags := ExpandConnectClusterCreate(plan)
+	assert.False(t, diags.HasError())
+	assert.NotNil(t, req.Compute.Kubernetes.SchedulingSpec)
+
+	state := &ConnectClusterResourceModel{Compute: plan.Compute}
+	diags = FlattenConnectCluster(&client.ConnectClusterVO{Id: connStrPtr("connect-cluster-1"), SchedulingSpec: &api}, state)
+	assert.False(t, diags.HasError())
+	assert.Equal(t, *req.Compute.Kubernetes.SchedulingSpec, state.Compute.Kubernetes.SchedulingSpec.ValueString())
+}
+
+func TestConnectClusterSchedulingSpec_EmptyYamlIsOmitted(t *testing.T) {
+	for _, input := range []string{"", "   \n", "{}\n", "[]"} {
+		plan := ConnectClusterResourceModel{
+			Name: types.StringValue("cluster-a"),
+			Plugins: []ConnectClusterPluginModel{
+				{Name: types.StringValue("s3-sink"), Version: types.StringValue("11.1.0")},
+			},
+			KafkaCluster: &ConnectClusterKafkaModel{KafkaInstanceID: types.StringValue("kf-1")},
+			Capacity: &ConnectClusterCapacityModel{
+				Type: types.StringValue("provisioned"),
+				Provisioned: &ConnectClusterProvisionedCapacityModel{
+					WorkerResourceSpec: types.StringValue("TIER1"),
+					WorkerCount:        types.Int64Value(1),
+				},
+			},
+			Compute: &ConnectClusterComputeModel{
+				Type: types.StringValue("k8s"),
+				Kubernetes: &ConnectClusterKubernetesModel{
+					ClusterID:      types.StringValue("eks-1"),
+					Namespace:      types.StringValue("connect"),
+					ServiceAccount: types.StringValue("connect-sa"),
+					SchedulingSpec: types.StringValue(input),
+				},
+			},
+		}
+
+		req, diags := ExpandConnectClusterCreate(plan)
+		assert.False(t, diags.HasError())
+		assert.Nil(t, req.Compute.Kubernetes.SchedulingSpec)
+	}
+}

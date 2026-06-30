@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -146,8 +147,11 @@ func (r *ConnectorResource) Schema(ctx context.Context, _ resource.SchemaRequest
 				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
 			},
 			"kafka_cluster": schema.SingleNestedAttribute{
-				Optional:    true,
+				Required:    true,
 				Description: "Kafka client authentication used by the connector plugin's producer or consumer clients. Worker-level Kafka authentication is managed by AutoMQ and is not configured here.",
+				PlanModifiers: []planmodifier.Object{
+					objectplanmodifier.RequiresReplace(),
+				},
 				Attributes: map[string]schema.Attribute{
 					"security_protocol": schema.SingleNestedAttribute{
 						Required:    true,
@@ -161,16 +165,12 @@ func (r *ConnectorResource) Schema(ctx context.Context, _ resource.SchemaRequest
 							"username": schema.StringAttribute{Optional: true, Description: "SASL username. Required by the backend connector runtime when `protocol` uses SASL."},
 							"password": schema.StringAttribute{Optional: true, Sensitive: true, Description: "SASL password. Required by the backend connector runtime when `protocol` uses SASL."},
 							"sasl_mechanism": schema.StringAttribute{
-								Optional:      true,
-								Computed:      true,
-								Description:   "SASL mechanism, such as `SCRAM-SHA-512`. If omitted for a SASL protocol, AutoMQ defaults to `SCRAM-SHA-512`.",
-								PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+								Optional:    true,
+								Description: "SASL mechanism, such as `SCRAM-SHA-512`. If omitted for a SASL protocol, AutoMQ defaults to `SCRAM-SHA-512`.",
 							},
 							"truststore_certs": schema.StringAttribute{
-								Optional:      true,
-								Computed:      true,
-								Description:   "Custom CA certificates in PEM format for SSL trust. If omitted, connector clients use the runtime default trust configuration.",
-								PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+								Optional:    true,
+								Description: "Custom CA certificates in PEM format for SSL trust. If omitted, connector clients use the runtime default trust configuration.",
 							},
 							"client_cert": schema.StringAttribute{Optional: true, Description: "Client certificate chain in PEM format for mTLS."},
 							"private_key": schema.StringAttribute{Optional: true, Sensitive: true, Description: "Client private key in PEM format for mTLS."},
@@ -239,6 +239,12 @@ func (r *ConnectorResource) Create(ctx context.Context, req resource.CreateReque
 	connectorID := derefString(created.Id)
 	if connectorID == "" {
 		resp.Diagnostics.AddError("Create Connector Error", "API returned empty connector id")
+		return
+	}
+	plan.ID = types.StringValue(connectorID)
+	plan.State = types.StringValue(derefStringWithDefault(created.State, client.ConnectorStateCreating))
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 	if err := waitForConnectorReady(ctx, r.api, connectorID, r.CreateTimeout(ctx, plan.Timeouts)); err != nil {
@@ -407,4 +413,11 @@ func derefString(v *string) string {
 		return ""
 	}
 	return *v
+}
+
+func derefStringWithDefault(value *string, fallback string) string {
+	if value == nil || *value == "" {
+		return fallback
+	}
+	return *value
 }

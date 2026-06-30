@@ -68,6 +68,7 @@ variable "aws_secret_access_key" {
 - `connect_cluster_id` (String) ID of the `automq_connect_cluster` that hosts this connector. The target cluster must already have a plugin that provides `connector_class`. Changing this value creates a new connector.
 - `connector_class` (String) Fully-qualified Kafka Connect connector class, such as `io.confluent.connect.s3.S3SinkConnector`. AutoMQ resolves the plugin from the target Connect Cluster by this class. Changing it creates a new connector.
 - `environment_id` (String) AutoMQ environment ID that owns the Connect resources, for example `env-xxxxx`. Changing it creates a new connector.
+- `kafka_cluster` (Attributes) Kafka client authentication used by the connector plugin's producer or consumer clients. Worker-level Kafka authentication is managed by AutoMQ and is not configured here. (see [below for nested schema](#nestedatt--kafka_cluster))
 - `name` (String) Globally unique connector name shown in AutoMQ. It must be 3 to 64 characters.
 - `task_count` (Number) Maximum number of Kafka Connect tasks for this connector. This maps to Connect `tasks.max` and must be at least 1.
 
@@ -77,7 +78,6 @@ variable "aws_secret_access_key" {
 - `connector_config_sensitive` (Map of String, Sensitive) Plugin-specific sensitive connector configuration, such as passwords, tokens, and private keys. Values are marked sensitive in Terraform and retained in state when the API masks them on read.
 - `description` (String) Optional human-readable description for the connector.
 - `initial_offsets` (Attributes List) Initial Kafka Connect offsets to apply when the connector is created. This is create-only; changing it creates a new connector. (see [below for nested schema](#nestedatt--initial_offsets))
-- `kafka_cluster` (Attributes) Kafka client authentication used by the connector plugin's producer or consumer clients. Worker-level Kafka authentication is managed by AutoMQ and is not configured here. (see [below for nested schema](#nestedatt--kafka_cluster))
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 ### Read-Only
@@ -88,15 +88,6 @@ variable "aws_secret_access_key" {
 - `plugin_id` (String) Resolved plugin ID. This is computed from `connect_cluster_id` and `connector_class`; it is not an input field.
 - `state` (String) Connector lifecycle state reported by AutoMQ, such as `RUNNING`, `PAUSED`, `CHANGING`, `FAILED`, or `DELETING`.
 - `updated_at` (String) Last update timestamp.
-
-<a id="nestedatt--initial_offsets"></a>
-### Nested Schema for `initial_offsets`
-
-Required:
-
-- `offset` (Map of String) Connector-specific source offset map used by Kafka Connect offsets.
-- `partition` (Map of String) Connector-specific source partition map used by Kafka Connect offsets.
-
 
 <a id="nestedatt--kafka_cluster"></a>
 ### Nested Schema for `kafka_cluster`
@@ -121,6 +112,15 @@ Optional:
 - `truststore_certs` (String) Custom CA certificates in PEM format for SSL trust. If omitted, connector clients use the runtime default trust configuration.
 - `username` (String) SASL username. Required by the backend connector runtime when `protocol` uses SASL.
 
+
+
+<a id="nestedatt--initial_offsets"></a>
+### Nested Schema for `initial_offsets`
+
+Required:
+
+- `offset` (Map of String) Connector-specific source offset map used by Kafka Connect offsets.
+- `partition` (Map of String) Connector-specific source partition map used by Kafka Connect offsets.
 
 
 <a id="nestedatt--timeouts"></a>

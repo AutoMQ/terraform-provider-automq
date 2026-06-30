@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-timetypes/timetypes"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -79,10 +80,9 @@ func ExpandConnectorCreate(plan ConnectorResourceModel) (*client.ConnectorCreate
 	if s := cOptStr(plan.Description); s != nil {
 		request.Description = s
 	}
-	if plan.KafkaCluster != nil && plan.KafkaCluster.Security != nil {
-		request.KafkaCluster = &client.ConnectorKafkaClusterParam{
-			SecurityProtocolConfig: cExpandSecurityProtocol(plan.KafkaCluster.Security),
-		}
+	securityConfig := requiredSecurityProtocolConfig(plan.KafkaCluster, &diags)
+	if securityConfig != nil {
+		request.KafkaCluster = &client.ConnectorKafkaClusterParam{SecurityProtocolConfig: securityConfig}
 	}
 	if m := cExpandStringMap(plan.ConnectorConfig); m != nil {
 		request.ConnectorConfig = &client.ConnectorConnectorConfigParam{Properties: m}
@@ -108,9 +108,6 @@ func ExpandConnectorUpdate(plan ConnectorResourceModel) (*client.ConnectorUpdate
 	if !plan.TaskCount.IsNull() && !plan.TaskCount.IsUnknown() {
 		tc := int32(plan.TaskCount.ValueInt64())
 		request.TaskCount = &tc
-	}
-	if plan.KafkaCluster != nil && plan.KafkaCluster.Security != nil {
-		request.SecurityProtocolConfig = cExpandSecurityProtocol(plan.KafkaCluster.Security)
 	}
 	if m := cExpandStringMap(plan.ConnectorConfig); m != nil {
 		request.ConnectorConfig = &client.ConnectorConnectorConfigParam{Properties: m}
@@ -179,6 +176,59 @@ func cExpandSecurityProtocol(m *SecurityProtocolConfigModel) *client.SecurityPro
 	}
 }
 
+func requiredSecurityProtocolConfig(kafka *ConnectorKafkaClusterModel, diags *diag.Diagnostics) *client.SecurityProtocolConfig {
+	if kafka == nil || kafka.Security == nil {
+		diags.AddError("Missing connector Kafka security protocol", "`kafka_cluster.security_protocol` is required for connector resources.")
+		return nil
+	}
+	cfg := cExpandSecurityProtocol(kafka.Security)
+	protocol := ""
+	if cfg != nil && cfg.SecurityProtocol != nil {
+		protocol = *cfg.SecurityProtocol
+	}
+	if protocol == "" {
+		diags.AddAttributeError(
+			path.Root("kafka_cluster").AtName("security_protocol").AtName("protocol"),
+			"Missing connector Kafka security protocol",
+			"`protocol` is required in connector `kafka_cluster.security_protocol`.",
+		)
+		return nil
+	}
+	switch protocol {
+	case "SASL_PLAINTEXT", "SASL_SSL":
+		if cfg.Username == nil || *cfg.Username == "" {
+			diags.AddAttributeError(
+				path.Root("kafka_cluster").AtName("security_protocol").AtName("username"),
+				"Missing SASL username",
+				"`username` is required when connector `protocol` is SASL_PLAINTEXT or SASL_SSL.",
+			)
+		}
+		if cfg.Password == nil || *cfg.Password == "" {
+			diags.AddAttributeError(
+				path.Root("kafka_cluster").AtName("security_protocol").AtName("password"),
+				"Missing SASL password",
+				"`password` is required when connector `protocol` is SASL_PLAINTEXT or SASL_SSL.",
+			)
+		}
+	case "SSL":
+		if cfg.ClientCert == nil || *cfg.ClientCert == "" {
+			diags.AddAttributeError(
+				path.Root("kafka_cluster").AtName("security_protocol").AtName("client_cert"),
+				"Missing client certificate",
+				"`client_cert` is required when connector `protocol` is SSL.",
+			)
+		}
+		if cfg.PrivateKey == nil || *cfg.PrivateKey == "" {
+			diags.AddAttributeError(
+				path.Root("kafka_cluster").AtName("security_protocol").AtName("private_key"),
+				"Missing private key",
+				"`private_key` is required when connector `protocol` is SSL.",
+			)
+		}
+	}
+	return cfg
+}
+
 func cExpandMetrics(m *ConnectorMetricsExporterModel) *client.ConnectMetricsConfigParam {
 	if m == nil || m.RemoteWrite == nil {
 		return nil
@@ -231,8 +281,8 @@ func cFlattenSecurityProtocol(cfg *client.SecurityProtocolConfig, prev *Security
 	m.Protocol = cRetainStr(firstString(cfg.Protocol, cfg.SecurityProtocol), m.Protocol)
 	m.Username = cRetainStr(cfg.Username, m.Username)
 	m.Password = cRetainStr(cfg.Password, m.Password)
-	m.SaslMechanism = cRetainStr(cfg.SaslMechanism, m.SaslMechanism)
-	m.TruststoreCerts = cRetainStr(cfg.TruststoreCerts, m.TruststoreCerts)
+	m.SaslMechanism = cRetainOptionalInputStr(cfg.SaslMechanism, m.SaslMechanism)
+	m.TruststoreCerts = cRetainOptionalInputStr(cfg.TruststoreCerts, m.TruststoreCerts)
 	m.ClientCert = cRetainStr(cfg.ClientCert, m.ClientCert)
 	m.PrivateKey = cRetainStr(cfg.PrivateKey, m.PrivateKey)
 	return m
@@ -301,6 +351,16 @@ func cFlattenInterfaceMap(src map[string]interface{}) types.Map {
 	return types.MapValueMust(types.StringType, vals)
 }
 
+func cFlattenInterfaceMapRetainEmpty(src map[string]interface{}, existing types.Map) types.Map {
+	if len(src) > 0 {
+		return cFlattenInterfaceMap(src)
+	}
+	if !existing.IsNull() && !existing.IsUnknown() && len(existing.Elements()) == 0 {
+		return existing
+	}
+	return types.MapNull(types.StringType)
+}
+
 func cFlattenStringMap(src map[string]string) types.Map {
 	if len(src) == 0 {
 		return types.MapNull(types.StringType)
@@ -328,6 +388,16 @@ func cRetainStr(api *string, existing types.String) types.String {
 	}
 	if existing.IsNull() || existing.IsUnknown() {
 		return types.StringNull()
+	}
+	return existing
+}
+
+func cRetainOptionalInputStr(api *string, existing types.String) types.String {
+	if existing.IsNull() || existing.IsUnknown() {
+		return types.StringNull()
+	}
+	if api != nil {
+		return types.StringValue(*api)
 	}
 	return existing
 }
