@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-timetypes/timetypes"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"gopkg.in/yaml.v3"
 )
 
 type ConnectClusterResourceModel struct {
@@ -145,7 +146,7 @@ func FlattenConnectCluster(vo *client.ConnectClusterVO, state *ConnectClusterRes
 	state.KafkaCluster = flattenClusterKafka(vo, state.KafkaCluster)
 	state.Capacity = flattenClusterCapacity(vo, state.Capacity)
 	state.Compute = flattenClusterCompute(vo, state.Compute)
-	state.WorkerConfig = cFlattenInterfaceMap(vo.WorkerConfig)
+	state.WorkerConfig = cFlattenInterfaceMapRetainEmpty(vo.WorkerConfig, state.WorkerConfig)
 	state.MetricExporter = cFlattenMetrics(vo.MetricExporter, state.MetricExporter)
 	state.Tags = cFlattenStringMap(vo.Tags)
 	state.Version = cToStr(vo.Version)
@@ -224,7 +225,7 @@ func expandClusterCompute(compute *ConnectClusterComputeModel) client.ConnectClu
 			ClusterId:      compute.Kubernetes.ClusterID.ValueString(),
 			Namespace:      compute.Kubernetes.Namespace.ValueString(),
 			ServiceAccount: compute.Kubernetes.ServiceAccount.ValueString(),
-			SchedulingSpec: cOptStr(compute.Kubernetes.SchedulingSpec),
+			SchedulingSpec: cOptNormalizedYAML(compute.Kubernetes.SchedulingSpec),
 		}
 	}
 	return result
@@ -303,7 +304,63 @@ func flattenClusterCompute(vo *client.ConnectClusterVO, prev *ConnectClusterComp
 		prev.Kubernetes.ClusterID = cRetainStr(vo.KubernetesClusterId, prev.Kubernetes.ClusterID)
 		prev.Kubernetes.Namespace = cRetainStr(vo.KubernetesNamespace, prev.Kubernetes.Namespace)
 		prev.Kubernetes.ServiceAccount = cRetainStr(vo.KubernetesServiceAccount, prev.Kubernetes.ServiceAccount)
-		prev.Kubernetes.SchedulingSpec = cRetainStr(vo.SchedulingSpec, prev.Kubernetes.SchedulingSpec)
+		prev.Kubernetes.SchedulingSpec = cRetainNormalizedYAML(vo.SchedulingSpec, prev.Kubernetes.SchedulingSpec)
 	}
 	return prev
+}
+
+func cOptNormalizedYAML(v types.String) *string {
+	if v.IsNull() || v.IsUnknown() {
+		return nil
+	}
+	s := normalizeYAML(v.ValueString())
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+func cRetainNormalizedYAML(api *string, existing types.String) types.String {
+	if api != nil {
+		if normalized := normalizeYAML(*api); normalized != "" {
+			return types.StringValue(normalized)
+		}
+		return types.StringNull()
+	}
+	if existing.IsNull() || existing.IsUnknown() {
+		return types.StringNull()
+	}
+	return existing
+}
+
+func normalizeYAML(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	var value interface{}
+	if err := yaml.Unmarshal([]byte(trimmed), &value); err != nil {
+		return trimmed
+	}
+	if isEmptyYAMLValue(value) {
+		return ""
+	}
+	out, err := yaml.Marshal(value)
+	if err != nil {
+		return trimmed
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func isEmptyYAMLValue(value interface{}) bool {
+	switch typed := value.(type) {
+	case nil:
+		return true
+	case map[string]interface{}:
+		return len(typed) == 0
+	case []interface{}:
+		return len(typed) == 0
+	default:
+		return false
+	}
 }

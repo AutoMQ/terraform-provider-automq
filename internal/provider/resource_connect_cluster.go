@@ -243,6 +243,12 @@ func (r *ConnectClusterResource) Create(ctx context.Context, req resource.Create
 		resp.Diagnostics.AddError("Create Connect Cluster Error", "API returned empty connect cluster id")
 		return
 	}
+	plan.ID = types.StringValue(clusterID)
+	plan.State = types.StringValue(derefStringWithDefault(created.State, client.ConnectClusterStateCreating))
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	if err := waitForConnectClusterReady(ctx, r.api, clusterID, r.CreateTimeout(ctx, plan.Timeouts)); err != nil {
 		resp.Diagnostics.AddError("Connect Cluster Provisioning Error", err.Error())
 		return

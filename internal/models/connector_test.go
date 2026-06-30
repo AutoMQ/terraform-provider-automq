@@ -60,6 +60,98 @@ func TestExpandConnectorCreate(t *testing.T) {
 	assert.Equal(t, "123", req.InitialOffsets[0].Offset["pos"])
 }
 
+func TestExpandConnectorCreate_RequiresKafkaClusterSecurityProtocol(t *testing.T) {
+	plan := ConnectorResourceModel{
+		ConnectClusterID: types.StringValue("connect-cluster-1"),
+		Name:             types.StringValue("test-connector"),
+		ConnectorClass:   types.StringValue("io.example.SourceConnector"),
+		TaskCount:        types.Int64Value(1),
+	}
+
+	_, diags := ExpandConnectorCreate(plan)
+	assert.True(t, diags.HasError())
+}
+
+func TestExpandConnectorCreate_AllowsPlaintextWithoutCredentials(t *testing.T) {
+	plan := ConnectorResourceModel{
+		ConnectClusterID: types.StringValue("connect-cluster-1"),
+		Name:             types.StringValue("test-connector"),
+		ConnectorClass:   types.StringValue("io.example.SourceConnector"),
+		TaskCount:        types.Int64Value(1),
+		KafkaCluster: &ConnectorKafkaClusterModel{
+			Security: &SecurityProtocolConfigModel{
+				Protocol: types.StringValue("PLAINTEXT"),
+			},
+		},
+	}
+
+	req, diags := ExpandConnectorCreate(plan)
+	assert.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+	assert.Equal(t, "PLAINTEXT", *req.KafkaCluster.SecurityProtocolConfig.Protocol)
+	assert.Nil(t, req.KafkaCluster.SecurityProtocolConfig.Username)
+	assert.Nil(t, req.KafkaCluster.SecurityProtocolConfig.Password)
+	assert.Nil(t, req.KafkaCluster.SecurityProtocolConfig.ClientCert)
+	assert.Nil(t, req.KafkaCluster.SecurityProtocolConfig.PrivateKey)
+}
+
+func TestExpandConnectorCreate_IgnoresUnknownComputedSecurityFields(t *testing.T) {
+	plan := ConnectorResourceModel{
+		ConnectClusterID: types.StringValue("connect-cluster-1"),
+		Name:             types.StringValue("test-connector"),
+		ConnectorClass:   types.StringValue("io.example.SourceConnector"),
+		TaskCount:        types.Int64Value(1),
+		KafkaCluster: &ConnectorKafkaClusterModel{
+			Security: &SecurityProtocolConfigModel{
+				Protocol:        types.StringValue("PLAINTEXT"),
+				SaslMechanism:   types.StringUnknown(),
+				TruststoreCerts: types.StringUnknown(),
+			},
+		},
+	}
+
+	req, diags := ExpandConnectorCreate(plan)
+	assert.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
+	assert.Equal(t, "PLAINTEXT", *req.KafkaCluster.SecurityProtocolConfig.Protocol)
+	assert.Nil(t, req.KafkaCluster.SecurityProtocolConfig.SaslMechanism)
+	assert.Nil(t, req.KafkaCluster.SecurityProtocolConfig.TruststoreCerts)
+}
+
+func TestExpandConnectorCreate_ValidatesSaslCredentials(t *testing.T) {
+	plan := ConnectorResourceModel{
+		ConnectClusterID: types.StringValue("connect-cluster-1"),
+		Name:             types.StringValue("test-connector"),
+		ConnectorClass:   types.StringValue("io.example.SourceConnector"),
+		TaskCount:        types.Int64Value(1),
+		KafkaCluster: &ConnectorKafkaClusterModel{
+			Security: &SecurityProtocolConfigModel{
+				Protocol: types.StringValue("SASL_PLAINTEXT"),
+			},
+		},
+	}
+
+	_, diags := ExpandConnectorCreate(plan)
+	assert.True(t, diags.HasError())
+	assert.Len(t, diags, 2)
+}
+
+func TestExpandConnectorCreate_ValidatesSslCredentials(t *testing.T) {
+	plan := ConnectorResourceModel{
+		ConnectClusterID: types.StringValue("connect-cluster-1"),
+		Name:             types.StringValue("test-connector"),
+		ConnectorClass:   types.StringValue("io.example.SourceConnector"),
+		TaskCount:        types.Int64Value(1),
+		KafkaCluster: &ConnectorKafkaClusterModel{
+			Security: &SecurityProtocolConfigModel{
+				Protocol: types.StringValue("SSL"),
+			},
+		},
+	}
+
+	_, diags := ExpandConnectorCreate(plan)
+	assert.True(t, diags.HasError())
+	assert.Len(t, diags, 2)
+}
+
 func TestExpandConnectorUpdate(t *testing.T) {
 	config, diags := types.MapValueFrom(context.Background(), types.StringType, map[string]string{"topics": "orders-updated"})
 	assert.False(t, diags.HasError())
@@ -69,9 +161,6 @@ func TestExpandConnectorUpdate(t *testing.T) {
 		Description:     types.StringValue("new desc"),
 		TaskCount:       types.Int64Value(5),
 		ConnectorConfig: config,
-		KafkaCluster: &ConnectorKafkaClusterModel{
-			Security: &SecurityProtocolConfigModel{Protocol: types.StringValue("PLAINTEXT")},
-		},
 	}
 
 	req, diags := ExpandConnectorUpdate(plan)
@@ -79,7 +168,6 @@ func TestExpandConnectorUpdate(t *testing.T) {
 	assert.Equal(t, "updated", *req.Name)
 	assert.Equal(t, "new desc", *req.Description)
 	assert.Equal(t, int32(5), *req.TaskCount)
-	assert.Equal(t, "PLAINTEXT", *req.SecurityProtocolConfig.Protocol)
 	assert.Equal(t, "orders-updated", req.ConnectorConfig.Properties["topics"])
 }
 
@@ -122,6 +210,59 @@ func TestFlattenConnector(t *testing.T) {
 	configVal, ok := state.ConnectorConfig.Elements()["topics"].(types.String)
 	assert.True(t, ok)
 	assert.Equal(t, "orders", configVal.ValueString())
+}
+
+func TestFlattenConnector_DoesNotPersistUnconfiguredSecurityDefaults(t *testing.T) {
+	vo := &client.ConnectorVO{
+		Id: connStrPtr("conn-1"),
+		SecurityProtocolConfig: &client.SecurityProtocolConfig{
+			Protocol:        connStrPtr("SASL_PLAINTEXT"),
+			SaslMechanism:   connStrPtr("SCRAM-SHA-512"),
+			TruststoreCerts: connStrPtr("-----BEGIN CERTIFICATE-----\nca\n-----END CERTIFICATE-----"),
+		},
+	}
+	state := &ConnectorResourceModel{
+		KafkaCluster: &ConnectorKafkaClusterModel{
+			Security: &SecurityProtocolConfigModel{
+				Protocol:        types.StringValue("SASL_PLAINTEXT"),
+				SaslMechanism:   types.StringNull(),
+				TruststoreCerts: types.StringNull(),
+			},
+		},
+	}
+
+	diags := FlattenConnector(vo, state)
+
+	assert.False(t, diags.HasError())
+	assert.Equal(t, "SASL_PLAINTEXT", state.KafkaCluster.Security.Protocol.ValueString())
+	assert.True(t, state.KafkaCluster.Security.SaslMechanism.IsNull())
+	assert.True(t, state.KafkaCluster.Security.TruststoreCerts.IsNull())
+}
+
+func TestFlattenConnector_RetainsConfiguredSecurityFields(t *testing.T) {
+	vo := &client.ConnectorVO{
+		Id: connStrPtr("conn-1"),
+		SecurityProtocolConfig: &client.SecurityProtocolConfig{
+			Protocol:        connStrPtr("SASL_SSL"),
+			SaslMechanism:   connStrPtr("PLAIN"),
+			TruststoreCerts: connStrPtr("-----BEGIN CERTIFICATE-----\nca\n-----END CERTIFICATE-----"),
+		},
+	}
+	state := &ConnectorResourceModel{
+		KafkaCluster: &ConnectorKafkaClusterModel{
+			Security: &SecurityProtocolConfigModel{
+				Protocol:        types.StringValue("SASL_SSL"),
+				SaslMechanism:   types.StringValue("PLAIN"),
+				TruststoreCerts: types.StringValue("-----BEGIN CERTIFICATE-----\nca\n-----END CERTIFICATE-----"),
+			},
+		},
+	}
+
+	diags := FlattenConnector(vo, state)
+
+	assert.False(t, diags.HasError())
+	assert.Equal(t, "PLAIN", state.KafkaCluster.Security.SaslMechanism.ValueString())
+	assert.Contains(t, state.KafkaCluster.Security.TruststoreCerts.ValueString(), "BEGIN CERTIFICATE")
 }
 
 func TestFlattenConnector_RetainsSensitiveConfig(t *testing.T) {

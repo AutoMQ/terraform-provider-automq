@@ -34,7 +34,6 @@ type ConnectorUpdateParam struct {
 	Name                     *string                        `json:"name,omitempty"`
 	Description              *string                        `json:"description,omitempty"`
 	TaskCount                *int32                         `json:"taskCount,omitempty"`
-	SecurityProtocolConfig   *SecurityProtocolConfig        `json:"securityProtocolConfig,omitempty"`
 	ConnectorConfig          *ConnectorConnectorConfigParam `json:"connectorConfig,omitempty"`
 	ConnectorConfigSensitive *ConnectorConnectorConfigParam `json:"connectorConfigSensitive,omitempty"`
 }

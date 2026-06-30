@@ -192,6 +192,12 @@ func (r *ConnectorPluginResource) Create(ctx context.Context, req resource.Creat
 		resp.Diagnostics.AddError("Create Connector Plugin Error", "API returned empty plugin id")
 		return
 	}
+	plan.ID = types.StringValue(pluginID)
+	plan.Status = types.StringValue(derefStringWithDefault(created.Status, client.PluginStatePending))
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	if err := waitForPluginActive(ctx, r.api, pluginID, r.CreateTimeout(ctx, plan.Timeouts)); err != nil {
 		resp.Diagnostics.AddError("Connector Plugin Provisioning Error", err.Error())
