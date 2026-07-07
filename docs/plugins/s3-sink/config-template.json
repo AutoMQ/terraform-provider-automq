@@ -1,0 +1,387 @@
+{
+  "plugin": {
+    "name": "s3-sink",
+    "connector_class": "io.confluent.connect.s3.S3SinkConnector",
+    "type": "SINK",
+    "version": "11.1.0",
+    "storage_url": "http://download.automq.com/resource/connector/automq-kafka-connect-s3-11.1.0.zip"
+  },
+  "worker_config": {
+    "recommended": {
+      "key.converter": {
+        "value": "org.apache.kafka.connect.storage.StringConverter",
+        "description": "Key converter. Use StringConverter for plain string keys, JsonConverter for JSON keys. Default JsonConverter will fail if message keys are not valid JSON.",
+        "type": "CLASS",
+        "importance": "HIGH",
+        "note": "Most common failure cause: default JsonConverter cannot deserialize non-JSON keys"
+      },
+      "value.converter": {
+        "value": "org.apache.kafka.connect.json.JsonConverter",
+        "description": "Value converter. JsonConverter for JSON messages, AvroConverter for Avro with Schema Registry, StringConverter for plain text.",
+        "type": "CLASS",
+        "importance": "HIGH"
+      },
+      "value.converter.schemas.enable": {
+        "value": "false",
+        "description": "Set to false if JSON messages don't include schema wrapper ({schema:{},payload:{}} format). Set to true only if messages follow the Kafka Connect JSON envelope format.",
+        "type": "BOOLEAN",
+        "importance": "MEDIUM"
+      },
+      "offset.flush.interval.ms": {
+        "value": "10000",
+        "description": "Interval in milliseconds at which to commit offsets. Lower values provide better exactly-once guarantees at the cost of more frequent offset commits.",
+        "type": "LONG",
+        "importance": "LOW"
+      }
+    }
+  },
+  "connector_config": {
+    "required": {
+      "topics": {
+        "description": "Comma-separated list of Kafka topics to consume from.",
+        "type": "LIST",
+        "importance": "HIGH",
+        "example": "order-events,user-events"
+      },
+      "s3.bucket.name": {
+        "description": "S3 bucket name where data will be written.",
+        "type": "STRING",
+        "importance": "HIGH",
+        "example": "my-data-lake"
+      },
+      "s3.region": {
+        "description": "AWS region of the S3 bucket.",
+        "type": "STRING",
+        "importance": "HIGH",
+        "default": "us-west-2",
+        "example": "us-east-1",
+        "validator": "valid AWS region"
+      },
+      "storage.class": {
+        "value": "io.confluent.connect.s3.storage.S3Storage",
+        "description": "Storage implementation class. Always use S3Storage for S3 Sink.",
+        "type": "CLASS",
+        "importance": "HIGH"
+      },
+      "format.class": {
+        "value": "io.confluent.connect.s3.format.json.JsonFormat",
+        "description": "Output format class. Options: JsonFormat, AvroFormat, ParquetFormat, ByteArrayFormat.",
+        "type": "CLASS",
+        "importance": "HIGH",
+        "example": "io.confluent.connect.s3.format.json.JsonFormat"
+      }
+    },
+    "recommended": {
+      "flush.size": {
+        "value": "1000",
+        "description": "Number of records per partition before flushing to S3. Lower values = more frequent smaller files, higher values = fewer larger files.",
+        "type": "INT",
+        "importance": "HIGH",
+        "default": "(no default)",
+        "example": "1000",
+        "performance_impact": "Directly affects file size and S3 PUT frequency. flush.size=1000 with 150B records ≈ 150KB files."
+      },
+      "rotate.interval.ms": {
+        "value": "600000",
+        "description": "Time-based rotation interval in milliseconds. Files are flushed after this interval even if flush.size is not reached.",
+        "type": "LONG",
+        "importance": "HIGH",
+        "default": "(no default)",
+        "example": "600000",
+        "performance_impact": "Ensures data freshness. Lower values = more frequent S3 writes."
+      },
+      "partitioner.class": {
+        "value": "io.confluent.connect.storage.partitioner.DefaultPartitioner",
+        "description": "Partitioner class controlling S3 directory structure. DefaultPartitioner uses Kafka partition. TimeBasedPartitioner for time-based directories.",
+        "type": "CLASS",
+        "importance": "MEDIUM",
+        "default": "io.confluent.connect.storage.partitioner.DefaultPartitioner"
+      },
+      "topics.dir": {
+        "value": "topics",
+        "description": "Top-level directory in S3 bucket. Files are written to {topics.dir}/{topic}/{partition}/.",
+        "type": "STRING",
+        "importance": "MEDIUM",
+        "default": "topics",
+        "example": "kafka-data"
+      },
+      "s3.compression.type": {
+        "value": "none",
+        "description": "Compression type for S3 files: none or gzip. Gzip reduces storage cost (~60-80% savings) but increases CPU usage.",
+        "type": "STRING",
+        "importance": "LOW",
+        "default": "none",
+        "validator": "one of: [none, gzip]"
+      },
+      "rotate.schedule.interval.ms": {
+        "description": "Time-based rotation using wall-clock time (scheduled rotation). Unlike rotate.interval.ms which uses record timestamps.",
+        "type": "LONG",
+        "importance": "MEDIUM",
+        "default": "(no default)"
+      }
+    },
+    "optional": {
+      "s3_connection": {
+        "s3.wan.mode": {
+          "description": "Use S3 Transfer Acceleration endpoint for cross-region writes.",
+          "type": "BOOLEAN",
+          "importance": "MEDIUM",
+          "default": "false"
+        },
+        "s3.path.style.access.enabled": {
+          "description": "Use path-style S3 access instead of virtual-hosted style. Required for some S3-compatible stores.",
+          "type": "BOOLEAN",
+          "importance": "LOW",
+          "default": "false"
+        },
+        "s3.proxy.url": {
+          "description": "S3 proxy URL for environments requiring proxy access.",
+          "type": "STRING",
+          "importance": "LOW",
+          "default": ""
+        },
+        "s3.proxy.user": {
+          "description": "Username for S3 proxy authentication.",
+          "type": "STRING",
+          "importance": "LOW",
+          "default": ""
+        },
+        "s3.part.size": {
+          "description": "S3 multipart upload part size in bytes. Minimum 5MB (5242880).",
+          "type": "INT",
+          "importance": "LOW",
+          "default": "26214400 (25 MB)",
+          "validator": "range=[5242880 (5MB), 2147483647 (~2GB)]"
+        },
+        "s3.retry.backoff.ms": {
+          "description": "Backoff time in milliseconds before retrying a failed S3 request.",
+          "type": "LONG",
+          "importance": "LOW",
+          "default": "200"
+        },
+        "s3.part.retries": {
+          "description": "Maximum number of retries for a failed S3 multipart upload part.",
+          "type": "INT",
+          "importance": "MEDIUM",
+          "default": "3"
+        },
+        "s3.http.send.expect.continue": {
+          "description": "Enable Expect: 100-Continue header for S3 PUT requests.",
+          "type": "BOOLEAN",
+          "importance": "LOW",
+          "default": "true"
+        },
+        "s3.canned.acl": {
+          "description": "S3 canned ACL to apply to uploaded objects (e.g., bucket-owner-full-control, private).",
+          "type": "STRING",
+          "importance": "LOW",
+          "default": "",
+          "validator": "valid S3 canned ACL"
+        }
+      },
+      "encryption": {
+        "s3.ssea.name": {
+          "description": "S3 server-side encryption algorithm: AES256 or aws:kms.",
+          "type": "STRING",
+          "importance": "LOW",
+          "default": ""
+        },
+        "s3.sse.kms.key.id": {
+          "description": "KMS key ID for aws:kms server-side encryption.",
+          "type": "STRING",
+          "importance": "LOW",
+          "default": ""
+        }
+      },
+      "authentication": {
+        "s3.credentials.provider.class": {
+          "description": "AWS credentials provider class. Use default for IAM Role-based auth (recommended).",
+          "type": "CLASS",
+          "importance": "LOW",
+          "default": "com.amazonaws.auth.DefaultAWSCredentialsProviderChain",
+          "validator": "class implementing AwsCredentialsProvider"
+        }
+      },
+      "data_processing": {
+        "store.kafka.keys": {
+          "description": "Include Kafka message keys in the output files.",
+          "type": "BOOLEAN",
+          "importance": "LOW",
+          "default": "false"
+        },
+        "store.kafka.headers": {
+          "description": "Include Kafka message headers in the output files.",
+          "type": "BOOLEAN",
+          "importance": "LOW",
+          "default": "false"
+        },
+        "keys.format.class": {
+          "description": "Format class for writing keys when store.kafka.keys=true.",
+          "type": "CLASS",
+          "importance": "LOW",
+          "default": "(same as format.class)"
+        },
+        "headers.format.class": {
+          "description": "Format class for writing headers when store.kafka.headers=true.",
+          "type": "CLASS",
+          "importance": "LOW",
+          "default": "(same as format.class)"
+        },
+        "behavior.on.null.values": {
+          "description": "How to handle null values: fail (throw error), ignore (skip record), or write (as tombstone marker).",
+          "type": "STRING",
+          "importance": "MEDIUM",
+          "default": "fail",
+          "validator": "one of: [ignore, fail, write]"
+        },
+        "s3.object.tagging": {
+          "description": "Enable S3 object tagging with offset metadata.",
+          "type": "BOOLEAN",
+          "importance": "LOW",
+          "default": "false"
+        },
+        "json.decimal.format": {
+          "description": "Format for decimal types in JSON output: BASE64 or NUMERIC.",
+          "type": "STRING",
+          "importance": "LOW",
+          "default": "BASE64"
+        },
+        "format.bytearray.extension": {
+          "description": "File extension for ByteArrayFormat output files.",
+          "type": "STRING",
+          "importance": "LOW",
+          "default": ".bin"
+        },
+        "format.bytearray.separator": {
+          "description": "Separator between records in ByteArrayFormat output.",
+          "type": "STRING",
+          "importance": "LOW",
+          "default": "null (system line separator)"
+        },
+        "schema.compatibility": {
+          "description": "Schema compatibility mode: NONE, BACKWARD, FORWARD, FULL.",
+          "type": "STRING",
+          "importance": "HIGH",
+          "default": "NONE"
+        },
+        "enhanced.avro.schema.support": {
+          "description": "Enable enhanced Avro schema support for complex types.",
+          "type": "BOOLEAN",
+          "importance": "LOW",
+          "default": "false"
+        },
+        "connect.meta.data": {
+          "description": "Include Connect metadata (topic, partition, offset) in output records.",
+          "type": "BOOLEAN",
+          "importance": "LOW",
+          "default": "true"
+        },
+        "avro.codec": {
+          "description": "Avro compression codec: null, deflate, snappy, bzip2, xz, zstandard.",
+          "type": "STRING",
+          "importance": "LOW",
+          "default": "null"
+        },
+        "s3.compression.level": {
+          "description": "Compression level for gzip. -1 for system default, 0-9 for specific levels.",
+          "type": "INT",
+          "importance": "LOW",
+          "default": "-1 (system default)",
+          "validator": "range=[-1, 9]"
+        }
+      },
+      "partitioning": {
+        "partition.duration.ms": {
+          "description": "Duration for TimeBasedPartitioner in milliseconds.",
+          "type": "LONG",
+          "importance": "MEDIUM",
+          "default": "(no default)"
+        },
+        "path.format": {
+          "description": "Path format string for TimeBasedPartitioner (e.g., 'year'=YYYY/'month'=MM/'day'=dd/'hour'=HH).",
+          "type": "STRING",
+          "importance": "MEDIUM",
+          "default": ""
+        },
+        "locale": {
+          "description": "Locale for TimeBasedPartitioner date formatting.",
+          "type": "STRING",
+          "importance": "MEDIUM",
+          "default": ""
+        },
+        "timezone": {
+          "description": "Timezone for TimeBasedPartitioner.",
+          "type": "STRING",
+          "importance": "MEDIUM",
+          "default": ""
+        },
+        "partition.field.name": {
+          "description": "Field name for FieldPartitioner.",
+          "type": "STRING",
+          "importance": "MEDIUM",
+          "default": ""
+        },
+        "timestamp.extractor": {
+          "description": "Timestamp extractor class for TimeBasedPartitioner: Wallclock, Record, RecordField.",
+          "type": "STRING",
+          "importance": "MEDIUM",
+          "default": "Wallclock"
+        },
+        "timestamp.field": {
+          "description": "Field name for RecordField timestamp extractor.",
+          "type": "STRING",
+          "importance": "MEDIUM",
+          "default": ""
+        },
+        "directory.delim": {
+          "description": "Directory delimiter for S3 object keys.",
+          "type": "STRING",
+          "importance": "MEDIUM",
+          "default": "/"
+        },
+        "file.delim": {
+          "description": "File delimiter in S3 object key names.",
+          "type": "STRING",
+          "importance": "MEDIUM",
+          "default": "+"
+        },
+        "schema.partition.affix.type": {
+          "description": "Schema partition affix type: NONE, PREFIX, SUFFIX.",
+          "type": "STRING",
+          "importance": "LOW",
+          "default": "NONE"
+        }
+      }
+    },
+    "sensitive": [
+      "aws.access.key.id",
+      "aws.secret.access.key",
+      "s3.proxy.password",
+      "s3.sse.customer.key"
+    ]
+  },
+  "confluent_parameter_mapping": {
+    "notes": "Confluent Cloud S3 Sink uses simplified parameter names. The open-source version parameters listed above are compatible. Parameters not listed in the mapping are Confluent-only and do not apply.",
+    "confluent_only_params": [
+      "output.data.format",
+      "input.data.format",
+      "kafka.auth.mode",
+      "kafka.api.key",
+      "kafka.api.secret",
+      "kafka.service.account.id"
+    ],
+    "mapping": {
+      "output.data.format=JSON": "format.class=io.confluent.connect.s3.format.json.JsonFormat",
+      "output.data.format=AVRO": "format.class=io.confluent.connect.s3.format.avro.AvroFormat",
+      "output.data.format=PARQUET": "format.class=io.confluent.connect.s3.format.parquet.ParquetFormat",
+      "output.data.format=BYTES": "format.class=io.confluent.connect.s3.format.bytearray.ByteArrayFormat",
+      "tasks.max": "task_count (Terraform resource attribute)",
+      "topics": "connector_config[\"topics\"] (direct copy)",
+      "s3.bucket.name": "connector_config[\"s3.bucket.name\"] (direct copy)",
+      "s3.region": "connector_config[\"s3.region\"] (direct copy)",
+      "flush.size": "connector_config[\"flush.size\"] (direct copy)",
+      "rotate.interval.ms": "connector_config[\"rotate.interval.ms\"] (direct copy)",
+      "s3.compression.type": "connector_config[\"s3.compression.type\"] (direct copy)"
+    }
+  }
+}
