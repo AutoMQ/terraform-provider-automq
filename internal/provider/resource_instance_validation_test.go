@@ -118,10 +118,14 @@ func TestValidateConfigAcceptsUnknownNestedValues(t *testing.T) {
 func TestValidateKafkaInstanceConfiguration_K8SValid(t *testing.T) {
 	plan := &models.KafkaInstanceResourceModel{
 		ComputeSpecs: &models.ComputeSpecsModel{
-			ReservedAku:          types.Int64Value(6),
-			DeployType:           types.StringValue("K8S"),
-			KubernetesClusterID:  types.StringValue("cluster-1"),
+			ReservedAku:         types.Int64Value(6),
+			DeployType:          types.StringValue("K8S"),
+			KubernetesClusterID: types.StringValue("cluster-1"),
+			InstanceTypes: types.ListValueMust(types.StringType, []attr.Value{
+				types.StringValue("m5.xlarge"),
+			}),
 			KubernetesNodeGroups: testNodeGroupList(t, []models.NodeGroupModel{{ID: types.StringValue("ng-1")}}),
+			ScheduleSpec:         types.StringValue("nodeSelector: {}"),
 			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone: types.StringValue("cn-test-1"),
 				Subnets: types.ListValueMust(types.StringType, []attr.Value{
@@ -1560,7 +1564,7 @@ func TestValidateKafkaInstanceConfiguration_UsageBasedMissingInstanceTypes(t *te
 	}
 }
 
-func TestValidateKafkaInstanceConfiguration_UsageBasedK8SAllowsMissingInstanceTypes(t *testing.T) {
+func TestValidateKafkaInstanceConfiguration_UsageBasedK8SRequiresInstanceTypes(t *testing.T) {
 	plan := &models.KafkaInstanceResourceModel{
 		ComputeSpecs: &models.ComputeSpecsModel{
 			PricingMode:         types.StringValue("UsageBased"),
@@ -1568,30 +1572,27 @@ func TestValidateKafkaInstanceConfiguration_UsageBasedK8SAllowsMissingInstanceTy
 			ReservedNodeCount:   types.Int64Value(5),
 			InstanceTypes:       types.ListNull(types.StringType),
 			KubernetesClusterID: types.StringValue("cluster-1"),
-			KubernetesNodeGroups: testNodeGroupList(t, []models.NodeGroupModel{{
-				ID: types.StringValue("ng-1"),
-			}}),
+			ScheduleSpec:        types.StringValue("nodeSelector: {}"),
 		},
 		Features: &models.FeaturesModel{WalMode: types.StringValue("EBSWAL")},
 	}
 
 	diags := validateInstanceContract(context.Background(), plan)
-	if diags.HasError() {
-		t.Fatalf("unexpected diagnostics when instance_types is omitted for UsageBased K8S: %v", diags)
+	if !diags.HasError() {
+		t.Fatal("expected diagnostics when instance_types is omitted for K8S")
 	}
 }
 
-func TestValidateKafkaInstanceConfiguration_K8SRejectsInstanceTypes(t *testing.T) {
+func TestValidateKafkaInstanceConfiguration_K8SAcceptsInstanceTypesWithoutNodeGroups(t *testing.T) {
 	plan := &models.KafkaInstanceResourceModel{
 		ComputeSpecs: &models.ComputeSpecsModel{
-			PricingMode:         types.StringValue("UsageBased"),
-			DeployType:          types.StringValue("K8S"),
-			ReservedNodeCount:   types.Int64Value(3),
-			InstanceTypes:       types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.xlarge")}),
-			KubernetesClusterID: types.StringValue("cluster-1"),
-			KubernetesNodeGroups: testNodeGroupList(t, []models.NodeGroupModel{{
-				ID: types.StringValue("ng-1"),
-			}}),
+			PricingMode:          types.StringValue("UsageBased"),
+			DeployType:           types.StringValue("K8S"),
+			ReservedNodeCount:    types.Int64Value(3),
+			InstanceTypes:        types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.xlarge")}),
+			KubernetesClusterID:  types.StringValue("cluster-1"),
+			KubernetesNodeGroups: types.ListNull(models.NodeGroupObjectType),
+			ScheduleSpec:         types.StringValue("nodeSelector: {}"),
 			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone:    types.StringValue("cn-test-1"),
 				Subnets: types.ListNull(types.StringType),
@@ -1601,18 +1602,8 @@ func TestValidateKafkaInstanceConfiguration_K8SRejectsInstanceTypes(t *testing.T
 	}
 
 	diags := validateInstanceContract(context.Background(), plan)
-	if !diags.HasError() {
-		t.Fatalf("expected diagnostics when instance_types is configured for K8S")
-	}
-	found := false
-	for _, d := range diags {
-		if strings.Contains(d.Detail(), "instance_types") && strings.Contains(d.Detail(), "K8S") {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("expected error mentioning instance_types and K8S, got: %v", diags)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics for valid K8S configuration: %v", diags)
 	}
 }
 
@@ -1810,6 +1801,25 @@ func TestInstanceTypesSchemaValidator(t *testing.T) {
 	// Should have size validators (at most 1, at least 1)
 	if len(instanceTypesAttr.Validators) < 2 {
 		t.Fatalf("expected instance_types to have at least 2 validators, got %d", len(instanceTypesAttr.Validators))
+	}
+}
+
+func TestKubernetesNodeGroupsSchemaIsOptionalAndDeprecated(t *testing.T) {
+	s := getKafkaInstanceResourceSchema(t)
+	computeAttr, ok := s.Attributes["compute_specs"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("compute_specs has unexpected type %T", s.Attributes["compute_specs"])
+	}
+
+	nodeGroupsAttr, ok := computeAttr.Attributes["kubernetes_node_groups"].(schema.ListNestedAttribute)
+	if !ok {
+		t.Fatalf("kubernetes_node_groups has unexpected type %T", computeAttr.Attributes["kubernetes_node_groups"])
+	}
+	if !nodeGroupsAttr.IsOptional() {
+		t.Fatal("expected kubernetes_node_groups to be optional")
+	}
+	if nodeGroupsAttr.GetDeprecationMessage() == "" {
+		t.Fatal("expected kubernetes_node_groups to have a deprecation message")
 	}
 }
 

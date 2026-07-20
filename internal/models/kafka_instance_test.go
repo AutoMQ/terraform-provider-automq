@@ -395,7 +395,7 @@ func TestKafkaInstanceFlattenContracts(t *testing.T) {
 	t.Run("usage based instance types from api", testFlattenKafkaInstanceModelSetsDefaultInstanceTypesFromAPI)
 	t.Run("usage based instance types without prior config", testFlattenKafkaInstanceModelSetsInstanceTypesWithoutPriorConfig)
 	t.Run("subscription pricing ignores instance types", testFlattenKafkaInstanceModelIgnoresInstanceTypesForSubscriptionBased)
-	t.Run("usage based k8s ignores instance types", testFlattenKafkaInstanceModelIgnoresInstanceTypesForUsageBasedK8S)
+	t.Run("usage based k8s retains instance types", testFlattenKafkaInstanceModelRetainsInstanceTypesForUsageBasedK8S)
 	t.Run("pricing readback usage based", testFlattenKafkaInstanceModelUsageBasedPricing)
 	t.Run("pricing readback subscription based", testFlattenKafkaInstanceModelCommittedPricing)
 }
@@ -879,7 +879,7 @@ func testFlattenKafkaInstanceModelIgnoresInstanceTypesForSubscriptionBased(t *te
 	assert.True(t, resource.ComputeSpecs.InstanceTypes.IsNull())
 }
 
-func testFlattenKafkaInstanceModelIgnoresInstanceTypesForUsageBasedK8S(t *testing.T) {
+func testFlattenKafkaInstanceModelRetainsInstanceTypesForUsageBasedK8S(t *testing.T) {
 	pricingMode := "UsageBased"
 	deployType := "K8S"
 	resource := &KafkaInstanceResourceModel{}
@@ -898,7 +898,7 @@ func testFlattenKafkaInstanceModelIgnoresInstanceTypesForUsageBasedK8S(t *testin
 
 	assert.False(t, diags.HasError())
 	assert.NotNil(t, resource.ComputeSpecs)
-	assert.True(t, resource.ComputeSpecs.InstanceTypes.IsNull())
+	assert.False(t, resource.ComputeSpecs.InstanceTypes.IsNull())
 }
 
 func timePtr(s string) *time.Time {

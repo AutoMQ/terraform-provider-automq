@@ -119,12 +119,14 @@ func TestInstanceContractValidation(t *testing.T) {
 		assert.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
 	})
 
-	t.Run("k8s deploy type requires cluster and node groups", func(t *testing.T) {
+	t.Run("k8s deploy type requires cluster instance types and schedule spec", func(t *testing.T) {
 		plan := models.KafkaInstanceResourceModel{
 			ComputeSpecs: &models.ComputeSpecsModel{
 				DeployType:           types.StringValue("K8S"),
+				InstanceTypes:        types.ListNull(types.StringType),
 				KubernetesClusterID:  types.StringNull(),
 				KubernetesNodeGroups: types.ListNull(models.NodeGroupObjectType),
+				ScheduleSpec:         types.StringNull(),
 			},
 			Features: &models.FeaturesModel{
 				WalMode: types.StringValue("EBSWAL"),
@@ -132,7 +134,7 @@ func TestInstanceContractValidation(t *testing.T) {
 		}
 		diags := validateInstanceContract(context.Background(), &plan)
 		require.True(t, diags.HasError())
-		assert.Len(t, diags.Errors(), 2)
+		assert.Len(t, diags.Errors(), 3)
 	})
 
 	t.Run("usage based iaas requires reserved node count and instance types", func(t *testing.T) {

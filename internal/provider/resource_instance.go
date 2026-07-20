@@ -170,7 +170,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					"instance_types": schema.ListAttribute{
 						ElementType:         types.StringType,
 						Optional:            true,
-						MarkdownDescription: "Instance type list for the nodes. Maximum 1 entry. Required when `pricing_mode` is `UsageBased` and `deploy_type` is `IAAS`. Can be updated for `IAAS` deployments. Do not configure this field for `K8S` deployments.",
+						MarkdownDescription: "Instance type list for the nodes. Maximum 1 entry. Required when `deploy_type` is `K8S`, or when `pricing_mode` is `UsageBased` and `deploy_type` is `IAAS`. Can be updated for `IAAS` deployments.",
 						Validators: []validator.List{
 							listvalidator.SizeAtMost(1),
 							listvalidator.SizeAtLeast(1),
@@ -227,7 +227,8 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					},
 					"kubernetes_node_groups": schema.ListNestedAttribute{
 						Optional:            true,
-						MarkdownDescription: "Node groups (or node pools) are units for unified configuration management of physical nodes in Kubernetes. Different Kubernetes providers may use different terms for node groups. Select target node groups that must be created in advance and configured for either single-AZ or three-AZ deployment. The instance node type must meet the requirements specified in the documentation. If you select a single-AZ node group, the AutoMQ instance will be deployed in a single availability zone; if you select a three-AZ node group, the instance will be deployed across three availability zones.",
+						DeprecationMessage:  "compute_specs.kubernetes_node_groups is deprecated and will be removed in a future release. Remove this configuration; Kubernetes scheduling is managed using compute_specs.instance_types and compute_specs.schedule_spec.",
+						MarkdownDescription: "Deprecated: Kubernetes node group configuration. Remove this attribute; Kubernetes scheduling is managed using `instance_types` and `schedule_spec`.",
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id": schema.StringAttribute{
@@ -286,6 +287,13 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.RequiresReplaceIfConfigured(),
 							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"schedule_spec": schema.StringAttribute{
+						Optional:            true,
+						MarkdownDescription: "Kubernetes scheduling specification. Required when `deploy_type` is `K8S`. Changing it requires instance replacement.",
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
 						},
 					},
 					"instance_role": schema.StringAttribute{
@@ -664,26 +672,21 @@ func validateDeployTypeContract(ctx context.Context, plan *models.KafkaInstanceR
 		return diagnostics
 	}
 	if deployType, ok := knownStringValue(plan.ComputeSpecs.DeployType); ok && strings.EqualFold(deployType, "K8S") {
-		if !plan.ComputeSpecs.InstanceTypes.IsNull() && !plan.ComputeSpecs.InstanceTypes.IsUnknown() {
+		if plan.ComputeSpecs.InstanceTypes.IsNull() {
 			diagnostics.AddError(
 				"Invalid Configuration",
-				"compute_specs.instance_types is only valid when compute_specs.deploy_type is IAAS. Do not configure it for K8S deployments.",
+				"When compute_specs.deploy_type is K8S, compute_specs.instance_types must be provided.",
 			)
 		}
-		if plan.ComputeSpecs.KubernetesNodeGroups.IsUnknown() {
-			return diagnostics
-		}
-		nodeGroups, nodeGroupDiags := models.NodeGroupListToModels(ctx, plan.ComputeSpecs.KubernetesNodeGroups)
-		diagnostics.Append(nodeGroupDiags...)
-		if nodeGroupDiags.HasError() {
-			return diagnostics
-		}
-		if len(nodeGroups) == 0 {
+		if _, ok := knownStringValue(plan.ComputeSpecs.ScheduleSpec); !ok && !plan.ComputeSpecs.ScheduleSpec.IsUnknown() {
 			diagnostics.AddError(
 				"Invalid Configuration",
-				"When compute_specs.deploy_type is K8S, at least one compute_specs.kubernetes_node_groups block must be provided.",
+				"When compute_specs.deploy_type is K8S, compute_specs.schedule_spec must be provided.",
 			)
-		} else {
+		}
+		if !plan.ComputeSpecs.KubernetesNodeGroups.IsNull() && !plan.ComputeSpecs.KubernetesNodeGroups.IsUnknown() {
+			nodeGroups, nodeGroupDiags := models.NodeGroupListToModels(ctx, plan.ComputeSpecs.KubernetesNodeGroups)
+			diagnostics.Append(nodeGroupDiags...)
 			for i, ng := range nodeGroups {
 				if !isStringValueSet(ng.ID) {
 					diagnostics.AddError(
