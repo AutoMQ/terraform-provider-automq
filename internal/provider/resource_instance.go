@@ -170,10 +170,17 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					"instance_types": schema.ListAttribute{
 						ElementType:         types.StringType,
 						Optional:            true,
-						MarkdownDescription: "Instance type list for the nodes. Maximum 1 entry. Required when `deploy_type` is `K8S`, or when `pricing_mode` is `UsageBased` and `deploy_type` is `IAAS`. Can be updated for `IAAS` deployments.",
+						MarkdownDescription: "Instance type list for the nodes. Maximum 1 entry. Required when `deploy_type` is `K8S`, or when `pricing_mode` is `UsageBased` and `deploy_type` is `IAAS`. Can be updated in place for `IAAS` deployments; changing it for `K8S` deployments requires instance replacement.",
 						Validators: []validator.List{
 							listvalidator.SizeAtMost(1),
 							listvalidator.SizeAtLeast(1),
+						},
+						PlanModifiers: []planmodifier.List{
+							listplanmodifier.RequiresReplaceIf(
+								requireReplaceInstanceTypesForK8S,
+								"Changing instance_types for a K8S deployment requires instance replacement.",
+								"Changing `instance_types` for a `K8S` deployment requires instance replacement.",
+							),
 						},
 					},
 					"deploy_type": schema.StringAttribute{
@@ -649,6 +656,20 @@ func knownInt64Value(attr types.Int64) (int64, bool) {
 		return 0, false
 	}
 	return attr.ValueInt64(), true
+}
+
+func requireReplaceInstanceTypesForK8S(ctx context.Context, req planmodifier.ListRequest, resp *listplanmodifier.RequiresReplaceIfFuncResponse) {
+	var deployType types.String
+	diags := req.Plan.GetAttribute(ctx, req.Path.ParentPath().AtName("deploy_type"), &deployType)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() || deployType.IsNull() || deployType.IsUnknown() {
+		return
+	}
+	resp.RequiresReplace = instanceTypesChangeRequiresReplace(deployType)
+}
+
+func instanceTypesChangeRequiresReplace(deployType types.String) bool {
+	return !deployType.IsNull() && !deployType.IsUnknown() && strings.EqualFold(deployType.ValueString(), "K8S")
 }
 
 func validateInstanceContract(ctx context.Context, plan *models.KafkaInstanceResourceModel) diag.Diagnostics {

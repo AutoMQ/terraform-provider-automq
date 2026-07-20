@@ -1672,7 +1672,7 @@ func TestImmutableAttributesHaveRequiresReplace_PricingMode(t *testing.T) {
 	}
 }
 
-func TestMutableAttributesDoNotRequireReplace_InstanceTypes(t *testing.T) {
+func TestInstanceTypesRequiresReplaceOnlyForK8S(t *testing.T) {
 	s := getKafkaInstanceResourceSchema(t)
 	computeAttr, ok := s.Attributes["compute_specs"].(schema.SingleNestedAttribute)
 	if !ok {
@@ -1683,8 +1683,23 @@ func TestMutableAttributesDoNotRequireReplace_InstanceTypes(t *testing.T) {
 	if !ok {
 		t.Fatalf("instance_types has unexpected type %T", computeAttr.Attributes["instance_types"])
 	}
-	if hasListRequiresReplace(instanceTypesAttr.PlanModifiers) {
-		t.Fatalf("expected instance_types to allow in-place IAAS updates")
+	if !hasListRequiresReplace(instanceTypesAttr.PlanModifiers) {
+		t.Fatal("expected instance_types to have a conditional replacement modifier")
+	}
+
+	for _, tc := range []struct {
+		deployType      string
+		requiresReplace bool
+	}{
+		{deployType: "IAAS", requiresReplace: false},
+		{deployType: "K8S", requiresReplace: true},
+	} {
+		t.Run(tc.deployType, func(t *testing.T) {
+			got := instanceTypesChangeRequiresReplace(types.StringValue(tc.deployType))
+			if got != tc.requiresReplace {
+				t.Fatalf("instanceTypesChangeRequiresReplace() = %t, want %t", got, tc.requiresReplace)
+			}
+		})
 	}
 }
 

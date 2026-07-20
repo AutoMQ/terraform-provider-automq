@@ -111,7 +111,7 @@ Optional:
 - `dns_zone` (String) DNS zone used when creating custom records. Changing a configured DNS zone requires instance replacement.
 - `file_system_param` (Attributes) File system configuration for FSWAL mode (see [below for nested schema](#nestedatt--compute_specs--file_system_param))
 - `instance_role` (String) IAM role ARN for the Kafka instance. If not specified, the backend will auto-generate an appropriate role. Format: `arn:aws:iam::<account-id>:role/<role-name>`. Changing a configured instance role requires instance replacement.
-- `instance_types` (List of String) Instance type list for the nodes. Maximum 1 entry. Required when `deploy_type` is `K8S`, or when `pricing_mode` is `UsageBased` and `deploy_type` is `IAAS`. Can be updated for `IAAS` deployments.
+- `instance_types` (List of String) Instance type list for the nodes. Maximum 1 entry. Required when `deploy_type` is `K8S`, or when `pricing_mode` is `UsageBased` and `deploy_type` is `IAAS`. Can be updated in place for `IAAS` deployments; changing it for `K8S` deployments requires instance replacement.
 - `kubernetes_cluster_id` (String) Identifier for the target Kubernetes cluster when `deploy_type` is `K8S`. Changing the Kubernetes cluster requires instance replacement.
 - `kubernetes_namespace` (String) Kubernetes namespace for the instance deployment. If not specified, the backend will auto-assign one. Changing a configured namespace requires instance replacement.
 - `kubernetes_node_groups` (Attributes List, Deprecated) Deprecated: Kubernetes node group configuration. Remove this attribute; Kubernetes scheduling is managed using `instance_types` and `schedule_spec`. (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
