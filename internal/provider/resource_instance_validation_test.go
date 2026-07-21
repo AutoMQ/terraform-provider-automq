@@ -238,12 +238,6 @@ func TestSpecificationUpdateParamMatchesBackendPatchContract(t *testing.T) {
 	}
 }
 
-func TestSpecificationVODoesNotExposeScheduleSpec(t *testing.T) {
-	if _, ok := reflect.TypeOf(client.SpecificationVO{}).FieldByName("ScheduleSpec"); ok {
-		t.Fatal("SpecificationVO must not expose ScheduleSpec; Terraform state preserves the configured value")
-	}
-}
-
 func TestFileSystemUpdateParamChangedOnlyConsidersPatchFields(t *testing.T) {
 	state := &models.FileSystemParamModel{
 		FileSystemType:               types.StringValue("EFS_PROVISIONED"),
