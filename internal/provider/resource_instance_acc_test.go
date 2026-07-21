@@ -54,10 +54,13 @@ type accConfig struct {
 }
 
 type accK8SConfig struct {
-	ClusterID      string   `json:"cluster_id"`
-	NodeGroups     []string `json:"node_groups"`
-	Namespace      string   `json:"namespace"`
-	ServiceAccount string   `json:"service_account"`
+	ClusterID           string   `json:"cluster_id"`
+	NodeGroups          []string `json:"node_groups"`
+	InstanceTypes       []string `json:"instance_types"`
+	LoadBalancerSubnets []string `json:"load_balancer_subnets"`
+	ScheduleSpec        string   `json:"schedule_spec"`
+	Namespace           string   `json:"namespace"`
+	ServiceAccount      string   `json:"service_account"`
 }
 
 type accConnectorConfig struct {
@@ -128,6 +131,9 @@ type accInstanceConfig struct {
 	Networks              []accNetwork
 	KubernetesClusterID   string
 	KubernetesNodeGroups  []string
+	InstanceTypes         []string
+	KubernetesLBSubnets   []string
+	ScheduleSpec          string
 	KubernetesNamespace   string
 	KubernetesServiceAcct string
 	InstanceRole          string
@@ -609,6 +615,9 @@ func buildK8SInstanceScenario(env accConfig) accInstanceScenario {
 		Networks:              cloneNetworks(networks),
 		KubernetesClusterID:   env.K8S.ClusterID,
 		KubernetesNodeGroups:  cloneStringSlice(env.K8S.NodeGroups),
+		InstanceTypes:         cloneStringSlice(env.K8S.InstanceTypes),
+		KubernetesLBSubnets:   cloneStringSlice(env.K8S.LoadBalancerSubnets),
+		ScheduleSpec:          env.K8S.ScheduleSpec,
 		KubernetesNamespace:   env.K8S.Namespace,
 		KubernetesServiceAcct: env.K8S.ServiceAccount,
 		WalMode:               "EBSWAL",
@@ -625,6 +634,7 @@ func buildK8SInstanceScenario(env accConfig) accInstanceScenario {
 			Checks: []resource.TestCheckFunc{
 				checkAttr("compute_specs.deploy_type", "K8S"),
 				checkAttr("compute_specs.kubernetes_cluster_id", env.K8S.ClusterID),
+				checkAttr("compute_specs.kubernetes_load_balancer_subnets.#", fmt.Sprintf("%d", len(env.K8S.LoadBalancerSubnets))),
 				checkAttr("compute_specs.kubernetes_node_groups.#", fmt.Sprintf("%d", len(env.K8S.NodeGroups))),
 			},
 		},
@@ -789,6 +799,8 @@ func cloneInstanceConfig(src accInstanceConfig) accInstanceConfig {
 	clone := src
 	clone.Networks = cloneNetworks(src.Networks)
 	clone.KubernetesNodeGroups = cloneStringSlice(src.KubernetesNodeGroups)
+	clone.InstanceTypes = cloneStringSlice(src.InstanceTypes)
+	clone.KubernetesLBSubnets = cloneStringSlice(src.KubernetesLBSubnets)
 	clone.InstanceConfigs = cloneStringMap(src.InstanceConfigs)
 	if src.MetricsExporter != nil {
 		clone.MetricsExporter = cloneMetricsExporter(src.MetricsExporter)
@@ -1007,6 +1019,29 @@ func renderKafkaInstanceConfig(env accConfig, cfg accInstanceConfig) string {
 	}
 	if cfg.KubernetesClusterID != "" {
 		fmt.Fprintf(&b, "    kubernetes_cluster_id = %q\n", cfg.KubernetesClusterID)
+	}
+	if len(cfg.InstanceTypes) > 0 {
+		b.WriteString("    instance_types = [")
+		for i, instanceType := range cfg.InstanceTypes {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(&b, "%q", instanceType)
+		}
+		b.WriteString("]\n")
+	}
+	if len(cfg.KubernetesLBSubnets) > 0 {
+		b.WriteString("    kubernetes_load_balancer_subnets = [")
+		for i, subnet := range cfg.KubernetesLBSubnets {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(&b, "%q", subnet)
+		}
+		b.WriteString("]\n")
+	}
+	if cfg.ScheduleSpec != "" {
+		fmt.Fprintf(&b, "    schedule_spec = %q\n", cfg.ScheduleSpec)
 	}
 	if len(cfg.KubernetesNodeGroups) > 0 {
 		b.WriteString("    kubernetes_node_groups = [\n")

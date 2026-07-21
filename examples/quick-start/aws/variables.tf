@@ -86,6 +86,24 @@ variable "kubernetes_cluster_id" {
   type        = string
 }
 
+variable "instance_types" {
+  description = "Kubernetes instance types"
+  type        = list(string)
+  default     = []
+}
+
+variable "kubernetes_load_balancer_subnets" {
+  description = "Subnet IDs used by the Kubernetes load balancer"
+  type        = list(string)
+  default     = []
+}
+
+variable "schedule_spec" {
+  description = "Kubernetes scheduling specification"
+  type        = string
+  default     = null
+}
+
 variable "kubernetes_node_groups" {
   description = "Kubernetes node group identifiers"
   type = list(object({

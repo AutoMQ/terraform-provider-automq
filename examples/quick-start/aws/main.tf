@@ -31,14 +31,17 @@ resource "automq_kafka_instance" "k8s" {
     reserved_aku = var.reserved_aku
     deploy_type  = var.deploy_type
 
-    networks                   = var.networks
-    dns_zone                   = var.dns_zone
-    data_buckets               = length(var.data_buckets) > 0 ? var.data_buckets : null
-    instance_role              = var.instance_role
-    kubernetes_cluster_id      = local.is_k8s ? var.kubernetes_cluster_id : null
-    kubernetes_node_groups     = local.is_k8s ? var.kubernetes_node_groups : null
-    kubernetes_namespace       = local.is_k8s ? var.kubernetes_namespace : null
-    kubernetes_service_account = local.is_k8s ? var.kubernetes_service_account : null
+    networks                         = var.networks
+    dns_zone                         = var.dns_zone
+    data_buckets                     = length(var.data_buckets) > 0 ? var.data_buckets : null
+    instance_role                    = var.instance_role
+    kubernetes_cluster_id            = local.is_k8s ? var.kubernetes_cluster_id : null
+    instance_types                   = local.is_k8s ? var.instance_types : null
+    kubernetes_load_balancer_subnets = local.is_k8s ? var.kubernetes_load_balancer_subnets : null
+    schedule_spec                    = local.is_k8s ? var.schedule_spec : null
+    kubernetes_node_groups           = local.is_k8s ? var.kubernetes_node_groups : null
+    kubernetes_namespace             = local.is_k8s ? var.kubernetes_namespace : null
+    kubernetes_service_account       = local.is_k8s ? var.kubernetes_service_account : null
   }
 
   features = {

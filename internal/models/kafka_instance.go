@@ -81,6 +81,7 @@ type ComputeSpecsModel struct {
 	KubernetesClusterID   types.String `tfsdk:"kubernetes_cluster_id"`
 	KubernetesNamespace   types.String `tfsdk:"kubernetes_namespace"`
 	KubernetesServiceAcct types.String `tfsdk:"kubernetes_service_account"`
+	KubernetesLBSubnets   types.List   `tfsdk:"kubernetes_load_balancer_subnets"`
 	ScheduleSpec          types.String `tfsdk:"schedule_spec"`
 	InstanceRole          types.String `tfsdk:"instance_role"`
 	DataBuckets           types.List   `tfsdk:"data_buckets"`
@@ -698,6 +699,14 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 			serviceAccount := instance.ComputeSpecs.KubernetesServiceAcct.ValueString()
 			request.Spec.KubernetesServiceAccount = &serviceAccount
 		}
+		if !instance.ComputeSpecs.KubernetesLBSubnets.IsNull() && !instance.ComputeSpecs.KubernetesLBSubnets.IsUnknown() {
+			var subnets []string
+			diags := instance.ComputeSpecs.KubernetesLBSubnets.ElementsAs(ctx, &subnets, false)
+			if diags.HasError() {
+				return fmt.Errorf("failed to parse kubernetes_load_balancer_subnets: %v", diags)
+			}
+			request.Spec.KubernetesLBSubnets = subnets
+		}
 		if !instance.ComputeSpecs.ScheduleSpec.IsNull() && !instance.ComputeSpecs.ScheduleSpec.IsUnknown() {
 			scheduleSpec := instance.ComputeSpecs.ScheduleSpec.ValueString()
 			request.Spec.ScheduleSpec = &scheduleSpec
@@ -1102,6 +1111,7 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 				KubernetesClusterID:   types.StringNull(),
 				KubernetesNamespace:   types.StringNull(),
 				KubernetesServiceAcct: types.StringNull(),
+				KubernetesLBSubnets:   types.ListNull(types.StringType),
 				ScheduleSpec:          types.StringNull(),
 				InstanceRole:          types.StringNull(),
 				FileSystemParam:       types.ObjectNull(FileSystemParamObjectType.AttrTypes),
@@ -1140,6 +1150,17 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 		resource.ComputeSpecs.KubernetesClusterID = coalesceStringAttr(instance.Spec.KubernetesClusterId, prevClusterID)
 		resource.ComputeSpecs.KubernetesNamespace = coalesceStringAttr(instance.Spec.KubernetesNamespace, prevNamespace)
 		resource.ComputeSpecs.KubernetesServiceAcct = coalesceStringAttr(instance.Spec.KubernetesServiceAccount, prevServiceAccount)
+		if len(instance.Spec.KubernetesLBSubnets) > 0 {
+			subnets, subnetDiags := types.ListValueFrom(ctx, types.StringType, instance.Spec.KubernetesLBSubnets)
+			diags.Append(subnetDiags...)
+			if !subnetDiags.HasError() {
+				resource.ComputeSpecs.KubernetesLBSubnets = subnets
+			}
+		} else if previousSpecs != nil {
+			resource.ComputeSpecs.KubernetesLBSubnets = previousSpecs.KubernetesLBSubnets
+		} else {
+			resource.ComputeSpecs.KubernetesLBSubnets = types.ListNull(types.StringType)
+		}
 		if previousSpecs != nil {
 			resource.ComputeSpecs.ScheduleSpec = previousSpecs.ScheduleSpec
 		} else {

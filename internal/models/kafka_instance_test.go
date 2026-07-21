@@ -921,6 +921,36 @@ func TestFlattenKafkaInstanceModelRetainsConfiguredScheduleSpec(t *testing.T) {
 	assert.Equal(t, "nodeSelector:\n  workload: kafka", resource.ComputeSpecs.ScheduleSpec.ValueString())
 }
 
+func TestKafkaInstanceKubernetesLoadBalancerSubnetsMapping(t *testing.T) {
+	configuredSubnets := types.ListValueMust(types.StringType, []attr.Value{
+		types.StringValue("subnet-1"),
+		types.StringValue("subnet-2"),
+	})
+	resource := KafkaInstanceResourceModel{
+		Name:    types.StringValue("test-instance"),
+		Version: types.StringValue("1.0.0"),
+		ComputeSpecs: &ComputeSpecsModel{
+			KubernetesLBSubnets: configuredSubnets,
+		},
+	}
+	request := client.InstanceCreateParam{}
+
+	err := ExpandKafkaInstanceResource(context.Background(), resource, &request)
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"subnet-1", "subnet-2"}, request.Spec.KubernetesLBSubnets)
+
+	instance := &client.InstanceVO{
+		InstanceId: strPtr("test-instance"),
+		Spec: &client.SpecificationVO{
+			KubernetesLBSubnets: []string{"subnet-3"},
+		},
+	}
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, &resource)
+	assert.False(t, diags.HasError())
+	assert.Equal(t, []attr.Value{types.StringValue("subnet-3")}, resource.ComputeSpecs.KubernetesLBSubnets.Elements())
+}
+
 func timePtr(s string) *time.Time {
 	t, _ := time.Parse(time.RFC3339, s)
 	return &t

@@ -10,12 +10,13 @@ func TestInstanceCreateParamMarshalMatchesNewContract(t *testing.T) {
 		Name:    "example",
 		Version: "1.0.0",
 		Spec: SpecificationParam{
-			ReservedAku:  6,
-			ScheduleSpec: stringPtr("nodeSelector: {}"),
-			Provider:     stringPtr("aws"),
-			Region:       stringPtr("us-east-1"),
-			Vpc:          stringPtr("vpc-123"),
-			DataBuckets:  []BucketProfileParam{{BucketName: "data-bucket"}},
+			ReservedAku:         6,
+			KubernetesLBSubnets: []string{"subnet-1"},
+			ScheduleSpec:        stringPtr("nodeSelector: {}"),
+			Provider:            stringPtr("aws"),
+			Region:              stringPtr("us-east-1"),
+			Vpc:                 stringPtr("vpc-123"),
+			DataBuckets:         []BucketProfileParam{{BucketName: "data-bucket"}},
 		},
 		Features: &InstanceFeatureParam{
 			MetricsExporter: &InstanceMetricsExporterParam{
@@ -52,6 +53,9 @@ func TestInstanceCreateParamMarshalMatchesNewContract(t *testing.T) {
 	}
 	if spec["scheduleSpec"] != "nodeSelector: {}" {
 		t.Errorf("expected spec.scheduleSpec to be present, got %v", spec["scheduleSpec"])
+	}
+	if subnets, ok := spec["kubernetesLoadBalancerSubnets"].([]any); !ok || len(subnets) != 1 || subnets[0] != "subnet-1" {
+		t.Errorf("expected spec.kubernetesLoadBalancerSubnets to be present, got %v", spec["kubernetesLoadBalancerSubnets"])
 	}
 
 	for _, key := range []string{"provider", "region", "vpc"} {

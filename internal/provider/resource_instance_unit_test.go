@@ -134,7 +134,7 @@ func TestInstanceContractValidation(t *testing.T) {
 		}
 		diags := validateInstanceContract(context.Background(), &plan)
 		require.True(t, diags.HasError())
-		assert.Len(t, diags.Errors(), 3)
+		assert.Len(t, diags.Errors(), 4)
 	})
 
 	t.Run("usage based iaas requires reserved node count and instance types", func(t *testing.T) {
@@ -711,7 +711,9 @@ func newValidUsageBasedK8SPlan() models.KafkaInstanceResourceModel {
 			ReservedNodeCount:    types.Int64Value(3),
 			InstanceTypes:        types.ListNull(types.StringType),
 			KubernetesClusterID:  types.StringValue("cluster-1"),
+			KubernetesLBSubnets:  mustStringList("subnet-1"),
 			KubernetesNodeGroups: testNodeGroupListForPlan("ng-1"),
+			ScheduleSpec:         types.StringValue("nodeSelector: {}"),
 		},
 		Features: &models.FeaturesModel{
 			WalMode:         types.StringValue("EBSWAL"),

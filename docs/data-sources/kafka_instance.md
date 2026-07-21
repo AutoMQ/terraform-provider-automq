@@ -68,6 +68,7 @@ Read-Only:
 - `instance_role` (String) IAM role ARN for the Kafka instance.
 - `instance_types` (List of String) Instance type list for the nodes.
 - `kubernetes_cluster_id` (String) Identifier for the target Kubernetes cluster.
+- `kubernetes_load_balancer_subnets` (List of String) Subnet IDs used by the Kubernetes load balancer.
 - `kubernetes_namespace` (String) Kubernetes namespace for the instance deployment.
 - `kubernetes_node_groups` (Attributes List) Kubernetes node groups configuration (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
 - `kubernetes_service_account` (String) Kubernetes service account for the instance pods.

@@ -296,6 +296,16 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							stringplanmodifier.UseStateForUnknown(),
 						},
 					},
+					"kubernetes_load_balancer_subnets": schema.ListAttribute{
+						ElementType:         types.StringType,
+						Optional:            true,
+						MarkdownDescription: "Subnet IDs used by the Kubernetes load balancer. Required when `deploy_type` is `K8S`. Changing them requires instance replacement.",
+						Validators: []validator.List{
+							listvalidator.UniqueValues(),
+							listvalidator.SizeAtLeast(1),
+						},
+						PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplace()},
+					},
 					"schedule_spec": schema.StringAttribute{
 						Optional:            true,
 						MarkdownDescription: "Kubernetes scheduling specification. Required when `deploy_type` is `K8S`. Schema-level updates are allowed, but applying a change is currently rejected until backend update support is available.",
@@ -700,6 +710,12 @@ func validateDeployTypeContract(ctx context.Context, plan *models.KafkaInstanceR
 			diagnostics.AddError(
 				"Invalid Configuration",
 				"When compute_specs.deploy_type is K8S, compute_specs.schedule_spec must be provided.",
+			)
+		}
+		if plan.ComputeSpecs.KubernetesLBSubnets.IsNull() {
+			diagnostics.AddError(
+				"Invalid Configuration",
+				"When compute_specs.deploy_type is K8S, compute_specs.kubernetes_load_balancer_subnets must be provided.",
 			)
 		}
 		if !plan.ComputeSpecs.KubernetesNodeGroups.IsNull() && !plan.ComputeSpecs.KubernetesNodeGroups.IsUnknown() {

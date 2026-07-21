@@ -72,6 +72,7 @@ func TestValidateConfigAcceptsUnknownNestedValues(t *testing.T) {
 					Subnets: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
 				}}),
 				KubernetesNodeGroups: types.ListUnknown(models.NodeGroupObjectType),
+				KubernetesLBSubnets:  types.ListNull(types.StringType),
 				FileSystemParam:      types.ObjectUnknown(models.FileSystemParamObjectType.AttrTypes),
 				DataBuckets:          types.ListNull(models.DataBucketObjectType),
 				SecurityGroups:       types.ListNull(types.StringType),
@@ -125,6 +126,7 @@ func TestValidateKafkaInstanceConfiguration_K8SValid(t *testing.T) {
 				types.StringValue("m5.xlarge"),
 			}),
 			KubernetesNodeGroups: testNodeGroupList(t, []models.NodeGroupModel{{ID: types.StringValue("ng-1")}}),
+			KubernetesLBSubnets:  types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
 			ScheduleSpec:         types.StringValue("nodeSelector: {}"),
 			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone: types.StringValue("cn-test-1"),
@@ -214,6 +216,7 @@ func TestSpecificationUpdateParamMatchesBackendPatchContract(t *testing.T) {
 		"KubernetesClusterId",
 		"KubernetesNamespace",
 		"KubernetesServiceAccount",
+		"KubernetesLBSubnets",
 		"InstanceRole",
 		"DataBuckets",
 	}
@@ -1600,6 +1603,7 @@ func TestValidateKafkaInstanceConfiguration_K8SAcceptsInstanceTypesWithoutNodeGr
 			InstanceTypes:        types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.xlarge")}),
 			KubernetesClusterID:  types.StringValue("cluster-1"),
 			KubernetesNodeGroups: types.ListNull(models.NodeGroupObjectType),
+			KubernetesLBSubnets:  types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
 			ScheduleSpec:         types.StringValue("nodeSelector: {}"),
 			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone:    types.StringValue("cn-test-1"),
@@ -1738,6 +1742,14 @@ func TestCreateOnlyComputeAttributesHaveRequiresReplace(t *testing.T) {
 	}
 	if !hasStringRequiresReplace(clusterIDAttr.PlanModifiers) {
 		t.Fatalf("expected kubernetes_cluster_id to require replacement")
+	}
+
+	loadBalancerSubnetsAttr, ok := computeAttr.Attributes["kubernetes_load_balancer_subnets"].(schema.ListAttribute)
+	if !ok {
+		t.Fatalf("kubernetes_load_balancer_subnets has unexpected type %T", computeAttr.Attributes["kubernetes_load_balancer_subnets"])
+	}
+	if !hasListRequiresReplace(loadBalancerSubnetsAttr.PlanModifiers) {
+		t.Fatal("expected kubernetes_load_balancer_subnets to require replacement")
 	}
 }
 
