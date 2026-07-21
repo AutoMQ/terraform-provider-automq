@@ -1126,14 +1126,13 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 			resource.ComputeSpecs.ReservedNodeCount = types.Int64Null()
 		}
 		var prevDeploy, prevDnsZone *types.String
-		var prevClusterID, prevNamespace, prevServiceAccount, prevScheduleSpec, prevInstanceRole *types.String
+		var prevClusterID, prevNamespace, prevServiceAccount, prevInstanceRole *types.String
 		if previousSpecs != nil {
 			prevDeploy = &previousSpecs.DeployType
 			prevDnsZone = &previousSpecs.DnsZone
 			prevClusterID = &previousSpecs.KubernetesClusterID
 			prevNamespace = &previousSpecs.KubernetesNamespace
 			prevServiceAccount = &previousSpecs.KubernetesServiceAcct
-			prevScheduleSpec = &previousSpecs.ScheduleSpec
 			prevInstanceRole = &previousSpecs.InstanceRole
 		}
 		resource.ComputeSpecs.DeployType = coalesceStringAttr(instance.Spec.DeployType, prevDeploy)
@@ -1141,7 +1140,11 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 		resource.ComputeSpecs.KubernetesClusterID = coalesceStringAttr(instance.Spec.KubernetesClusterId, prevClusterID)
 		resource.ComputeSpecs.KubernetesNamespace = coalesceStringAttr(instance.Spec.KubernetesNamespace, prevNamespace)
 		resource.ComputeSpecs.KubernetesServiceAcct = coalesceStringAttr(instance.Spec.KubernetesServiceAccount, prevServiceAccount)
-		resource.ComputeSpecs.ScheduleSpec = coalesceStringAttr(instance.Spec.ScheduleSpec, prevScheduleSpec)
+		if previousSpecs != nil {
+			resource.ComputeSpecs.ScheduleSpec = previousSpecs.ScheduleSpec
+		} else {
+			resource.ComputeSpecs.ScheduleSpec = types.StringNull()
+		}
 		resource.ComputeSpecs.InstanceRole = coalesceStringAttr(instance.Spec.InstanceRole, prevInstanceRole)
 		// Instance Types (from NodeConfig)
 		shouldRetainInstanceTypes := strings.EqualFold(resource.ComputeSpecs.DeployType.ValueString(), "K8S") ||

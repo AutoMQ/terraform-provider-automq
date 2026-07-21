@@ -901,6 +901,26 @@ func testFlattenKafkaInstanceModelRetainsInstanceTypesForUsageBasedK8S(t *testin
 	assert.False(t, resource.ComputeSpecs.InstanceTypes.IsNull())
 }
 
+func TestFlattenKafkaInstanceModelRetainsConfiguredScheduleSpec(t *testing.T) {
+	deployType := "K8S"
+	resource := &KafkaInstanceResourceModel{
+		ComputeSpecs: &ComputeSpecsModel{
+			ScheduleSpec: types.StringValue("nodeSelector:\n  workload: kafka"),
+		},
+	}
+	instance := &client.InstanceVO{
+		InstanceId: strPtr("test-instance"),
+		Spec: &client.SpecificationVO{
+			DeployType: &deployType,
+		},
+	}
+
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+
+	assert.False(t, diags.HasError())
+	assert.Equal(t, "nodeSelector:\n  workload: kafka", resource.ComputeSpecs.ScheduleSpec.ValueString())
+}
+
 func timePtr(s string) *time.Time {
 	t, _ := time.Parse(time.RFC3339, s)
 	return &t
