@@ -298,10 +298,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					},
 					"schedule_spec": schema.StringAttribute{
 						Optional:            true,
-						MarkdownDescription: "Kubernetes scheduling specification. Required when `deploy_type` is `K8S`. Changing it requires instance replacement.",
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.RequiresReplace(),
-						},
+						MarkdownDescription: "Kubernetes scheduling specification. Required when `deploy_type` is `K8S`. Schema-level updates are allowed, but applying a change is currently rejected until backend update support is available.",
 					},
 					"instance_role": schema.StringAttribute{
 						Computed:            true,
@@ -1188,6 +1185,13 @@ type instanceUpdatePlan struct {
 
 func validateInstanceUpdateContract(ctx context.Context, instanceId string, plan, state models.KafkaInstanceResourceModel) diag.Diagnostics {
 	diags := diag.Diagnostics{}
+	if plan.ComputeSpecs != nil && state.ComputeSpecs != nil && !stringAttrEqual(plan.ComputeSpecs.ScheduleSpec, state.ComputeSpecs.ScheduleSpec) {
+		diags.AddError(
+			"Schedule Spec Update Error",
+			fmt.Sprintf("Error occurred while updating Kafka Instance %q. compute_specs.schedule_spec cannot currently be updated. Keep its existing value until schedule spec updates are supported.", instanceId),
+		)
+		return diags
+	}
 	if plan.Features != nil && state.Features != nil {
 		stateTableTopic, stateTopicDiags := models.TableTopicObjectToModel(ctx, state.Features.TableTopic)
 		diags.Append(stateTopicDiags...)

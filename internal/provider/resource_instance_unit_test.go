@@ -223,6 +223,19 @@ func TestInstanceContractValidation(t *testing.T) {
 }
 
 func TestInstanceUpdateContractValidation(t *testing.T) {
+	t.Run("schedule spec change is rejected", func(t *testing.T) {
+		plan := newValidUsageBasedK8SPlan()
+		state := newValidUsageBasedK8SPlan()
+		plan.ComputeSpecs.ScheduleSpec = types.StringValue("nodeSelector: {workload: new}")
+		state.ComputeSpecs.ScheduleSpec = types.StringValue("nodeSelector: {workload: old}")
+
+		diags := testValidateInstanceUpdateContract(plan, state)
+
+		require.True(t, diags.HasError())
+		assert.Equal(t, "Schedule Spec Update Error", diags.Errors()[0].Summary())
+		assert.Contains(t, diags.Errors()[0].Detail(), "cannot currently be updated")
+	})
+
 	t.Run("removing instance config key is rejected", func(t *testing.T) {
 		plan := newConfigOnlyPlan(map[string]string{"b": "2"})
 		state := newConfigOnlyPlan(map[string]string{"a": "1", "b": "2"})

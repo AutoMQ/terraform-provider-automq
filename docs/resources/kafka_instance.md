@@ -119,7 +119,7 @@ Optional:
 - `pricing_mode` (String) Pricing mode for the instance. Supported values: `UsageBased` (pay-as-you-go based on actual usage, requires `reserved_node_count`), `SubscriptionBased` (subscription-based pricing, requires `reserved_aku`). Defaults to `SubscriptionBased`. Changes to pricing mode require instance replacement.
 - `reserved_aku` (Number) AKU (AutoMQ Kafka Unit) defines the cluster scale. Each AKU provides up to 30 MiB/s write or 60 MiB/s read throughput. Minimum value is 3; maximum depends on your license quota. Required when `pricing_mode` is `SubscriptionBased`. For sizing guidance, refer to the [billing documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints).
 - `reserved_node_count` (Number) Number of reserved nodes for the instance. Valid range is 3 to 100. Required when `pricing_mode` is `UsageBased`.
-- `schedule_spec` (String) Kubernetes scheduling specification. Required when `deploy_type` is `K8S`. Changing it requires instance replacement.
+- `schedule_spec` (String) Kubernetes scheduling specification. Required when `deploy_type` is `K8S`. Schema-level updates are allowed, but applying a change is currently rejected until backend update support is available.
 - `security_groups` (List of String) Security groups for the instance. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group. Changing configured security groups requires instance replacement.
 
 <a id="nestedatt--compute_specs--networks"></a>

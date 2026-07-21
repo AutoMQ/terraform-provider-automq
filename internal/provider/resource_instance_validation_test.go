@@ -584,6 +584,14 @@ func TestImmutableAttributesHaveRequiresReplace(t *testing.T) {
 		t.Fatalf("expected instance_role to require replacement, modifiers: %v", instanceRoleAttr.PlanModifiers)
 	}
 	requireConfiguredOnlyStringReplacement(t, instanceRoleAttr.PlanModifiers)
+
+	scheduleSpecAttr, ok := computeAttr.Attributes["schedule_spec"].(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("schedule_spec attribute has unexpected type %T", computeAttr.Attributes["schedule_spec"])
+	}
+	if hasStringRequiresReplace(scheduleSpecAttr.PlanModifiers) {
+		t.Fatalf("schedule_spec must allow an update plan so update validation can reject it explicitly")
+	}
 }
 
 func TestGeneratedStringAttributesOnlyReplaceWhenConfigured(t *testing.T) {
