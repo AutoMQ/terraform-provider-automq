@@ -127,7 +127,7 @@ func TestValidateKafkaInstanceConfiguration_K8SValid(t *testing.T) {
 			}),
 			KubernetesNodeGroups: testNodeGroupList(t, []models.NodeGroupModel{{ID: types.StringValue("ng-1")}}),
 			KubernetesLBSubnets:  types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
-			ScheduleSpec:         types.StringValue("nodeSelector: {}"),
+			ScheduleSpec:         types.StringNull(),
 			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone: types.StringValue("cn-test-1"),
 				Subnets: types.ListValueMust(types.StringType, []attr.Value{
@@ -141,6 +141,66 @@ func TestValidateKafkaInstanceConfiguration_K8SValid(t *testing.T) {
 	diags := validateInstanceContract(context.Background(), plan)
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
+func TestValidateKafkaInstanceConfiguration_K8SAcceptsUnknownNodeGroupID(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			ReservedAku:         types.Int64Value(6),
+			DeployType:          types.StringValue("K8S"),
+			KubernetesClusterID: types.StringValue("cluster-1"),
+			InstanceTypes: types.ListValueMust(types.StringType, []attr.Value{
+				types.StringValue("m5.xlarge"),
+			}),
+			KubernetesNodeGroups: testNodeGroupList(t, []models.NodeGroupModel{{ID: types.StringUnknown()}}),
+			KubernetesLBSubnets:  types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
+			ScheduleSpec:         types.StringNull(),
+			Networks: testNetworkList(t, []models.NetworkModel{{
+				Zone:    types.StringValue("cn-test-1"),
+				Subnets: types.ListNull(types.StringType),
+			}}),
+		},
+		Features: &models.FeaturesModel{WalMode: types.StringValue("EBSWAL")},
+	}
+
+	diags := validateInstanceContract(context.Background(), plan)
+	if diags.HasError() {
+		t.Fatalf("unknown node group ID should be deferred until apply: %v", diags)
+	}
+}
+
+func TestValidateKafkaInstanceConfiguration_K8SWithoutNodeGroupsRequiresScheduleSpec(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			ReservedAku:          types.Int64Value(6),
+			DeployType:           types.StringValue("K8S"),
+			KubernetesClusterID:  types.StringValue("cluster-1"),
+			InstanceTypes:        types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.xlarge")}),
+			KubernetesNodeGroups: types.ListNull(models.NodeGroupObjectType),
+			KubernetesLBSubnets:  types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
+			ScheduleSpec:         types.StringNull(),
+			Networks: testNetworkList(t, []models.NetworkModel{{
+				Zone:    types.StringValue("cn-test-1"),
+				Subnets: types.ListNull(types.StringType),
+			}}),
+		},
+		Features: &models.FeaturesModel{WalMode: types.StringValue("EBSWAL")},
+	}
+
+	diags := validateInstanceContract(context.Background(), plan)
+	if !diags.HasError() {
+		t.Fatal("expected diagnostics when schedule_spec and kubernetes_node_groups are both omitted")
+	}
+	found := false
+	for _, d := range diags {
+		if strings.Contains(d.Detail(), "schedule_spec") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected error mentioning schedule_spec, got: %v", diags)
 	}
 }
 

@@ -308,7 +308,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					},
 					"schedule_spec": schema.StringAttribute{
 						Optional:            true,
-						MarkdownDescription: "Kubernetes scheduling specification. Required when `deploy_type` is `K8S`. Schema-level updates are allowed, but applying a change is currently rejected until backend update support is available.",
+						MarkdownDescription: "Kubernetes scheduling specification. Required when `deploy_type` is `K8S` and `kubernetes_node_groups` is omitted. Schema-level updates are allowed, but applying a change is currently rejected until backend update support is available.",
 					},
 					"instance_role": schema.StringAttribute{
 						Computed:            true,
@@ -706,28 +706,32 @@ func validateDeployTypeContract(ctx context.Context, plan *models.KafkaInstanceR
 				"When compute_specs.deploy_type is K8S, compute_specs.instance_types must be provided.",
 			)
 		}
-		if _, ok := knownStringValue(plan.ComputeSpecs.ScheduleSpec); !ok && !plan.ComputeSpecs.ScheduleSpec.IsUnknown() {
-			diagnostics.AddError(
-				"Invalid Configuration",
-				"When compute_specs.deploy_type is K8S, compute_specs.schedule_spec must be provided.",
-			)
-		}
 		if plan.ComputeSpecs.KubernetesLBSubnets.IsNull() {
 			diagnostics.AddError(
 				"Invalid Configuration",
 				"When compute_specs.deploy_type is K8S, compute_specs.kubernetes_load_balancer_subnets must be provided.",
 			)
 		}
+		hasNodeGroups := false
 		if !plan.ComputeSpecs.KubernetesNodeGroups.IsNull() && !plan.ComputeSpecs.KubernetesNodeGroups.IsUnknown() {
 			nodeGroups, nodeGroupDiags := models.NodeGroupListToModels(ctx, plan.ComputeSpecs.KubernetesNodeGroups)
 			diagnostics.Append(nodeGroupDiags...)
+			hasNodeGroups = len(nodeGroups) > 0
 			for i, ng := range nodeGroups {
-				if !isStringValueSet(ng.ID) {
+				if !ng.ID.IsUnknown() && !isStringValueSet(ng.ID) {
 					diagnostics.AddError(
 						"Invalid Configuration",
 						fmt.Sprintf("compute_specs.kubernetes_node_groups[%d].id must be provided when deploy_type is K8S.", i),
 					)
 				}
+			}
+		}
+		if !hasNodeGroups && !plan.ComputeSpecs.KubernetesNodeGroups.IsUnknown() {
+			if _, ok := knownStringValue(plan.ComputeSpecs.ScheduleSpec); !ok && !plan.ComputeSpecs.ScheduleSpec.IsUnknown() {
+				diagnostics.AddError(
+					"Invalid Configuration",
+					"When compute_specs.deploy_type is K8S and compute_specs.kubernetes_node_groups is omitted, compute_specs.schedule_spec must be provided.",
+				)
 			}
 		}
 
