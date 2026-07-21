@@ -81,7 +81,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 					"instance_types": schema.ListAttribute{
 						ElementType:         types.StringType,
 						Computed:            true,
-						MarkdownDescription: "Instance type list for the nodes. Only available when `deploy_type` is `IAAS`; not returned for `K8S` deployments.",
+						MarkdownDescription: "Instance type list for the nodes.",
 					},
 					"deploy_type": schema.StringAttribute{
 						Computed:            true,
@@ -91,6 +91,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 					"kubernetes_cluster_id":      schema.StringAttribute{Computed: true, MarkdownDescription: "Identifier for the target Kubernetes cluster."},
 					"kubernetes_namespace":       schema.StringAttribute{Computed: true, MarkdownDescription: "Kubernetes namespace for the instance deployment."},
 					"kubernetes_service_account": schema.StringAttribute{Computed: true, MarkdownDescription: "Kubernetes service account for the instance pods."},
+					"schedule_spec":              schema.StringAttribute{Computed: true, MarkdownDescription: "Kubernetes scheduling specification. This value is not populated from API responses."},
 					"instance_role":              schema.StringAttribute{Computed: true, MarkdownDescription: "IAM role ARN for the Kafka instance."},
 					"networks": schema.ListNestedAttribute{
 						Computed:            true,
