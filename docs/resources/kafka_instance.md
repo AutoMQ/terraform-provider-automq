@@ -4,7 +4,7 @@ page_title: "automq_kafka_instance Resource - automq"
 subcategory: ""
 description: |-
   Using the automq_kafka_instance resource type, you can create and manage Kafka instances, where each instance represents a physical cluster.
-  Note: This provider version is only compatible with AutoMQ control plane versions 8.0 and later.
+  Note: This provider version is only compatible with AutoMQ control plane versions 8.0 and later. K8S scheduling with instance_types, kubernetes_load_balancer_subnets, and schedule_spec requires control plane version 8.3.6 or later.
 ---
 
 # automq_kafka_instance
@@ -13,7 +13,7 @@ description: |-
 
 Using the `automq_kafka_instance` resource type, you can create and manage Kafka instances, where each instance represents a physical cluster.
 
-> **Note**: This provider version is only compatible with AutoMQ control plane versions 8.0 and later.
+> **Note**: This provider version is only compatible with AutoMQ control plane versions 8.0 and later. K8S scheduling with `instance_types`, `kubernetes_load_balancer_subnets`, and `schedule_spec` requires control plane version 8.3.6 or later.
 
 ## Example Usage
 
@@ -115,7 +115,7 @@ Optional:
 - `kubernetes_cluster_id` (String) Identifier for the target Kubernetes cluster when `deploy_type` is `K8S`. Changing the Kubernetes cluster requires instance replacement.
 - `kubernetes_load_balancer_subnets` (List of String) Subnet IDs used by the Kubernetes load balancer. Required when `deploy_type` is `K8S`. Changing them requires instance replacement.
 - `kubernetes_namespace` (String) Kubernetes namespace for the instance deployment. If not specified, the backend will auto-assign one. Changing a configured namespace requires instance replacement.
-- `kubernetes_node_groups` (Attributes List, Deprecated) Deprecated: Kubernetes node group configuration. Remove this attribute; Kubernetes scheduling is managed using `instance_types` and `schedule_spec`. (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
+- `kubernetes_node_groups` (Attributes List, Deprecated) Deprecated Kubernetes node group configuration. Keep this attribute in existing configurations to avoid instance replacement; use `instance_types` and `schedule_spec` for new K8S instances. (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
 - `kubernetes_service_account` (String) Kubernetes service account for the instance pods. If not specified, the backend will auto-assign one. Changing a configured service account requires instance replacement.
 - `pricing_mode` (String) Pricing mode for the instance. Supported values: `UsageBased` (pay-as-you-go based on actual usage, requires `reserved_node_count`), `SubscriptionBased` (subscription-based pricing, requires `reserved_aku`). Defaults to `SubscriptionBased`. Changes to pricing mode require instance replacement.
 - `reserved_aku` (Number) AKU (AutoMQ Kafka Unit) defines the cluster scale. Each AKU provides up to 30 MiB/s write or 60 MiB/s read throughput. Minimum value is 3; maximum depends on your license quota. Required when `pricing_mode` is `SubscriptionBased`. For sizing guidance, refer to the [billing documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints).

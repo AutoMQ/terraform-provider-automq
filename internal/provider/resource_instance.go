@@ -101,7 +101,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 		// This description is used by the documentation generator and the language server.
 		MarkdownDescription: "![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)\n\n" +
 			"Using the `automq_kafka_instance` resource type, you can create and manage Kafka instances, where each instance represents a physical cluster.\n\n" +
-			"> **Note**: This provider version is only compatible with AutoMQ control plane versions 8.0 and later.",
+			"> **Note**: This provider version is only compatible with AutoMQ control plane versions 8.0 and later. K8S scheduling with `instance_types`, `kubernetes_load_balancer_subnets`, and `schedule_spec` requires control plane version 8.3.6 or later.",
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
@@ -234,8 +234,8 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					},
 					"kubernetes_node_groups": schema.ListNestedAttribute{
 						Optional:            true,
-						DeprecationMessage:  "compute_specs.kubernetes_node_groups is deprecated and will be removed in a future release. Remove this configuration; Kubernetes scheduling is managed using compute_specs.instance_types and compute_specs.schedule_spec.",
-						MarkdownDescription: "Deprecated: Kubernetes node group configuration. Remove this attribute; Kubernetes scheduling is managed using `instance_types` and `schedule_spec`.",
+						DeprecationMessage:  "compute_specs.kubernetes_node_groups is deprecated and will be removed in a future release. Keep it in existing configurations to avoid instance replacement; use compute_specs.instance_types and compute_specs.schedule_spec for new K8S instances.",
+						MarkdownDescription: "Deprecated Kubernetes node group configuration. Keep this attribute in existing configurations to avoid instance replacement; use `instance_types` and `schedule_spec` for new K8S instances.",
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id": schema.StringAttribute{
