@@ -234,8 +234,8 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					},
 					"kubernetes_node_groups": schema.ListNestedAttribute{
 						Optional:            true,
-						DeprecationMessage:  "compute_specs.kubernetes_node_groups is deprecated and will be removed in a future release. Keep it in existing configurations to avoid instance replacement; use compute_specs.instance_types and compute_specs.schedule_spec for new K8S instances.",
-						MarkdownDescription: "Deprecated Kubernetes node group configuration. Keep this attribute in existing configurations to avoid instance replacement; use `instance_types` and `schedule_spec` for new K8S instances.",
+						DeprecationMessage:  "compute_specs.kubernetes_node_groups is deprecated and will be removed in a future release. Removing it from an existing configuration requires instance replacement; use compute_specs.instance_types and compute_specs.schedule_spec for new K8S instances.",
+						MarkdownDescription: "Deprecated Kubernetes node group configuration. Removing this attribute from an existing configuration requires instance replacement; use `instance_types` and `schedule_spec` for new K8S instances.",
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id": schema.StringAttribute{
@@ -308,7 +308,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					},
 					"schedule_spec": schema.StringAttribute{
 						Optional:            true,
-						MarkdownDescription: "Kubernetes scheduling specification. Required when `deploy_type` is `K8S` and `kubernetes_node_groups` is omitted. Schema-level updates are allowed, but applying a change is currently rejected until backend update support is available.",
+						MarkdownDescription: "Kubernetes scheduling specification. Required when `deploy_type` is `K8S` and `kubernetes_node_groups` is omitted. Updates are not currently supported and will be rejected.",
 					},
 					"instance_role": schema.StringAttribute{
 						Computed:            true,

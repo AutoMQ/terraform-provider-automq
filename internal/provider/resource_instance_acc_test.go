@@ -663,10 +663,14 @@ func buildK8SInstanceScenario(env accConfig) accInstanceScenario {
 			Checks: []resource.TestCheckFunc{
 				checkAttr("compute_specs.deploy_type", "K8S"),
 				checkAttr("compute_specs.kubernetes_cluster_id", env.K8S.ClusterID),
+				checkAttr("compute_specs.instance_types.#", fmt.Sprintf("%d", len(env.K8S.InstanceTypes))),
 				checkAttr("compute_specs.kubernetes_load_balancer_subnets.#", fmt.Sprintf("%d", len(env.K8S.LoadBalancerSubnets))),
 				checkAttr("compute_specs.kubernetes_node_groups.#", fmt.Sprintf("%d", len(env.K8S.NodeGroups))),
 			},
 		},
+	}
+	if env.K8S.ScheduleSpec != "" {
+		steps[0].Checks = append(steps[0].Checks, checkAttr("compute_specs.schedule_spec", env.K8S.ScheduleSpec))
 	}
 
 	current := cloneInstanceConfig(base)
