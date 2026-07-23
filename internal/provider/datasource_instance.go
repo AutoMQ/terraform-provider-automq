@@ -33,12 +33,11 @@ func (r *KafkaInstanceDataSource) Metadata(ctx context.Context, req datasource.M
 func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)\n\n" +
-			"Using the `automq_kafka_instance` data source, you can manage kafka resoure within instance.\n\n" +
-			"> **Note**: This provider version is only compatible with AutoMQ control plane versions 8.0 and later. K8S scheduling with `instance_types`, `kubernetes_load_balancer_subnets`, and `schedule_spec` requires control plane version 8.3.6 or later.",
+			"Use the `automq_kafka_instance` data source to read an existing Kafka instance from an AutoMQ BYOC environment.",
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
-				MarkdownDescription: "Target AutoMQ BYOC environment identifier (e.g. `env-xxxxx`). Find this on the AutoMQ console System Settings page.",
+				MarkdownDescription: "Target AutoMQ BYOC environment identifier (for example, `env-xxxxx`). The environment determines the cloud provider and region. Find the ID on the AutoMQ console System Settings page.",
 				Required:            true,
 			},
 			"id": schema.StringAttribute{
@@ -85,7 +84,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 					},
 					"deploy_type": schema.StringAttribute{
 						Computed:            true,
-						MarkdownDescription: "Deployment platform for the instance.",
+						MarkdownDescription: "Deployment platform for the instance. Availability depends on the target environment's cloud provider and Control Plane version.",
 					},
 					"dns_zone":                         schema.StringAttribute{Computed: true, MarkdownDescription: "DNS zone used when creating custom records."},
 					"kubernetes_cluster_id":            schema.StringAttribute{Computed: true, MarkdownDescription: "Identifier for the target Kubernetes cluster."},
@@ -93,7 +92,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 					"kubernetes_service_account":       schema.StringAttribute{Computed: true, MarkdownDescription: "Kubernetes service account for the instance pods."},
 					"kubernetes_load_balancer_subnets": schema.ListAttribute{Computed: true, ElementType: types.StringType, MarkdownDescription: "Subnet IDs used by the Kubernetes load balancer."},
 					"schedule_spec":                    schema.StringAttribute{Computed: true, MarkdownDescription: "Kubernetes scheduling specification. This value is not populated from API responses."},
-					"instance_role":                    schema.StringAttribute{Computed: true, MarkdownDescription: "IAM role ARN for the Kafka instance."},
+					"instance_role":                    schema.StringAttribute{Computed: true, MarkdownDescription: "Data Plane cloud identity used by the Kafka instance, such as an AWS IAM Role ARN or GCP GSA full resource name."},
 					"networks": schema.ListNestedAttribute{
 						Computed:            true,
 						MarkdownDescription: "To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones.",
@@ -101,7 +100,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 							Attributes: map[string]schema.Attribute{
 								"zone": schema.StringAttribute{
 									Computed:            true,
-									MarkdownDescription: "Cloud provider availability zone ID (e.g. `us-east-1a` for AWS).",
+									MarkdownDescription: "Cloud provider availability zone ID (for example, `us-east-1a` on AWS or `us-central1-a` on GCP).",
 								},
 								"subnets": schema.ListAttribute{
 									Computed:            true,
@@ -135,11 +134,11 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 					"security_groups": schema.ListAttribute{
 						ElementType:         types.StringType,
 						Computed:            true,
-						MarkdownDescription: "Security groups for the instance",
+						MarkdownDescription: "AWS security groups for the instance. This field does not apply to GCP environments.",
 					},
 					"file_system_param": schema.SingleNestedAttribute{
 						Computed:            true,
-						MarkdownDescription: "File system configuration for FSWAL mode",
+						MarkdownDescription: "AWS `IAAS` file system configuration for `FSWAL` mode.",
 						Attributes: map[string]schema.Attribute{
 							"file_system_type": schema.StringAttribute{
 								Computed:            true,
@@ -156,7 +155,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 							"security_groups": schema.ListAttribute{
 								ElementType:         types.StringType,
 								Computed:            true,
-								MarkdownDescription: "Security groups for file systems",
+								MarkdownDescription: "AWS security groups for file systems.",
 							},
 						},
 					},
@@ -168,7 +167,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 				Attributes: map[string]schema.Attribute{
 					"wal_mode": schema.StringAttribute{
 						Computed:            true,
-						MarkdownDescription: "Write-Ahead Logging mode: EBSWAL (using EBS as write buffer), S3WAL (using object storage as write buffer), or FSWAL (using file system as write buffer). Defaults to EBSWAL.",
+						MarkdownDescription: "Write-Ahead Log storage mode. `EBSWAL` uses block storage, `S3WAL` uses object storage, and `FSWAL` is available only for AWS `IAAS` file-system deployments.",
 					},
 					"instance_configs": schema.MapAttribute{
 						ElementType:         types.StringType,

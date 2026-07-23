@@ -56,6 +56,7 @@ func (p *AutoMQProvider) Metadata(ctx context.Context, req provider.MetadataRequ
 
 func (p *AutoMQProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		MarkdownDescription: "Configures access to an existing AutoMQ BYOC environment through its Control Plane API.",
 		Attributes: map[string]schema.Attribute{
 			"automq_byoc_access_key_id": schema.StringAttribute{
 				MarkdownDescription: "Set the Access Key Id of Service Account. You can create and manage Access Keys by using the AutoMQ Cloud BYOC Console. Learn more about AutoMQ Cloud BYOC Console access [here](https://docs.automq.com/automq-cloud/manage-identities-and-access/service-accounts).",
@@ -68,7 +69,7 @@ func (p *AutoMQProvider) Schema(ctx context.Context, req provider.SchemaRequest,
 				Sensitive:           true,
 			},
 			"automq_byoc_endpoint": schema.StringAttribute{
-				MarkdownDescription: "Set the AutoMQ BYOC environment endpoint. The endpoint looks like http://{hostname}:8080. You can get this endpoint when deploy environment complete.",
+				MarkdownDescription: "Control Plane API endpoint for the installed AutoMQ BYOC environment. Obtain this endpoint after the environment installation completes.",
 				Optional:            true,
 			},
 		},

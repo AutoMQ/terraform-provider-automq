@@ -1,7 +1,8 @@
 terraform {
   required_providers {
     automq = {
-      source = "automq/automq"
+      source  = "automq/automq"
+      version = "~> 0.4.4"
     }
     tls = {
       source  = "hashicorp/tls"

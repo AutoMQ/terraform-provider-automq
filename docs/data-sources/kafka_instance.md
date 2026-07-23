@@ -3,17 +3,14 @@
 page_title: "automq_kafka_instance Data Source - automq"
 subcategory: ""
 description: |-
-  Using the automq_kafka_instance data source, you can manage kafka resoure within instance.
-  Note: This provider version is only compatible with AutoMQ control plane versions 8.0 and later. K8S scheduling with instance_types, kubernetes_load_balancer_subnets, and schedule_spec requires control plane version 8.3.6 or later.
+  Use the automq_kafka_instance data source to read an existing Kafka instance from an AutoMQ BYOC environment.
 ---
 
 # automq_kafka_instance (Data Source)
 
 ![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)
 
-Using the `automq_kafka_instance` data source, you can manage kafka resoure within instance.
-
-> **Note**: This provider version is only compatible with AutoMQ control plane versions 8.0 and later. K8S scheduling with `instance_types`, `kubernetes_load_balancer_subnets`, and `schedule_spec` requires control plane version 8.3.6 or later.
+Use the `automq_kafka_instance` data source to read an existing Kafka instance from an AutoMQ BYOC environment.
 
 ## Example Usage
 
@@ -37,7 +34,7 @@ output "example-id" {
 
 ### Required
 
-- `environment_id` (String) Target AutoMQ BYOC environment identifier (e.g. `env-xxxxx`). Find this on the AutoMQ console System Settings page.
+- `environment_id` (String) Target AutoMQ BYOC environment identifier (for example, `env-xxxxx`). The environment determines the cloud provider and region. Find the ID on the AutoMQ console System Settings page.
 
 ### Optional
 
@@ -62,10 +59,10 @@ output "example-id" {
 Read-Only:
 
 - `data_buckets` (Attributes List) Inline bucket configuration replacing legacy bucket profiles. (see [below for nested schema](#nestedatt--compute_specs--data_buckets))
-- `deploy_type` (String) Deployment platform for the instance.
+- `deploy_type` (String) Deployment platform for the instance. Availability depends on the target environment's cloud provider and Control Plane version.
 - `dns_zone` (String) DNS zone used when creating custom records.
-- `file_system_param` (Attributes) File system configuration for FSWAL mode (see [below for nested schema](#nestedatt--compute_specs--file_system_param))
-- `instance_role` (String) IAM role ARN for the Kafka instance.
+- `file_system_param` (Attributes) AWS `IAAS` file system configuration for `FSWAL` mode. (see [below for nested schema](#nestedatt--compute_specs--file_system_param))
+- `instance_role` (String) Data Plane cloud identity used by the Kafka instance, such as an AWS IAM Role ARN or GCP GSA full resource name.
 - `instance_types` (List of String) Instance type list for the nodes.
 - `kubernetes_cluster_id` (String) Identifier for the target Kubernetes cluster.
 - `kubernetes_load_balancer_subnets` (List of String) Subnet IDs used by the Kubernetes load balancer.
@@ -77,7 +74,7 @@ Read-Only:
 - `reserved_aku` (Number) AKU (AutoMQ Kafka Unit) defines the cluster scale. Each AKU provides up to 30 MiB/s write or 60 MiB/s read throughput. For sizing guidance, refer to the [billing documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints).
 - `reserved_node_count` (Number) Number of reserved nodes for the instance.
 - `schedule_spec` (String) Kubernetes scheduling specification. This value is not populated from API responses.
-- `security_groups` (List of String) Security groups for the instance
+- `security_groups` (List of String) AWS security groups for the instance. This field does not apply to GCP environments.
 
 <a id="nestedatt--compute_specs--data_buckets"></a>
 ### Nested Schema for `compute_specs.data_buckets`
@@ -94,7 +91,7 @@ Read-Only:
 
 - `file_system_count` (Number) Number of file systems
 - `file_system_type` (String) File system type. Supported values: EFS_PROVISIONED (Amazon Elastic File System), ONTAP_V2 (Amazon FSx for NetApp ONTAP). EFS offers superior elasticity and lower costs for small-scale deployments; FSx for NetApp ONTAP features lower write latency and a more favorable cost advantage at large scales.
-- `security_groups` (List of String) Security groups for file systems
+- `security_groups` (List of String) AWS security groups for file systems.
 - `throughput_mibps_per_file_system` (Number) Throughput in MiBps per file system
 
 
@@ -112,7 +109,7 @@ Read-Only:
 Read-Only:
 
 - `subnets` (List of String) Specify the subnet under the corresponding availability zone for deploying the instance. Currently, only one subnet can be set for each availability zone.
-- `zone` (String) Cloud provider availability zone ID (e.g. `us-east-1a` for AWS).
+- `zone` (String) Cloud provider availability zone ID (for example, `us-east-1a` on AWS or `us-central1-a` on GCP).
 
 
 
@@ -138,7 +135,7 @@ Read-Only:
 - `schema_registry_enabled` (Boolean) Whether Schema Registry is enabled for this Kafka instance.
 - `security` (Attributes) Security configuration for the Kafka instance. (see [below for nested schema](#nestedatt--features--security))
 - `table_topic` (Attributes) Table topic configuration (warehouse/catalog settings). (see [below for nested schema](#nestedatt--features--table_topic))
-- `wal_mode` (String) Write-Ahead Logging mode: EBSWAL (using EBS as write buffer), S3WAL (using object storage as write buffer), or FSWAL (using file system as write buffer). Defaults to EBSWAL.
+- `wal_mode` (String) Write-Ahead Log storage mode. `EBSWAL` uses block storage, `S3WAL` uses object storage, and `FSWAL` is available only for AWS `IAAS` file-system deployments.
 
 <a id="nestedatt--features--metrics_exporter"></a>
 ### Nested Schema for `features.metrics_exporter`
