@@ -72,6 +72,7 @@ func TestValidateConfigAcceptsUnknownNestedValues(t *testing.T) {
 					Subnets: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
 				}}),
 				KubernetesNodeGroups: types.ListUnknown(models.NodeGroupObjectType),
+				KubernetesLBSubnets:  types.ListNull(types.StringType),
 				FileSystemParam:      types.ObjectUnknown(models.FileSystemParamObjectType.AttrTypes),
 				DataBuckets:          types.ListNull(models.DataBucketObjectType),
 				SecurityGroups:       types.ListNull(types.StringType),
@@ -118,10 +119,15 @@ func TestValidateConfigAcceptsUnknownNestedValues(t *testing.T) {
 func TestValidateKafkaInstanceConfiguration_K8SValid(t *testing.T) {
 	plan := &models.KafkaInstanceResourceModel{
 		ComputeSpecs: &models.ComputeSpecsModel{
-			ReservedAku:          types.Int64Value(6),
-			DeployType:           types.StringValue("K8S"),
-			KubernetesClusterID:  types.StringValue("cluster-1"),
+			ReservedAku:         types.Int64Value(6),
+			DeployType:          types.StringValue("K8S"),
+			KubernetesClusterID: types.StringValue("cluster-1"),
+			InstanceTypes: types.ListValueMust(types.StringType, []attr.Value{
+				types.StringValue("m5.xlarge"),
+			}),
 			KubernetesNodeGroups: testNodeGroupList(t, []models.NodeGroupModel{{ID: types.StringValue("ng-1")}}),
+			KubernetesLBSubnets:  types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
+			ScheduleSpec:         types.StringNull(),
 			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone: types.StringValue("cn-test-1"),
 				Subnets: types.ListValueMust(types.StringType, []attr.Value{
@@ -135,6 +141,66 @@ func TestValidateKafkaInstanceConfiguration_K8SValid(t *testing.T) {
 	diags := validateInstanceContract(context.Background(), plan)
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
+func TestValidateKafkaInstanceConfiguration_K8SAcceptsUnknownNodeGroupID(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			ReservedAku:         types.Int64Value(6),
+			DeployType:          types.StringValue("K8S"),
+			KubernetesClusterID: types.StringValue("cluster-1"),
+			InstanceTypes: types.ListValueMust(types.StringType, []attr.Value{
+				types.StringValue("m5.xlarge"),
+			}),
+			KubernetesNodeGroups: testNodeGroupList(t, []models.NodeGroupModel{{ID: types.StringUnknown()}}),
+			KubernetesLBSubnets:  types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
+			ScheduleSpec:         types.StringNull(),
+			Networks: testNetworkList(t, []models.NetworkModel{{
+				Zone:    types.StringValue("cn-test-1"),
+				Subnets: types.ListNull(types.StringType),
+			}}),
+		},
+		Features: &models.FeaturesModel{WalMode: types.StringValue("EBSWAL")},
+	}
+
+	diags := validateInstanceContract(context.Background(), plan)
+	if diags.HasError() {
+		t.Fatalf("unknown node group ID should be deferred until apply: %v", diags)
+	}
+}
+
+func TestValidateKafkaInstanceConfiguration_K8SWithoutNodeGroupsRequiresScheduleSpec(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			ReservedAku:          types.Int64Value(6),
+			DeployType:           types.StringValue("K8S"),
+			KubernetesClusterID:  types.StringValue("cluster-1"),
+			InstanceTypes:        types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.xlarge")}),
+			KubernetesNodeGroups: types.ListNull(models.NodeGroupObjectType),
+			KubernetesLBSubnets:  types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
+			ScheduleSpec:         types.StringNull(),
+			Networks: testNetworkList(t, []models.NetworkModel{{
+				Zone:    types.StringValue("cn-test-1"),
+				Subnets: types.ListNull(types.StringType),
+			}}),
+		},
+		Features: &models.FeaturesModel{WalMode: types.StringValue("EBSWAL")},
+	}
+
+	diags := validateInstanceContract(context.Background(), plan)
+	if !diags.HasError() {
+		t.Fatal("expected diagnostics when schedule_spec and kubernetes_node_groups are both omitted")
+	}
+	found := false
+	for _, d := range diags {
+		if strings.Contains(d.Detail(), "schedule_spec") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected error mentioning schedule_spec, got: %v", diags)
 	}
 }
 
@@ -210,6 +276,7 @@ func TestSpecificationUpdateParamMatchesBackendPatchContract(t *testing.T) {
 		"KubernetesClusterId",
 		"KubernetesNamespace",
 		"KubernetesServiceAccount",
+		"KubernetesLBSubnets",
 		"InstanceRole",
 		"DataBuckets",
 	}
@@ -580,6 +647,14 @@ func TestImmutableAttributesHaveRequiresReplace(t *testing.T) {
 		t.Fatalf("expected instance_role to require replacement, modifiers: %v", instanceRoleAttr.PlanModifiers)
 	}
 	requireConfiguredOnlyStringReplacement(t, instanceRoleAttr.PlanModifiers)
+
+	scheduleSpecAttr, ok := computeAttr.Attributes["schedule_spec"].(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("schedule_spec attribute has unexpected type %T", computeAttr.Attributes["schedule_spec"])
+	}
+	if hasStringRequiresReplace(scheduleSpecAttr.PlanModifiers) {
+		t.Fatalf("schedule_spec must allow an update plan so update validation can reject it explicitly")
+	}
 }
 
 func TestGeneratedStringAttributesOnlyReplaceWhenConfigured(t *testing.T) {
@@ -1560,7 +1635,7 @@ func TestValidateKafkaInstanceConfiguration_UsageBasedMissingInstanceTypes(t *te
 	}
 }
 
-func TestValidateKafkaInstanceConfiguration_UsageBasedK8SAllowsMissingInstanceTypes(t *testing.T) {
+func TestValidateKafkaInstanceConfiguration_UsageBasedK8SRequiresInstanceTypes(t *testing.T) {
 	plan := &models.KafkaInstanceResourceModel{
 		ComputeSpecs: &models.ComputeSpecsModel{
 			PricingMode:         types.StringValue("UsageBased"),
@@ -1568,30 +1643,28 @@ func TestValidateKafkaInstanceConfiguration_UsageBasedK8SAllowsMissingInstanceTy
 			ReservedNodeCount:   types.Int64Value(5),
 			InstanceTypes:       types.ListNull(types.StringType),
 			KubernetesClusterID: types.StringValue("cluster-1"),
-			KubernetesNodeGroups: testNodeGroupList(t, []models.NodeGroupModel{{
-				ID: types.StringValue("ng-1"),
-			}}),
+			ScheduleSpec:        types.StringValue("nodeSelector: {}"),
 		},
 		Features: &models.FeaturesModel{WalMode: types.StringValue("EBSWAL")},
 	}
 
 	diags := validateInstanceContract(context.Background(), plan)
-	if diags.HasError() {
-		t.Fatalf("unexpected diagnostics when instance_types is omitted for UsageBased K8S: %v", diags)
+	if !diags.HasError() {
+		t.Fatal("expected diagnostics when instance_types is omitted for K8S")
 	}
 }
 
-func TestValidateKafkaInstanceConfiguration_K8SRejectsInstanceTypes(t *testing.T) {
+func TestValidateKafkaInstanceConfiguration_K8SAcceptsInstanceTypesWithoutNodeGroups(t *testing.T) {
 	plan := &models.KafkaInstanceResourceModel{
 		ComputeSpecs: &models.ComputeSpecsModel{
-			PricingMode:         types.StringValue("UsageBased"),
-			DeployType:          types.StringValue("K8S"),
-			ReservedNodeCount:   types.Int64Value(3),
-			InstanceTypes:       types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.xlarge")}),
-			KubernetesClusterID: types.StringValue("cluster-1"),
-			KubernetesNodeGroups: testNodeGroupList(t, []models.NodeGroupModel{{
-				ID: types.StringValue("ng-1"),
-			}}),
+			PricingMode:          types.StringValue("UsageBased"),
+			DeployType:           types.StringValue("K8S"),
+			ReservedNodeCount:    types.Int64Value(3),
+			InstanceTypes:        types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.xlarge")}),
+			KubernetesClusterID:  types.StringValue("cluster-1"),
+			KubernetesNodeGroups: types.ListNull(models.NodeGroupObjectType),
+			KubernetesLBSubnets:  types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
+			ScheduleSpec:         types.StringValue("nodeSelector: {}"),
 			Networks: testNetworkList(t, []models.NetworkModel{{
 				Zone:    types.StringValue("cn-test-1"),
 				Subnets: types.ListNull(types.StringType),
@@ -1601,18 +1674,8 @@ func TestValidateKafkaInstanceConfiguration_K8SRejectsInstanceTypes(t *testing.T
 	}
 
 	diags := validateInstanceContract(context.Background(), plan)
-	if !diags.HasError() {
-		t.Fatalf("expected diagnostics when instance_types is configured for K8S")
-	}
-	found := false
-	for _, d := range diags {
-		if strings.Contains(d.Detail(), "instance_types") && strings.Contains(d.Detail(), "K8S") {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("expected error mentioning instance_types and K8S, got: %v", diags)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics for valid K8S configuration: %v", diags)
 	}
 }
 
@@ -1681,7 +1744,7 @@ func TestImmutableAttributesHaveRequiresReplace_PricingMode(t *testing.T) {
 	}
 }
 
-func TestMutableAttributesDoNotRequireReplace_InstanceTypes(t *testing.T) {
+func TestInstanceTypesRequiresReplaceOnlyForK8S(t *testing.T) {
 	s := getKafkaInstanceResourceSchema(t)
 	computeAttr, ok := s.Attributes["compute_specs"].(schema.SingleNestedAttribute)
 	if !ok {
@@ -1692,8 +1755,23 @@ func TestMutableAttributesDoNotRequireReplace_InstanceTypes(t *testing.T) {
 	if !ok {
 		t.Fatalf("instance_types has unexpected type %T", computeAttr.Attributes["instance_types"])
 	}
-	if hasListRequiresReplace(instanceTypesAttr.PlanModifiers) {
-		t.Fatalf("expected instance_types to allow in-place IAAS updates")
+	if !hasListRequiresReplace(instanceTypesAttr.PlanModifiers) {
+		t.Fatal("expected instance_types to have a conditional replacement modifier")
+	}
+
+	for _, tc := range []struct {
+		deployType      string
+		requiresReplace bool
+	}{
+		{deployType: "IAAS", requiresReplace: false},
+		{deployType: "K8S", requiresReplace: true},
+	} {
+		t.Run(tc.deployType, func(t *testing.T) {
+			got := instanceTypesChangeRequiresReplace(types.StringValue(tc.deployType))
+			if got != tc.requiresReplace {
+				t.Fatalf("instanceTypesChangeRequiresReplace() = %t, want %t", got, tc.requiresReplace)
+			}
+		})
 	}
 }
 
@@ -1724,6 +1802,14 @@ func TestCreateOnlyComputeAttributesHaveRequiresReplace(t *testing.T) {
 	}
 	if !hasStringRequiresReplace(clusterIDAttr.PlanModifiers) {
 		t.Fatalf("expected kubernetes_cluster_id to require replacement")
+	}
+
+	loadBalancerSubnetsAttr, ok := computeAttr.Attributes["kubernetes_load_balancer_subnets"].(schema.ListAttribute)
+	if !ok {
+		t.Fatalf("kubernetes_load_balancer_subnets has unexpected type %T", computeAttr.Attributes["kubernetes_load_balancer_subnets"])
+	}
+	if !hasListRequiresReplace(loadBalancerSubnetsAttr.PlanModifiers) {
+		t.Fatal("expected kubernetes_load_balancer_subnets to require replacement")
 	}
 }
 
@@ -1810,6 +1896,25 @@ func TestInstanceTypesSchemaValidator(t *testing.T) {
 	// Should have size validators (at most 1, at least 1)
 	if len(instanceTypesAttr.Validators) < 2 {
 		t.Fatalf("expected instance_types to have at least 2 validators, got %d", len(instanceTypesAttr.Validators))
+	}
+}
+
+func TestKubernetesNodeGroupsSchemaIsOptionalAndDeprecated(t *testing.T) {
+	s := getKafkaInstanceResourceSchema(t)
+	computeAttr, ok := s.Attributes["compute_specs"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("compute_specs has unexpected type %T", s.Attributes["compute_specs"])
+	}
+
+	nodeGroupsAttr, ok := computeAttr.Attributes["kubernetes_node_groups"].(schema.ListNestedAttribute)
+	if !ok {
+		t.Fatalf("kubernetes_node_groups has unexpected type %T", computeAttr.Attributes["kubernetes_node_groups"])
+	}
+	if !nodeGroupsAttr.IsOptional() {
+		t.Fatal("expected kubernetes_node_groups to be optional")
+	}
+	if nodeGroupsAttr.GetDeprecationMessage() == "" {
+		t.Fatal("expected kubernetes_node_groups to have a deprecation message")
 	}
 }
 

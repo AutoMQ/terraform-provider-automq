@@ -9,7 +9,8 @@ package provider
 //
 //   K8S tests (TestAccKafkaInstance_K8S_Scenario)
 //     - All VM requirements
-//     - k8s.cluster_id, k8s.node_groups (comma separated), optional namespace/service_account
+//     - k8s.cluster_id, k8s.instance_types, k8s.load_balancer_subnets
+//     - either k8s.node_groups or k8s.schedule_spec, optional namespace/service_account
 //
 // Configuration sources (priority order):
 //   1. JSON file provided via -acc.config flag (see accConfigFile struct for schema)
@@ -54,10 +55,13 @@ type accConfig struct {
 }
 
 type accK8SConfig struct {
-	ClusterID      string   `json:"cluster_id"`
-	NodeGroups     []string `json:"node_groups"`
-	Namespace      string   `json:"namespace"`
-	ServiceAccount string   `json:"service_account"`
+	ClusterID           string   `json:"cluster_id"`
+	NodeGroups          []string `json:"node_groups"`
+	InstanceTypes       []string `json:"instance_types"`
+	LoadBalancerSubnets []string `json:"load_balancer_subnets"`
+	ScheduleSpec        string   `json:"schedule_spec"`
+	Namespace           string   `json:"namespace"`
+	ServiceAccount      string   `json:"service_account"`
 }
 
 type accConnectorConfig struct {
@@ -128,6 +132,9 @@ type accInstanceConfig struct {
 	Networks              []accNetwork
 	KubernetesClusterID   string
 	KubernetesNodeGroups  []string
+	InstanceTypes         []string
+	KubernetesLBSubnets   []string
+	ScheduleSpec          string
 	KubernetesNamespace   string
 	KubernetesServiceAcct string
 	InstanceRole          string
@@ -200,10 +207,13 @@ func parseAccConfigFromFile(path string) (accConfig, error) {
 		UpgradeVersion: strings.TrimSpace(raw.UpgradeVersion),
 		Networks:       append([]accNetwork{}, raw.Networks...),
 		K8S: accK8SConfig{
-			ClusterID:      strings.TrimSpace(raw.K8S.ClusterID),
-			NodeGroups:     append([]string{}, raw.K8S.NodeGroups...),
-			Namespace:      strings.TrimSpace(raw.K8S.Namespace),
-			ServiceAccount: strings.TrimSpace(raw.K8S.ServiceAccount),
+			ClusterID:           strings.TrimSpace(raw.K8S.ClusterID),
+			NodeGroups:          append([]string{}, raw.K8S.NodeGroups...),
+			InstanceTypes:       append([]string{}, raw.K8S.InstanceTypes...),
+			LoadBalancerSubnets: append([]string{}, raw.K8S.LoadBalancerSubnets...),
+			ScheduleSpec:        strings.TrimSpace(raw.K8S.ScheduleSpec),
+			Namespace:           strings.TrimSpace(raw.K8S.Namespace),
+			ServiceAccount:      strings.TrimSpace(raw.K8S.ServiceAccount),
 		},
 		Connector: accConnectorConfig{
 			PluginName:           strings.TrimSpace(raw.Connector.PluginName),
@@ -240,6 +250,9 @@ func (c accConfig) normalise() accConfig {
 	c.Networks = normaliseNetworks(c.Networks)
 	c.K8S.ClusterID = strings.TrimSpace(c.K8S.ClusterID)
 	c.K8S.NodeGroups = trimStringSlice(c.K8S.NodeGroups)
+	c.K8S.InstanceTypes = trimStringSlice(c.K8S.InstanceTypes)
+	c.K8S.LoadBalancerSubnets = trimStringSlice(c.K8S.LoadBalancerSubnets)
+	c.K8S.ScheduleSpec = strings.TrimSpace(c.K8S.ScheduleSpec)
 	c.K8S.Namespace = strings.TrimSpace(c.K8S.Namespace)
 	c.K8S.ServiceAccount = strings.TrimSpace(c.K8S.ServiceAccount)
 	c.Connector.PluginName = strings.TrimSpace(c.Connector.PluginName)
@@ -285,7 +298,29 @@ func (c accConfig) requireVM(t *testing.T) {
 }
 
 func (c accConfig) hasK8S() bool {
-	return c.K8S.ClusterID != "" && len(c.K8S.NodeGroups) > 0
+	return c.K8S.ClusterID != "" &&
+		len(c.K8S.InstanceTypes) > 0 &&
+		len(c.K8S.LoadBalancerSubnets) > 0 &&
+		(len(c.K8S.NodeGroups) > 0 || c.K8S.ScheduleSpec != "")
+}
+
+func TestParseAccConfigK8SFields(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "acc.json")
+	data := []byte(`{"k8s":{"cluster_id":" cluster-1 ","instance_types":[" m7g.xlarge "],"load_balancer_subnets":[" subnet-1 "],"schedule_spec":" spec "}}`)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatalf("write acceptance config: %v", err)
+	}
+
+	cfg, err := parseAccConfigFromFile(path)
+	if err != nil {
+		t.Fatalf("parse acceptance config: %v", err)
+	}
+	if !cfg.hasK8S() {
+		t.Fatalf("expected parsed K8S configuration to be usable: %+v", cfg.K8S)
+	}
+	if cfg.K8S.InstanceTypes[0] != "m7g.xlarge" || cfg.K8S.LoadBalancerSubnets[0] != "subnet-1" || cfg.K8S.ScheduleSpec != "spec" {
+		t.Fatalf("expected K8S fields to be normalized: %+v", cfg.K8S)
+	}
 }
 
 func (c accConfig) hasConnector() bool {
@@ -307,7 +342,7 @@ func TestAccKafkaInstance_VM_Scenario(t *testing.T) {
 func TestAccKafkaInstance_K8S_Scenario(t *testing.T) {
 	env := loadAccConfig(t)
 	if !env.hasK8S() {
-		t.Skip("Skipping K8S acceptance tests: acc.config.k8s.cluster_id/node_groups not configured")
+		t.Skip("Skipping K8S acceptance tests: acc.config.k8s requires cluster_id, instance_types, load_balancer_subnets, and either node_groups or schedule_spec")
 	}
 	env.requireVM(t)
 	ensureAccTimeout(t)
@@ -449,7 +484,7 @@ func runAccKafkaInstanceScenario(t *testing.T, env accConfig, scenario accInstan
 			env.requireVM(t)
 		}
 		if scenario.RequiresK8S && !env.hasK8S() {
-			t.Skip("Skipping K8S acceptance tests: acc.config.k8s.cluster_id/node_groups not configured")
+			t.Skip("Skipping K8S acceptance tests: acc.config.k8s requires cluster_id, instance_types, load_balancer_subnets, and either node_groups or schedule_spec")
 		}
 	}
 
@@ -609,6 +644,9 @@ func buildK8SInstanceScenario(env accConfig) accInstanceScenario {
 		Networks:              cloneNetworks(networks),
 		KubernetesClusterID:   env.K8S.ClusterID,
 		KubernetesNodeGroups:  cloneStringSlice(env.K8S.NodeGroups),
+		InstanceTypes:         cloneStringSlice(env.K8S.InstanceTypes),
+		KubernetesLBSubnets:   cloneStringSlice(env.K8S.LoadBalancerSubnets),
+		ScheduleSpec:          env.K8S.ScheduleSpec,
 		KubernetesNamespace:   env.K8S.Namespace,
 		KubernetesServiceAcct: env.K8S.ServiceAccount,
 		WalMode:               "EBSWAL",
@@ -625,9 +663,14 @@ func buildK8SInstanceScenario(env accConfig) accInstanceScenario {
 			Checks: []resource.TestCheckFunc{
 				checkAttr("compute_specs.deploy_type", "K8S"),
 				checkAttr("compute_specs.kubernetes_cluster_id", env.K8S.ClusterID),
+				checkAttr("compute_specs.instance_types.#", fmt.Sprintf("%d", len(env.K8S.InstanceTypes))),
+				checkAttr("compute_specs.kubernetes_load_balancer_subnets.#", fmt.Sprintf("%d", len(env.K8S.LoadBalancerSubnets))),
 				checkAttr("compute_specs.kubernetes_node_groups.#", fmt.Sprintf("%d", len(env.K8S.NodeGroups))),
 			},
 		},
+	}
+	if env.K8S.ScheduleSpec != "" {
+		steps[0].Checks = append(steps[0].Checks, checkAttr("compute_specs.schedule_spec", env.K8S.ScheduleSpec))
 	}
 
 	current := cloneInstanceConfig(base)
@@ -789,6 +832,8 @@ func cloneInstanceConfig(src accInstanceConfig) accInstanceConfig {
 	clone := src
 	clone.Networks = cloneNetworks(src.Networks)
 	clone.KubernetesNodeGroups = cloneStringSlice(src.KubernetesNodeGroups)
+	clone.InstanceTypes = cloneStringSlice(src.InstanceTypes)
+	clone.KubernetesLBSubnets = cloneStringSlice(src.KubernetesLBSubnets)
 	clone.InstanceConfigs = cloneStringMap(src.InstanceConfigs)
 	if src.MetricsExporter != nil {
 		clone.MetricsExporter = cloneMetricsExporter(src.MetricsExporter)
@@ -1007,6 +1052,29 @@ func renderKafkaInstanceConfig(env accConfig, cfg accInstanceConfig) string {
 	}
 	if cfg.KubernetesClusterID != "" {
 		fmt.Fprintf(&b, "    kubernetes_cluster_id = %q\n", cfg.KubernetesClusterID)
+	}
+	if len(cfg.InstanceTypes) > 0 {
+		b.WriteString("    instance_types = [")
+		for i, instanceType := range cfg.InstanceTypes {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(&b, "%q", instanceType)
+		}
+		b.WriteString("]\n")
+	}
+	if len(cfg.KubernetesLBSubnets) > 0 {
+		b.WriteString("    kubernetes_load_balancer_subnets = [")
+		for i, subnet := range cfg.KubernetesLBSubnets {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(&b, "%q", subnet)
+		}
+		b.WriteString("]\n")
+	}
+	if cfg.ScheduleSpec != "" {
+		fmt.Fprintf(&b, "    schedule_spec = %q\n", cfg.ScheduleSpec)
 	}
 	if len(cfg.KubernetesNodeGroups) > 0 {
 		b.WriteString("    kubernetes_node_groups = [\n")

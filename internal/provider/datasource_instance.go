@@ -34,7 +34,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)\n\n" +
 			"Using the `automq_kafka_instance` data source, you can manage kafka resoure within instance.\n\n" +
-			"> **Note**: This provider version is only compatible with AutoMQ control plane versions 8.0 and later.",
+			"> **Note**: This provider version is only compatible with AutoMQ control plane versions 8.0 and later. K8S scheduling with `instance_types`, `kubernetes_load_balancer_subnets`, and `schedule_spec` requires control plane version 8.3.6 or later.",
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
@@ -81,17 +81,19 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 					"instance_types": schema.ListAttribute{
 						ElementType:         types.StringType,
 						Computed:            true,
-						MarkdownDescription: "Instance type list for the nodes. Only available when `deploy_type` is `IAAS`; not returned for `K8S` deployments.",
+						MarkdownDescription: "Instance type list for the nodes.",
 					},
 					"deploy_type": schema.StringAttribute{
 						Computed:            true,
 						MarkdownDescription: "Deployment platform for the instance.",
 					},
-					"dns_zone":                   schema.StringAttribute{Computed: true, MarkdownDescription: "DNS zone used when creating custom records."},
-					"kubernetes_cluster_id":      schema.StringAttribute{Computed: true, MarkdownDescription: "Identifier for the target Kubernetes cluster."},
-					"kubernetes_namespace":       schema.StringAttribute{Computed: true, MarkdownDescription: "Kubernetes namespace for the instance deployment."},
-					"kubernetes_service_account": schema.StringAttribute{Computed: true, MarkdownDescription: "Kubernetes service account for the instance pods."},
-					"instance_role":              schema.StringAttribute{Computed: true, MarkdownDescription: "IAM role ARN for the Kafka instance."},
+					"dns_zone":                         schema.StringAttribute{Computed: true, MarkdownDescription: "DNS zone used when creating custom records."},
+					"kubernetes_cluster_id":            schema.StringAttribute{Computed: true, MarkdownDescription: "Identifier for the target Kubernetes cluster."},
+					"kubernetes_namespace":             schema.StringAttribute{Computed: true, MarkdownDescription: "Kubernetes namespace for the instance deployment."},
+					"kubernetes_service_account":       schema.StringAttribute{Computed: true, MarkdownDescription: "Kubernetes service account for the instance pods."},
+					"kubernetes_load_balancer_subnets": schema.ListAttribute{Computed: true, ElementType: types.StringType, MarkdownDescription: "Subnet IDs used by the Kubernetes load balancer."},
+					"schedule_spec":                    schema.StringAttribute{Computed: true, MarkdownDescription: "Kubernetes scheduling specification. This value is not populated from API responses."},
+					"instance_role":                    schema.StringAttribute{Computed: true, MarkdownDescription: "IAM role ARN for the Kafka instance."},
 					"networks": schema.ListNestedAttribute{
 						Computed:            true,
 						MarkdownDescription: "To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones.",

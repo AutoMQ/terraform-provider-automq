@@ -101,7 +101,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 		// This description is used by the documentation generator and the language server.
 		MarkdownDescription: "![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)\n\n" +
 			"Using the `automq_kafka_instance` resource type, you can create and manage Kafka instances, where each instance represents a physical cluster.\n\n" +
-			"> **Note**: This provider version is only compatible with AutoMQ control plane versions 8.0 and later.",
+			"> **Note**: This provider version is only compatible with AutoMQ control plane versions 8.0 and later. K8S scheduling with `instance_types`, `kubernetes_load_balancer_subnets`, and `schedule_spec` requires control plane version 8.3.6 or later.",
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
@@ -170,10 +170,17 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					"instance_types": schema.ListAttribute{
 						ElementType:         types.StringType,
 						Optional:            true,
-						MarkdownDescription: "Instance type list for the nodes. Maximum 1 entry. Required when `pricing_mode` is `UsageBased` and `deploy_type` is `IAAS`. Can be updated for `IAAS` deployments. Do not configure this field for `K8S` deployments.",
+						MarkdownDescription: "Instance type list for the nodes. Maximum 1 entry. Required when `deploy_type` is `K8S`, or when `pricing_mode` is `UsageBased` and `deploy_type` is `IAAS`. Can be updated in place for `IAAS` deployments; changing it for `K8S` deployments requires instance replacement.",
 						Validators: []validator.List{
 							listvalidator.SizeAtMost(1),
 							listvalidator.SizeAtLeast(1),
+						},
+						PlanModifiers: []planmodifier.List{
+							listplanmodifier.RequiresReplaceIf(
+								requireReplaceInstanceTypesForK8S,
+								"Changing instance_types for a K8S deployment requires instance replacement.",
+								"Changing `instance_types` for a `K8S` deployment requires instance replacement.",
+							),
 						},
 					},
 					"deploy_type": schema.StringAttribute{
@@ -227,7 +234,8 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					},
 					"kubernetes_node_groups": schema.ListNestedAttribute{
 						Optional:            true,
-						MarkdownDescription: "Node groups (or node pools) are units for unified configuration management of physical nodes in Kubernetes. Different Kubernetes providers may use different terms for node groups. Select target node groups that must be created in advance and configured for either single-AZ or three-AZ deployment. The instance node type must meet the requirements specified in the documentation. If you select a single-AZ node group, the AutoMQ instance will be deployed in a single availability zone; if you select a three-AZ node group, the instance will be deployed across three availability zones.",
+						DeprecationMessage:  "compute_specs.kubernetes_node_groups is deprecated and will be removed in a future release. Removing it from an existing configuration requires instance replacement; use compute_specs.instance_types and compute_specs.schedule_spec for new K8S instances.",
+						MarkdownDescription: "Deprecated Kubernetes node group configuration. Removing this attribute from an existing configuration requires instance replacement; use `instance_types` and `schedule_spec` for new K8S instances.",
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id": schema.StringAttribute{
@@ -287,6 +295,20 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							stringplanmodifier.RequiresReplaceIfConfigured(),
 							stringplanmodifier.UseStateForUnknown(),
 						},
+					},
+					"kubernetes_load_balancer_subnets": schema.ListAttribute{
+						ElementType:         types.StringType,
+						Optional:            true,
+						MarkdownDescription: "Subnet IDs used by the Kubernetes load balancer. Required when `deploy_type` is `K8S`. Changing them requires instance replacement.",
+						Validators: []validator.List{
+							listvalidator.UniqueValues(),
+							listvalidator.SizeAtLeast(1),
+						},
+						PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplace()},
+					},
+					"schedule_spec": schema.StringAttribute{
+						Optional:            true,
+						MarkdownDescription: "Kubernetes scheduling specification. Required when `deploy_type` is `K8S` and `kubernetes_node_groups` is omitted. Updates are not currently supported and will be rejected.",
 					},
 					"instance_role": schema.StringAttribute{
 						Computed:            true,
@@ -643,6 +665,20 @@ func knownInt64Value(attr types.Int64) (int64, bool) {
 	return attr.ValueInt64(), true
 }
 
+func requireReplaceInstanceTypesForK8S(ctx context.Context, req planmodifier.ListRequest, resp *listplanmodifier.RequiresReplaceIfFuncResponse) {
+	var deployType types.String
+	diags := req.Plan.GetAttribute(ctx, req.Path.ParentPath().AtName("deploy_type"), &deployType)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() || deployType.IsNull() || deployType.IsUnknown() {
+		return
+	}
+	resp.RequiresReplace = instanceTypesChangeRequiresReplace(deployType)
+}
+
+func instanceTypesChangeRequiresReplace(deployType types.String) bool {
+	return !deployType.IsNull() && !deployType.IsUnknown() && strings.EqualFold(deployType.ValueString(), "K8S")
+}
+
 func validateInstanceContract(ctx context.Context, plan *models.KafkaInstanceResourceModel) diag.Diagnostics {
 	var diagnostics diag.Diagnostics
 	if plan == nil {
@@ -664,33 +700,38 @@ func validateDeployTypeContract(ctx context.Context, plan *models.KafkaInstanceR
 		return diagnostics
 	}
 	if deployType, ok := knownStringValue(plan.ComputeSpecs.DeployType); ok && strings.EqualFold(deployType, "K8S") {
-		if !plan.ComputeSpecs.InstanceTypes.IsNull() && !plan.ComputeSpecs.InstanceTypes.IsUnknown() {
+		if plan.ComputeSpecs.InstanceTypes.IsNull() {
 			diagnostics.AddError(
 				"Invalid Configuration",
-				"compute_specs.instance_types is only valid when compute_specs.deploy_type is IAAS. Do not configure it for K8S deployments.",
+				"When compute_specs.deploy_type is K8S, compute_specs.instance_types must be provided.",
 			)
 		}
-		if plan.ComputeSpecs.KubernetesNodeGroups.IsUnknown() {
-			return diagnostics
-		}
-		nodeGroups, nodeGroupDiags := models.NodeGroupListToModels(ctx, plan.ComputeSpecs.KubernetesNodeGroups)
-		diagnostics.Append(nodeGroupDiags...)
-		if nodeGroupDiags.HasError() {
-			return diagnostics
-		}
-		if len(nodeGroups) == 0 {
+		if plan.ComputeSpecs.KubernetesLBSubnets.IsNull() {
 			diagnostics.AddError(
 				"Invalid Configuration",
-				"When compute_specs.deploy_type is K8S, at least one compute_specs.kubernetes_node_groups block must be provided.",
+				"When compute_specs.deploy_type is K8S, compute_specs.kubernetes_load_balancer_subnets must be provided.",
 			)
-		} else {
+		}
+		hasNodeGroups := false
+		if !plan.ComputeSpecs.KubernetesNodeGroups.IsNull() && !plan.ComputeSpecs.KubernetesNodeGroups.IsUnknown() {
+			nodeGroups, nodeGroupDiags := models.NodeGroupListToModels(ctx, plan.ComputeSpecs.KubernetesNodeGroups)
+			diagnostics.Append(nodeGroupDiags...)
+			hasNodeGroups = len(nodeGroups) > 0
 			for i, ng := range nodeGroups {
-				if !isStringValueSet(ng.ID) {
+				if !ng.ID.IsUnknown() && !isStringValueSet(ng.ID) {
 					diagnostics.AddError(
 						"Invalid Configuration",
 						fmt.Sprintf("compute_specs.kubernetes_node_groups[%d].id must be provided when deploy_type is K8S.", i),
 					)
 				}
+			}
+		}
+		if !hasNodeGroups && !plan.ComputeSpecs.KubernetesNodeGroups.IsUnknown() {
+			if _, ok := knownStringValue(plan.ComputeSpecs.ScheduleSpec); !ok && !plan.ComputeSpecs.ScheduleSpec.IsUnknown() {
+				diagnostics.AddError(
+					"Invalid Configuration",
+					"When compute_specs.deploy_type is K8S and compute_specs.kubernetes_node_groups is omitted, compute_specs.schedule_spec must be provided.",
+				)
 			}
 		}
 
@@ -1164,6 +1205,13 @@ type instanceUpdatePlan struct {
 
 func validateInstanceUpdateContract(ctx context.Context, instanceId string, plan, state models.KafkaInstanceResourceModel) diag.Diagnostics {
 	diags := diag.Diagnostics{}
+	if plan.ComputeSpecs != nil && state.ComputeSpecs != nil && !stringAttrEqual(plan.ComputeSpecs.ScheduleSpec, state.ComputeSpecs.ScheduleSpec) {
+		diags.AddError(
+			"Schedule Spec Update Error",
+			fmt.Sprintf("Error occurred while updating Kafka Instance %q. compute_specs.schedule_spec cannot currently be updated. Keep its existing value until schedule spec updates are supported.", instanceId),
+		)
+		return diags
+	}
 	if plan.Features != nil && state.Features != nil {
 		stateTableTopic, stateTopicDiags := models.TableTopicObjectToModel(ctx, state.Features.TableTopic)
 		diags.Append(stateTopicDiags...)

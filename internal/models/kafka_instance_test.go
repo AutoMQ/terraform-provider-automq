@@ -395,7 +395,7 @@ func TestKafkaInstanceFlattenContracts(t *testing.T) {
 	t.Run("usage based instance types from api", testFlattenKafkaInstanceModelSetsDefaultInstanceTypesFromAPI)
 	t.Run("usage based instance types without prior config", testFlattenKafkaInstanceModelSetsInstanceTypesWithoutPriorConfig)
 	t.Run("subscription pricing ignores instance types", testFlattenKafkaInstanceModelIgnoresInstanceTypesForSubscriptionBased)
-	t.Run("usage based k8s ignores instance types", testFlattenKafkaInstanceModelIgnoresInstanceTypesForUsageBasedK8S)
+	t.Run("usage based k8s retains instance types", testFlattenKafkaInstanceModelRetainsInstanceTypesForUsageBasedK8S)
 	t.Run("pricing readback usage based", testFlattenKafkaInstanceModelUsageBasedPricing)
 	t.Run("pricing readback subscription based", testFlattenKafkaInstanceModelCommittedPricing)
 }
@@ -879,7 +879,7 @@ func testFlattenKafkaInstanceModelIgnoresInstanceTypesForSubscriptionBased(t *te
 	assert.True(t, resource.ComputeSpecs.InstanceTypes.IsNull())
 }
 
-func testFlattenKafkaInstanceModelIgnoresInstanceTypesForUsageBasedK8S(t *testing.T) {
+func testFlattenKafkaInstanceModelRetainsInstanceTypesForUsageBasedK8S(t *testing.T) {
 	pricingMode := "UsageBased"
 	deployType := "K8S"
 	resource := &KafkaInstanceResourceModel{}
@@ -898,7 +898,57 @@ func testFlattenKafkaInstanceModelIgnoresInstanceTypesForUsageBasedK8S(t *testin
 
 	assert.False(t, diags.HasError())
 	assert.NotNil(t, resource.ComputeSpecs)
-	assert.True(t, resource.ComputeSpecs.InstanceTypes.IsNull())
+	assert.False(t, resource.ComputeSpecs.InstanceTypes.IsNull())
+}
+
+func TestFlattenKafkaInstanceModelRetainsConfiguredScheduleSpec(t *testing.T) {
+	deployType := "K8S"
+	resource := &KafkaInstanceResourceModel{
+		ComputeSpecs: &ComputeSpecsModel{
+			ScheduleSpec: types.StringValue("nodeSelector:\n  workload: kafka"),
+		},
+	}
+	instance := &client.InstanceVO{
+		InstanceId: strPtr("test-instance"),
+		Spec: &client.SpecificationVO{
+			DeployType: &deployType,
+		},
+	}
+
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+
+	assert.False(t, diags.HasError())
+	assert.Equal(t, "nodeSelector:\n  workload: kafka", resource.ComputeSpecs.ScheduleSpec.ValueString())
+}
+
+func TestKafkaInstanceKubernetesLoadBalancerSubnetsMapping(t *testing.T) {
+	configuredSubnets := types.ListValueMust(types.StringType, []attr.Value{
+		types.StringValue("subnet-1"),
+		types.StringValue("subnet-2"),
+	})
+	resource := KafkaInstanceResourceModel{
+		Name:    types.StringValue("test-instance"),
+		Version: types.StringValue("1.0.0"),
+		ComputeSpecs: &ComputeSpecsModel{
+			KubernetesLBSubnets: configuredSubnets,
+		},
+	}
+	request := client.InstanceCreateParam{}
+
+	err := ExpandKafkaInstanceResource(context.Background(), resource, &request)
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"subnet-1", "subnet-2"}, request.Spec.KubernetesLBSubnets)
+
+	instance := &client.InstanceVO{
+		InstanceId: strPtr("test-instance"),
+		Spec: &client.SpecificationVO{
+			KubernetesLBSubnets: []string{"subnet-3"},
+		},
+	}
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, &resource)
+	assert.False(t, diags.HasError())
+	assert.Equal(t, []attr.Value{types.StringValue("subnet-3")}, resource.ComputeSpecs.KubernetesLBSubnets.Elements())
 }
 
 func timePtr(s string) *time.Time {

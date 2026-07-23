@@ -86,11 +86,30 @@ variable "kubernetes_cluster_id" {
   type        = string
 }
 
+variable "instance_types" {
+  description = "Kubernetes instance types. Required when deploy_type is K8S; leave null for IAAS."
+  type        = list(string)
+  default     = null
+}
+
+variable "kubernetes_load_balancer_subnets" {
+  description = "Subnet IDs used by the Kubernetes load balancer. Required when deploy_type is K8S; leave null for IAAS."
+  type        = list(string)
+  default     = null
+}
+
+variable "schedule_spec" {
+  description = "Kubernetes scheduling specification. Required for K8S when kubernetes_node_groups is null."
+  type        = string
+  default     = null
+}
+
 variable "kubernetes_node_groups" {
-  description = "Kubernetes node group identifiers"
+  description = "Deprecated Kubernetes node group identifiers. Leave null for schedule_spec-based K8S configurations."
   type = list(object({
     id = string
   }))
+  default = null
 }
 
 variable "kubernetes_namespace" {

@@ -119,12 +119,14 @@ func TestInstanceContractValidation(t *testing.T) {
 		assert.False(t, diags.HasError(), "unexpected diagnostics: %v", diags)
 	})
 
-	t.Run("k8s deploy type requires cluster and node groups", func(t *testing.T) {
+	t.Run("k8s deploy type requires cluster instance types and schedule spec", func(t *testing.T) {
 		plan := models.KafkaInstanceResourceModel{
 			ComputeSpecs: &models.ComputeSpecsModel{
 				DeployType:           types.StringValue("K8S"),
+				InstanceTypes:        types.ListNull(types.StringType),
 				KubernetesClusterID:  types.StringNull(),
 				KubernetesNodeGroups: types.ListNull(models.NodeGroupObjectType),
+				ScheduleSpec:         types.StringNull(),
 			},
 			Features: &models.FeaturesModel{
 				WalMode: types.StringValue("EBSWAL"),
@@ -132,7 +134,7 @@ func TestInstanceContractValidation(t *testing.T) {
 		}
 		diags := validateInstanceContract(context.Background(), &plan)
 		require.True(t, diags.HasError())
-		assert.Len(t, diags.Errors(), 2)
+		assert.Len(t, diags.Errors(), 4)
 	})
 
 	t.Run("usage based iaas requires reserved node count and instance types", func(t *testing.T) {
@@ -221,6 +223,19 @@ func TestInstanceContractValidation(t *testing.T) {
 }
 
 func TestInstanceUpdateContractValidation(t *testing.T) {
+	t.Run("schedule spec change is rejected", func(t *testing.T) {
+		plan := newValidUsageBasedK8SPlan()
+		state := newValidUsageBasedK8SPlan()
+		plan.ComputeSpecs.ScheduleSpec = types.StringValue("nodeSelector: {workload: new}")
+		state.ComputeSpecs.ScheduleSpec = types.StringValue("nodeSelector: {workload: old}")
+
+		diags := testValidateInstanceUpdateContract(plan, state)
+
+		require.True(t, diags.HasError())
+		assert.Equal(t, "Schedule Spec Update Error", diags.Errors()[0].Summary())
+		assert.Contains(t, diags.Errors()[0].Detail(), "cannot currently be updated")
+	})
+
 	t.Run("removing instance config key is rejected", func(t *testing.T) {
 		plan := newConfigOnlyPlan(map[string]string{"b": "2"})
 		state := newConfigOnlyPlan(map[string]string{"a": "1", "b": "2"})
@@ -696,7 +711,9 @@ func newValidUsageBasedK8SPlan() models.KafkaInstanceResourceModel {
 			ReservedNodeCount:    types.Int64Value(3),
 			InstanceTypes:        types.ListNull(types.StringType),
 			KubernetesClusterID:  types.StringValue("cluster-1"),
+			KubernetesLBSubnets:  mustStringList("subnet-1"),
 			KubernetesNodeGroups: testNodeGroupListForPlan("ng-1"),
+			ScheduleSpec:         types.StringValue("nodeSelector: {}"),
 		},
 		Features: &models.FeaturesModel{
 			WalMode:         types.StringValue("EBSWAL"),

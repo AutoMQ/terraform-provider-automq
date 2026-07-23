@@ -81,6 +81,8 @@ type ComputeSpecsModel struct {
 	KubernetesClusterID   types.String `tfsdk:"kubernetes_cluster_id"`
 	KubernetesNamespace   types.String `tfsdk:"kubernetes_namespace"`
 	KubernetesServiceAcct types.String `tfsdk:"kubernetes_service_account"`
+	KubernetesLBSubnets   types.List   `tfsdk:"kubernetes_load_balancer_subnets"`
+	ScheduleSpec          types.String `tfsdk:"schedule_spec"`
 	InstanceRole          types.String `tfsdk:"instance_role"`
 	DataBuckets           types.List   `tfsdk:"data_buckets"`
 	SecurityGroups        types.List   `tfsdk:"security_groups"`
@@ -697,6 +699,18 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 			serviceAccount := instance.ComputeSpecs.KubernetesServiceAcct.ValueString()
 			request.Spec.KubernetesServiceAccount = &serviceAccount
 		}
+		if !instance.ComputeSpecs.KubernetesLBSubnets.IsNull() && !instance.ComputeSpecs.KubernetesLBSubnets.IsUnknown() {
+			var subnets []string
+			diags := instance.ComputeSpecs.KubernetesLBSubnets.ElementsAs(ctx, &subnets, false)
+			if diags.HasError() {
+				return fmt.Errorf("failed to parse kubernetes_load_balancer_subnets: %v", diags)
+			}
+			request.Spec.KubernetesLBSubnets = subnets
+		}
+		if !instance.ComputeSpecs.ScheduleSpec.IsNull() && !instance.ComputeSpecs.ScheduleSpec.IsUnknown() {
+			scheduleSpec := instance.ComputeSpecs.ScheduleSpec.ValueString()
+			request.Spec.ScheduleSpec = &scheduleSpec
+		}
 		if !instance.ComputeSpecs.InstanceRole.IsNull() && !instance.ComputeSpecs.InstanceRole.IsUnknown() {
 			role := instance.ComputeSpecs.InstanceRole.ValueString()
 			request.Spec.InstanceRole = &role
@@ -1097,6 +1111,8 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 				KubernetesClusterID:   types.StringNull(),
 				KubernetesNamespace:   types.StringNull(),
 				KubernetesServiceAcct: types.StringNull(),
+				KubernetesLBSubnets:   types.ListNull(types.StringType),
+				ScheduleSpec:          types.StringNull(),
 				InstanceRole:          types.StringNull(),
 				FileSystemParam:       types.ObjectNull(FileSystemParamObjectType.AttrTypes),
 			}
@@ -1134,16 +1150,32 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 		resource.ComputeSpecs.KubernetesClusterID = coalesceStringAttr(instance.Spec.KubernetesClusterId, prevClusterID)
 		resource.ComputeSpecs.KubernetesNamespace = coalesceStringAttr(instance.Spec.KubernetesNamespace, prevNamespace)
 		resource.ComputeSpecs.KubernetesServiceAcct = coalesceStringAttr(instance.Spec.KubernetesServiceAccount, prevServiceAccount)
+		if len(instance.Spec.KubernetesLBSubnets) > 0 {
+			subnets, subnetDiags := types.ListValueFrom(ctx, types.StringType, instance.Spec.KubernetesLBSubnets)
+			diags.Append(subnetDiags...)
+			if !subnetDiags.HasError() {
+				resource.ComputeSpecs.KubernetesLBSubnets = subnets
+			}
+		} else if previousSpecs != nil {
+			resource.ComputeSpecs.KubernetesLBSubnets = previousSpecs.KubernetesLBSubnets
+		} else {
+			resource.ComputeSpecs.KubernetesLBSubnets = types.ListNull(types.StringType)
+		}
+		if previousSpecs != nil {
+			resource.ComputeSpecs.ScheduleSpec = previousSpecs.ScheduleSpec
+		} else {
+			resource.ComputeSpecs.ScheduleSpec = types.StringNull()
+		}
 		resource.ComputeSpecs.InstanceRole = coalesceStringAttr(instance.Spec.InstanceRole, prevInstanceRole)
 		// Instance Types (from NodeConfig)
-		isUsageBasedIAAS := strings.EqualFold(resource.ComputeSpecs.PricingMode.ValueString(), "UsageBased") &&
-			strings.EqualFold(resource.ComputeSpecs.DeployType.ValueString(), "IAAS")
-		if isUsageBasedIAAS && instance.Spec.NodeConfig != nil && len(instance.Spec.NodeConfig.InstanceTypes) > 0 {
+		shouldRetainInstanceTypes := strings.EqualFold(resource.ComputeSpecs.DeployType.ValueString(), "K8S") ||
+			(strings.EqualFold(resource.ComputeSpecs.PricingMode.ValueString(), "UsageBased") && strings.EqualFold(resource.ComputeSpecs.DeployType.ValueString(), "IAAS"))
+		if shouldRetainInstanceTypes && instance.Spec.NodeConfig != nil && len(instance.Spec.NodeConfig.InstanceTypes) > 0 {
 			instanceTypesList, itDiags := types.ListValueFrom(ctx, types.StringType, instance.Spec.NodeConfig.InstanceTypes)
 			if !itDiags.HasError() {
 				resource.ComputeSpecs.InstanceTypes = instanceTypesList
 			}
-		} else if isUsageBasedIAAS && previousSpecs != nil && !previousSpecs.InstanceTypes.IsNull() && !previousSpecs.InstanceTypes.IsUnknown() {
+		} else if shouldRetainInstanceTypes && previousSpecs != nil && !previousSpecs.InstanceTypes.IsNull() && !previousSpecs.InstanceTypes.IsUnknown() {
 			resource.ComputeSpecs.InstanceTypes = previousSpecs.InstanceTypes
 		} else {
 			resource.ComputeSpecs.InstanceTypes = types.ListNull(types.StringType)

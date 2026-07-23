@@ -33,6 +33,8 @@ type SpecificationParam struct {
 	KubernetesClusterId      *string                    `json:"kubernetesClusterId,omitempty"`
 	KubernetesNamespace      *string                    `json:"kubernetesNamespace,omitempty"`
 	KubernetesServiceAccount *string                    `json:"kubernetesServiceAccount,omitempty"`
+	KubernetesLBSubnets      []string                   `json:"kubernetesLoadBalancerSubnets,omitempty"`
+	ScheduleSpec             *string                    `json:"scheduleSpec,omitempty"`
 	InstanceRole             *string                    `json:"instanceRole,omitempty"`
 	DataBuckets              []BucketProfileParam       `json:"dataBuckets,omitempty"`
 }
@@ -244,6 +246,7 @@ type SpecificationVO struct {
 	KubernetesClusterId      *string                  `json:"kubernetesClusterId,omitempty"`
 	KubernetesNamespace      *string                  `json:"kubernetesNamespace,omitempty"`
 	KubernetesServiceAccount *string                  `json:"kubernetesServiceAccount,omitempty"`
+	KubernetesLBSubnets      []string                 `json:"kubernetesLoadBalancerSubnets,omitempty"`
 	InstanceRole             *string                  `json:"instanceRole,omitempty"`
 	DeployType               *string                  `json:"deployType,omitempty"`
 }

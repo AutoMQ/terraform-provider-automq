@@ -4,7 +4,7 @@ page_title: "automq_kafka_instance Data Source - automq"
 subcategory: ""
 description: |-
   Using the automq_kafka_instance data source, you can manage kafka resoure within instance.
-  Note: This provider version is only compatible with AutoMQ control plane versions 8.0 and later.
+  Note: This provider version is only compatible with AutoMQ control plane versions 8.0 and later. K8S scheduling with instance_types, kubernetes_load_balancer_subnets, and schedule_spec requires control plane version 8.3.6 or later.
 ---
 
 # automq_kafka_instance (Data Source)
@@ -13,7 +13,7 @@ description: |-
 
 Using the `automq_kafka_instance` data source, you can manage kafka resoure within instance.
 
-> **Note**: This provider version is only compatible with AutoMQ control plane versions 8.0 and later.
+> **Note**: This provider version is only compatible with AutoMQ control plane versions 8.0 and later. K8S scheduling with `instance_types`, `kubernetes_load_balancer_subnets`, and `schedule_spec` requires control plane version 8.3.6 or later.
 
 ## Example Usage
 
@@ -66,8 +66,9 @@ Read-Only:
 - `dns_zone` (String) DNS zone used when creating custom records.
 - `file_system_param` (Attributes) File system configuration for FSWAL mode (see [below for nested schema](#nestedatt--compute_specs--file_system_param))
 - `instance_role` (String) IAM role ARN for the Kafka instance.
-- `instance_types` (List of String) Instance type list for the nodes. Only available when `deploy_type` is `IAAS`; not returned for `K8S` deployments.
+- `instance_types` (List of String) Instance type list for the nodes.
 - `kubernetes_cluster_id` (String) Identifier for the target Kubernetes cluster.
+- `kubernetes_load_balancer_subnets` (List of String) Subnet IDs used by the Kubernetes load balancer.
 - `kubernetes_namespace` (String) Kubernetes namespace for the instance deployment.
 - `kubernetes_node_groups` (Attributes List) Kubernetes node groups configuration (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
 - `kubernetes_service_account` (String) Kubernetes service account for the instance pods.
@@ -75,6 +76,7 @@ Read-Only:
 - `pricing_mode` (String) Pricing mode for the instance. Values: `UsageBased` or `SubscriptionBased`.
 - `reserved_aku` (Number) AKU (AutoMQ Kafka Unit) defines the cluster scale. Each AKU provides up to 30 MiB/s write or 60 MiB/s read throughput. For sizing guidance, refer to the [billing documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints).
 - `reserved_node_count` (Number) Number of reserved nodes for the instance.
+- `schedule_spec` (String) Kubernetes scheduling specification. This value is not populated from API responses.
 - `security_groups` (List of String) Security groups for the instance
 
 <a id="nestedatt--compute_specs--data_buckets"></a>
