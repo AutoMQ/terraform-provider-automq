@@ -1,6 +1,18 @@
 # Terraform Provider AutoMQ
 
-Manage AutoMQ BYOC environments and Kafka resources (instances, topics, users, ACLs, mirroring) with Terraform. 
+Manage Kafka instances, topics, users, ACLs, and mirroring in an existing AutoMQ BYOC environment. Terraform sends these requests to the environment's Control Plane API; the cloud provider and region are selected when the environment is installed.
+
+## Cloud Support
+
+| Cloud | Deployment type | Minimum Control Plane version |
+|-------|-----------------|-------------------------------|
+| AWS | `IAAS` on EC2 | 8.0 |
+| AWS | `K8S` on EKS | 8.3.6 |
+| GCP | `K8S` on GKE Standard | 8.3.8 |
+
+GCP `IAAS` deployments and GKE Autopilot are not supported.
+
+> **Note**: `K8S` scheduling with `instance_types`, `kubernetes_load_balancer_subnets`, and `schedule_spec` requires AutoMQ Control Plane 8.3.6 or later.
 
 ## Requirements
 
@@ -18,7 +30,7 @@ terraform {
   required_providers {
     automq = {
       source  = "automq/automq"
-      version = "~> 0.1"
+      version = "~> 0.4.4"
     }
   }
 }
@@ -37,6 +49,7 @@ provider "automq" {
 Reusable configuration samples live under `examples/`. Highlights:
 - `examples/provider` – minimal provider configuration.
 - `examples/quick-start/aws` – end-to-end instance provisioning, with TLS automation for BYOC on AWS.
+- `examples/quick-start/gcp` – GKE Standard instance provisioning for a GCP BYOC environment running Control Plane 8.3.8 or later.
 - `examples/resources/*` – focused snippets that align with each resource schema (instance, link, mirror group/topic, ACL, etc.).
 
 Use these as references or copy them into your own configuration, updating IDs/secrets as needed.
@@ -67,8 +80,6 @@ Then commit the changes to `go.mod` and `go.sum`.
 
 ## Using the Provider
 
-The AutoMQ Terraform Provider manages resources within your AutoMQ BYOC (Bring Your Own Cloud) environment.
-
 ### Available Resources
 
 - **`automq_kafka_instance`** – Provision and manage Kafka instances (clusters) with compute specs, security, and feature configurations
@@ -89,7 +100,6 @@ The AutoMQ Terraform Provider manages resources within your AutoMQ BYOC (Bring Y
 - **Security & Compliance** – Configure TLS encryption, authentication methods, and ACL-based authorization
 - **Metrics Integration** – Export metrics to Prometheus or AWS Managed Service for Prometheus
 - **Cross-Cluster Mirroring** – Replicate topics and consumer groups between clusters
-- **AWS BYOC Support** – Deploy on AWS with EKS or EC2, leveraging your own cloud infrastructure
 
 For detailed usage examples and configuration options, refer to the [Terraform Registry documentation](https://registry.terraform.io/providers/automq/automq/latest/docs).
 

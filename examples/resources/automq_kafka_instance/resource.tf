@@ -1,3 +1,4 @@
+# AWS IAAS example
 resource "automq_kafka_instance" "example" {
   environment_id = var.automq_environment_id
   name           = "automq-example"

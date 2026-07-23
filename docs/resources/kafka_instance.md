@@ -4,7 +4,6 @@ page_title: "automq_kafka_instance Resource - automq"
 subcategory: ""
 description: |-
   Using the automq_kafka_instance resource type, you can create and manage Kafka instances, where each instance represents a physical cluster.
-  Note: This provider version is only compatible with AutoMQ control plane versions 8.0 and later. K8S scheduling with instance_types, kubernetes_load_balancer_subnets, and schedule_spec requires control plane version 8.3.6 or later.
 ---
 
 # automq_kafka_instance
@@ -13,11 +12,10 @@ description: |-
 
 Using the `automq_kafka_instance` resource type, you can create and manage Kafka instances, where each instance represents a physical cluster.
 
-> **Note**: This provider version is only compatible with AutoMQ control plane versions 8.0 and later. K8S scheduling with `instance_types`, `kubernetes_load_balancer_subnets`, and `schedule_spec` requires control plane version 8.3.6 or later.
-
 ## Example Usage
 
 ```terraform
+# AWS IAAS example
 resource "automq_kafka_instance" "example" {
   environment_id = var.automq_environment_id
   name           = "automq-example"
@@ -78,7 +76,7 @@ variable "automq_environment_id" {
 ### Required
 
 - `compute_specs` (Attributes) The compute specs of the instance (see [below for nested schema](#nestedatt--compute_specs))
-- `environment_id` (String) Target AutoMQ BYOC environment identifier (e.g. `env-xxxxx`). Find this on the AutoMQ console System Settings page.
+- `environment_id` (String) Target AutoMQ BYOC environment identifier (for example, `env-xxxxx`). The environment determines the cloud provider and region. Find the ID on the AutoMQ console System Settings page.
 - `features` (Attributes) Feature configuration for the Kafka instance including WAL mode, security, metrics, and table topics. (see [below for nested schema](#nestedatt--features))
 - `name` (String) The name of the Kafka instance. It can contain letters (a-z or A-Z), numbers (0-9), underscores (_), and hyphens (-), with a length limit of 3 to 64 characters.
 - `version` (String) The software version of AutoMQ instance. If you need to specify a version, refer to the [documentation](https://docs.automq.com/automq-cloud/release-notes) to choose the appropriate version number.
@@ -102,37 +100,37 @@ variable "automq_environment_id" {
 
 Required:
 
-- `networks` (Attributes List) To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones. (see [below for nested schema](#nestedatt--compute_specs--networks))
+- `networks` (Attributes List) Cloud placement information for the instance. Specify either one or three availability zones and any applicable subnet identifiers. Identifier formats depend on the target environment. (see [below for nested schema](#nestedatt--compute_specs--networks))
 
 Optional:
 
 - `data_buckets` (Attributes List) Inline bucket configuration replacing legacy bucket profiles. Omit this field to let backend manage the data bucket. Changing configured data bucket settings requires instance replacement. (see [below for nested schema](#nestedatt--compute_specs--data_buckets))
-- `deploy_type` (String) Deployment platform for the instance. `IAAS` deploys on EC2/VM instances; `K8S` deploys on a managed Kubernetes cluster (EKS/GKE/AKS). Supported values: `IAAS`, `K8S`. Changing deployment type requires instance replacement.
+- `deploy_type` (String) Deployment platform for the instance. Supported values are `IAAS` and `K8S`; availability depends on the target environment. AWS supports `IAAS` on EC2 and `K8S` on EKS. GCP supports `K8S` on GKE Standard with Control Plane 8.3.8 or later; GCP `IAAS` and GKE Autopilot are not supported. Changing deployment type requires instance replacement.
 - `dns_zone` (String) DNS zone used when creating custom records. Changing a configured DNS zone requires instance replacement.
-- `file_system_param` (Attributes) File system configuration for FSWAL mode (see [below for nested schema](#nestedatt--compute_specs--file_system_param))
-- `instance_role` (String) IAM role ARN for the Kafka instance. If not specified, the backend will auto-generate an appropriate role. Format: `arn:aws:iam::<account-id>:role/<role-name>`. Changing a configured instance role requires instance replacement.
+- `file_system_param` (Attributes) AWS `IAAS` file system configuration for `FSWAL` mode. This field is not supported for `K8S` or GCP deployments. (see [below for nested schema](#nestedatt--compute_specs--file_system_param))
+- `instance_role` (String) Data Plane cloud identity used by the Kafka instance. Omit this field to let the Control Plane manage the identity. For AWS, use an IAM Role ARN such as `arn:aws:iam::<account-id>:role/<role-name>`. For GCP, use a GSA full resource name such as `projects/<project>/serviceAccounts/<email>`. Changing a configured identity requires instance replacement.
 - `instance_types` (List of String) Instance type list for the nodes. Maximum 1 entry. Required when `deploy_type` is `K8S`, or when `pricing_mode` is `UsageBased` and `deploy_type` is `IAAS`. Can be updated in place for `IAAS` deployments; changing it for `K8S` deployments requires instance replacement.
-- `kubernetes_cluster_id` (String) Identifier for the target Kubernetes cluster when `deploy_type` is `K8S`. Changing the Kubernetes cluster requires instance replacement.
-- `kubernetes_load_balancer_subnets` (List of String) Subnet IDs used by the Kubernetes load balancer. Required when `deploy_type` is `K8S`. Changing them requires instance replacement.
+- `kubernetes_cluster_id` (String) Identifier for the target Kubernetes cluster when `deploy_type` is `K8S`. For GCP, use the full GKE resource name `projects/<project>/locations/<location>/clusters/<name>`. Changing the Kubernetes cluster requires instance replacement.
+- `kubernetes_load_balancer_subnets` (List of String) Subnet identifiers used by the Kubernetes load balancer. Required when `deploy_type` is `K8S`. For GCP, use full subnetwork resource names such as `projects/<project>/regions/<region>/subnetworks/<name>`. Changing them requires instance replacement.
 - `kubernetes_namespace` (String) Kubernetes namespace for the instance deployment. If not specified, the backend will auto-assign one. Changing a configured namespace requires instance replacement.
 - `kubernetes_node_groups` (Attributes List, Deprecated) Deprecated Kubernetes node group configuration. Removing this attribute from an existing configuration requires instance replacement; use `instance_types` and `schedule_spec` for new K8S instances. (see [below for nested schema](#nestedatt--compute_specs--kubernetes_node_groups))
 - `kubernetes_service_account` (String) Kubernetes service account for the instance pods. If not specified, the backend will auto-assign one. Changing a configured service account requires instance replacement.
 - `pricing_mode` (String) Pricing mode for the instance. Supported values: `UsageBased` (pay-as-you-go based on actual usage, requires `reserved_node_count`), `SubscriptionBased` (subscription-based pricing, requires `reserved_aku`). Defaults to `SubscriptionBased`. Changes to pricing mode require instance replacement.
 - `reserved_aku` (Number) AKU (AutoMQ Kafka Unit) defines the cluster scale. Each AKU provides up to 30 MiB/s write or 60 MiB/s read throughput. Minimum value is 3; maximum depends on your license quota. Required when `pricing_mode` is `SubscriptionBased`. For sizing guidance, refer to the [billing documentation](https://docs.automq.com/automq-cloud/subscriptions-and-billings/byoc-env-billings/billing-instructions-for-byoc#indicator-constraints).
 - `reserved_node_count` (Number) Number of reserved nodes for the instance. Valid range is 3 to 100. Required when `pricing_mode` is `UsageBased`.
-- `schedule_spec` (String) Kubernetes scheduling specification. Required when `deploy_type` is `K8S` and `kubernetes_node_groups` is omitted. Updates are not currently supported and will be rejected.
-- `security_groups` (List of String) Security groups for the instance. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group. Changing configured security groups requires instance replacement.
+- `schedule_spec` (String) Kubernetes affinity and tolerations YAML. Required when `deploy_type` is `K8S` and `kubernetes_node_groups` is omitted. The constraints must match the target cluster's node labels and taints. Requires Control Plane 8.3.6 or later. Updates are not currently supported and will be rejected.
+- `security_groups` (List of String) AWS security groups for the instance. Do not configure this field for GCP environments. On AWS, omit it to let the Control Plane manage security groups; if specified, it must contain at least one security group. Changing configured security groups requires instance replacement.
 
 <a id="nestedatt--compute_specs--networks"></a>
 ### Nested Schema for `compute_specs.networks`
 
 Required:
 
-- `zone` (String) Cloud provider availability zone ID (e.g. `us-east-1a` for AWS). Must match the zone of the specified subnet.
+- `zone` (String) Cloud provider availability zone ID (for example, `us-east-1a` on AWS or `us-central1-a` on GCP). Must match the zone of the specified subnet.
 
 Optional:
 
-- `subnets` (List of String) Specify the subnet under the corresponding availability zone for deploying the instance. Currently, only one subnet can be set for each availability zone.
+- `subnets` (List of String) Subnet identifiers associated with the availability zone. At most one subnet can be set for each zone. Use the identifier format required by the target environment.
 
 
 <a id="nestedatt--compute_specs--data_buckets"></a>
@@ -159,7 +157,7 @@ Changing this field requires resource replacement.
 
 Optional:
 
-- `security_groups` (List of String) Security groups for file systems. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group. Changing configured security groups requires instance replacement.
+- `security_groups` (List of String) AWS security groups for the file systems. Omit this field to let the Control Plane manage them. If specified, it must contain at least one security group. Changing configured security groups requires instance replacement.
 
 
 <a id="nestedatt--compute_specs--kubernetes_node_groups"></a>
@@ -177,7 +175,7 @@ Required:
 Required:
 
 - `security` (Attributes) (see [below for nested schema](#nestedatt--features--security))
-- `wal_mode` (String) Write-Ahead Log storage mode: `EBSWAL`, `S3WAL`, or `FSWAL`. `FSWAL` requires `file_system_param` and is not supported with `K8S` deploy type. See [WAL mode documentation](https://docs.automq.com/automq-cloud/manage-instances/create-instance/choose-wal-mode) for details.
+- `wal_mode` (String) Write-Ahead Log storage mode. `EBSWAL` uses block storage and `S3WAL` uses object storage; the underlying service depends on the target environment. `FSWAL` is AWS `IAAS` only, requires `file_system_param`, and is not supported with `K8S`. See the [WAL mode documentation](https://docs.automq.com/automq-cloud/manage-instances/create-instance/choose-wal-mode) for details.
 
 Optional:
 

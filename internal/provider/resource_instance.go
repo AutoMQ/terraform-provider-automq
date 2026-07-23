@@ -100,12 +100,11 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 	resp.Schema = schema.Schema{
 		// This description is used by the documentation generator and the language server.
 		MarkdownDescription: "![Preview](https://img.shields.io/badge/Lifecycle_Stage-Preview-blue?style=flat&logoColor=8A3BE2&labelColor=rgba)\n\n" +
-			"Using the `automq_kafka_instance` resource type, you can create and manage Kafka instances, where each instance represents a physical cluster.\n\n" +
-			"> **Note**: This provider version is only compatible with AutoMQ control plane versions 8.0 and later. K8S scheduling with `instance_types`, `kubernetes_load_balancer_subnets`, and `schedule_spec` requires control plane version 8.3.6 or later.",
+			"Using the `automq_kafka_instance` resource type, you can create and manage Kafka instances, where each instance represents a physical cluster.",
 
 		Attributes: map[string]schema.Attribute{
 			"environment_id": schema.StringAttribute{
-				MarkdownDescription: "Target AutoMQ BYOC environment identifier (e.g. `env-xxxxx`). Find this on the AutoMQ console System Settings page.",
+				MarkdownDescription: "Target AutoMQ BYOC environment identifier (for example, `env-xxxxx`). The environment determines the cloud provider and region. Find the ID on the AutoMQ console System Settings page.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
@@ -186,7 +185,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					"deploy_type": schema.StringAttribute{
 						Optional:            true,
 						Computed:            true,
-						MarkdownDescription: "Deployment platform for the instance. `IAAS` deploys on EC2/VM instances; `K8S` deploys on a managed Kubernetes cluster (EKS/GKE/AKS). Supported values: `IAAS`, `K8S`. Changing deployment type requires instance replacement.",
+						MarkdownDescription: "Deployment platform for the instance. Supported values are `IAAS` and `K8S`; availability depends on the target environment. AWS supports `IAAS` on EC2 and `K8S` on EKS. GCP supports `K8S` on GKE Standard with Control Plane 8.3.8 or later; GCP `IAAS` and GKE Autopilot are not supported. Changing deployment type requires instance replacement.",
 						Default:             stringdefault.StaticString("IAAS"),
 						Validators: []validator.String{
 							stringvalidator.OneOf("IAAS", "K8S"),
@@ -206,7 +205,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					},
 					"networks": schema.ListNestedAttribute{
 						Required:            true,
-						MarkdownDescription: "To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones.",
+						MarkdownDescription: "Cloud placement information for the instance. Specify either one or three availability zones and any applicable subnet identifiers. Identifier formats depend on the target environment.",
 						Validators: []validator.List{
 							listvalidator.UniqueValues(),
 							listvalidator.SizeAtMost(3),
@@ -216,12 +215,12 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							Attributes: map[string]schema.Attribute{
 								"zone": schema.StringAttribute{
 									Required:            true,
-									MarkdownDescription: "Cloud provider availability zone ID (e.g. `us-east-1a` for AWS). Must match the zone of the specified subnet.",
+									MarkdownDescription: "Cloud provider availability zone ID (for example, `us-east-1a` on AWS or `us-central1-a` on GCP). Must match the zone of the specified subnet.",
 									PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 								},
 								"subnets": schema.ListAttribute{
 									Optional:            true,
-									MarkdownDescription: "Specify the subnet under the corresponding availability zone for deploying the instance. Currently, only one subnet can be set for each availability zone.",
+									MarkdownDescription: "Subnet identifiers associated with the availability zone. At most one subnet can be set for each zone. Use the identifier format required by the target environment.",
 									ElementType:         types.StringType,
 									Validators: []validator.List{
 										listvalidator.UniqueValues(),
@@ -273,7 +272,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					},
 					"kubernetes_cluster_id": schema.StringAttribute{
 						Optional:            true,
-						MarkdownDescription: "Identifier for the target Kubernetes cluster when `deploy_type` is `K8S`. Changing the Kubernetes cluster requires instance replacement.",
+						MarkdownDescription: "Identifier for the target Kubernetes cluster when `deploy_type` is `K8S`. For GCP, use the full GKE resource name `projects/<project>/locations/<location>/clusters/<name>`. Changing the Kubernetes cluster requires instance replacement.",
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.RequiresReplace(),
 						},
@@ -299,7 +298,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					"kubernetes_load_balancer_subnets": schema.ListAttribute{
 						ElementType:         types.StringType,
 						Optional:            true,
-						MarkdownDescription: "Subnet IDs used by the Kubernetes load balancer. Required when `deploy_type` is `K8S`. Changing them requires instance replacement.",
+						MarkdownDescription: "Subnet identifiers used by the Kubernetes load balancer. Required when `deploy_type` is `K8S`. For GCP, use full subnetwork resource names such as `projects/<project>/regions/<region>/subnetworks/<name>`. Changing them requires instance replacement.",
 						Validators: []validator.List{
 							listvalidator.UniqueValues(),
 							listvalidator.SizeAtLeast(1),
@@ -308,12 +307,12 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					},
 					"schedule_spec": schema.StringAttribute{
 						Optional:            true,
-						MarkdownDescription: "Kubernetes scheduling specification. Required when `deploy_type` is `K8S` and `kubernetes_node_groups` is omitted. Updates are not currently supported and will be rejected.",
+						MarkdownDescription: "Kubernetes affinity and tolerations YAML. Required when `deploy_type` is `K8S` and `kubernetes_node_groups` is omitted. The constraints must match the target cluster's node labels and taints. Requires Control Plane 8.3.6 or later. Updates are not currently supported and will be rejected.",
 					},
 					"instance_role": schema.StringAttribute{
 						Computed:            true,
 						Optional:            true,
-						MarkdownDescription: "IAM role ARN for the Kafka instance. If not specified, the backend will auto-generate an appropriate role. Format: `arn:aws:iam::<account-id>:role/<role-name>`. Changing a configured instance role requires instance replacement.",
+						MarkdownDescription: "Data Plane cloud identity used by the Kafka instance. Omit this field to let the Control Plane manage the identity. For AWS, use an IAM Role ARN such as `arn:aws:iam::<account-id>:role/<role-name>`. For GCP, use a GSA full resource name such as `projects/<project>/serviceAccounts/<email>`. Changing a configured identity requires instance replacement.",
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.RequiresReplaceIfConfigured(),
 							stringplanmodifier.UseStateForUnknown(),
@@ -323,7 +322,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 						ElementType:         types.StringType,
 						Optional:            true,
 						Computed:            true,
-						MarkdownDescription: "Security groups for the instance. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group. Changing configured security groups requires instance replacement.",
+						MarkdownDescription: "AWS security groups for the instance. Do not configure this field for GCP environments. On AWS, omit it to let the Control Plane manage security groups; if specified, it must contain at least one security group. Changing configured security groups requires instance replacement.",
 						PlanModifiers: []planmodifier.List{
 							listplanmodifier.RequiresReplaceIfConfigured(),
 							listplanmodifier.UseStateForUnknown(),
@@ -334,7 +333,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					},
 					"file_system_param": schema.SingleNestedAttribute{
 						Optional:            true,
-						MarkdownDescription: "File system configuration for FSWAL mode",
+						MarkdownDescription: "AWS `IAAS` file system configuration for `FSWAL` mode. This field is not supported for `K8S` or GCP deployments.",
 						Attributes: map[string]schema.Attribute{
 							"file_system_type": schema.StringAttribute{
 								Required:            true,
@@ -364,7 +363,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 								ElementType:         types.StringType,
 								Optional:            true,
 								Computed:            true,
-								MarkdownDescription: "Security groups for file systems. Omit this field entirely to let backend auto-generate. If specified, must contain at least one security group. Changing configured security groups requires instance replacement.",
+								MarkdownDescription: "AWS security groups for the file systems. Omit this field to let the Control Plane manage them. If specified, it must contain at least one security group. Changing configured security groups requires instance replacement.",
 								PlanModifiers: []planmodifier.List{
 									listplanmodifier.RequiresReplaceIfConfigured(),
 									listplanmodifier.UseStateForUnknown(),
@@ -383,7 +382,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				Attributes: map[string]schema.Attribute{
 					"wal_mode": schema.StringAttribute{
 						Required:            true,
-						MarkdownDescription: "Write-Ahead Log storage mode: `EBSWAL`, `S3WAL`, or `FSWAL`. `FSWAL` requires `file_system_param` and is not supported with `K8S` deploy type. See [WAL mode documentation](https://docs.automq.com/automq-cloud/manage-instances/create-instance/choose-wal-mode) for details.",
+						MarkdownDescription: "Write-Ahead Log storage mode. `EBSWAL` uses block storage and `S3WAL` uses object storage; the underlying service depends on the target environment. `FSWAL` is AWS `IAAS` only, requires `file_system_param`, and is not supported with `K8S`. See the [WAL mode documentation](https://docs.automq.com/automq-cloud/manage-instances/create-instance/choose-wal-mode) for details.",
 						Validators: []validator.String{
 							stringvalidator.OneOf("EBSWAL", "S3WAL", "FSWAL"),
 						},
