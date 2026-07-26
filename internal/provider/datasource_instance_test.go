@@ -50,6 +50,14 @@ func TestKafkaInstanceDataSourceSchema(t *testing.T) {
 	_, exists = fileSystemParamNested.Attributes["security_groups"]
 	assert.True(t, exists, "security_groups should exist")
 
+	subnetIDs, exists := fileSystemParamNested.Attributes["subnet_ids"]
+	assert.True(t, exists, "subnet_ids should exist")
+	subnetIDsAttr, ok := subnetIDs.(schema.ListAttribute)
+	if !ok {
+		t.Fatalf("subnet_ids has unexpected type %T", subnetIDs)
+	}
+	assert.True(t, subnetIDsAttr.IsComputed(), "subnet_ids should be computed")
+
 	// Verify WAL mode description includes FSWAL
 	features, exists := resp.Schema.Attributes["features"]
 	assert.True(t, exists, "features should exist in schema")

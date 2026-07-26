@@ -125,9 +125,21 @@ variable "kubernetes_service_account" {
 }
 
 variable "wal_mode" {
-  description = "WAL mode (EBSWAL or S3WAL)"
+  description = "WAL mode (EBSWAL, S3WAL, or FSWAL)"
   type        = string
   default     = "EBSWAL"
+}
+
+variable "file_system_param" {
+  description = "FSWAL file system configuration. For K8S, use EFS_PROVISIONED and provide at least three subnet_ids covering the selected availability zones."
+  type = object({
+    file_system_type                 = string
+    throughput_mibps_per_file_system = number
+    file_system_count                = number
+    security_groups                  = optional(list(string))
+    subnet_ids                       = optional(list(string))
+  })
+  default = null
 }
 
 variable "instance_configs" {

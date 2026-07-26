@@ -102,6 +102,7 @@ type FileSystemParamModel struct {
 	ThroughputMibpsPerFileSystem types.Int64  `tfsdk:"throughput_mibps_per_file_system"`
 	FileSystemCount              types.Int64  `tfsdk:"file_system_count"`
 	SecurityGroups               types.List   `tfsdk:"security_groups"`
+	SubnetIDs                    types.List   `tfsdk:"subnet_ids"`
 }
 
 var NetworkObjectType = types.ObjectType{
@@ -129,6 +130,7 @@ var FileSystemParamObjectType = types.ObjectType{
 		"throughput_mibps_per_file_system": types.Int64Type,
 		"file_system_count":                types.Int64Type,
 		"security_groups":                  types.ListType{ElemType: types.StringType},
+		"subnet_ids":                       types.ListType{ElemType: types.StringType},
 	},
 }
 
@@ -258,6 +260,9 @@ func FileSystemParamModelToObject(ctx context.Context, model *FileSystemParamMod
 	}
 	if normalized.SecurityGroups.IsNull() {
 		normalized.SecurityGroups = types.ListNull(types.StringType)
+	}
+	if normalized.SubnetIDs.IsNull() {
+		normalized.SubnetIDs = types.ListNull(types.StringType)
 	}
 	return types.ObjectValueFrom(ctx, FileSystemParamObjectType.AttrTypes, normalized)
 }
@@ -806,6 +811,17 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 					fileSystemParam.SecurityGroups = securityGroups
 				}
 			}
+			if !fileSystemModel.SubnetIDs.IsNull() &&
+				!fileSystemModel.SubnetIDs.IsUnknown() {
+				var subnetIDs []string
+				diags := fileSystemModel.SubnetIDs.ElementsAs(ctx, &subnetIDs, false)
+				if diags.HasError() {
+					return fmt.Errorf("failed to parse compute_specs.file_system_param.subnet_ids: %v", diags.Errors())
+				}
+				if len(subnetIDs) > 0 {
+					fileSystemParam.SubnetIds = subnetIDs
+				}
+			}
 
 			request.Spec.FileSystem = fileSystemParam
 		}
@@ -1275,6 +1291,7 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 				ThroughputMibpsPerFileSystem: types.Int64Null(),
 				FileSystemCount:              types.Int64Null(),
 				SecurityGroups:               types.ListNull(types.StringType),
+				SubnetIDs:                    types.ListNull(types.StringType),
 			}
 
 			// Copy previous values if they exist
@@ -1283,6 +1300,9 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 				fileSystemParam.ThroughputMibpsPerFileSystem = previousFileSystemParam.ThroughputMibpsPerFileSystem
 				fileSystemParam.FileSystemCount = previousFileSystemParam.FileSystemCount
 				fileSystemParam.SecurityGroups = previousFileSystemParam.SecurityGroups
+				if !previousFileSystemParam.SubnetIDs.IsNull() && !previousFileSystemParam.SubnetIDs.IsUnknown() {
+					fileSystemParam.SubnetIDs = previousFileSystemParam.SubnetIDs
+				}
 			}
 
 			// Update with API response values
@@ -1301,6 +1321,14 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 					fileSystemParam.SecurityGroups = securityGroupsList
 				}
 			}
+			if len(instance.Spec.FileSystem.SubnetIds) > 0 {
+				subnetIDsList, subnetDiags := types.ListValueFrom(ctx, types.StringType, instance.Spec.FileSystem.SubnetIds)
+				if subnetDiags.HasError() {
+					diags.Append(subnetDiags...)
+				} else {
+					fileSystemParam.SubnetIDs = subnetIDsList
+				}
+			}
 
 			fileSystemObject, objectDiags := FileSystemParamModelToObject(ctx, fileSystemParam)
 			if objectDiags.HasError() {
@@ -1309,8 +1337,18 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 				resource.ComputeSpecs.FileSystemParam = fileSystemObject
 			}
 		} else if previousFileSystemParam != nil {
-			// Preserve previous file system parameters if API doesn't return them
-			resource.ComputeSpecs.FileSystemParam = previousSpecs.FileSystemParam
+			// Preserve previous file system parameters if API doesn't return them,
+			// but do not persist an unknown planned subnet list into state.
+			preservedFileSystemParam := *previousFileSystemParam
+			if preservedFileSystemParam.SubnetIDs.IsNull() || preservedFileSystemParam.SubnetIDs.IsUnknown() {
+				preservedFileSystemParam.SubnetIDs = types.ListNull(types.StringType)
+			}
+			fileSystemObject, objectDiags := FileSystemParamModelToObject(ctx, &preservedFileSystemParam)
+			if objectDiags.HasError() {
+				diags.Append(objectDiags...)
+			} else {
+				resource.ComputeSpecs.FileSystemParam = fileSystemObject
+			}
 		} else {
 			resource.ComputeSpecs.FileSystemParam = types.ObjectNull(FileSystemParamObjectType.AttrTypes)
 		}

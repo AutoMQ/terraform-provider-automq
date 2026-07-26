@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"terraform-provider-automq/client"
 	"terraform-provider-automq/internal/framework"
@@ -333,7 +334,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					},
 					"file_system_param": schema.SingleNestedAttribute{
 						Optional:            true,
-						MarkdownDescription: "AWS `IAAS` file system configuration for `FSWAL` mode. This field is not supported for `K8S` or GCP deployments.",
+						MarkdownDescription: "AWS file system configuration for `FSWAL` mode. `IAAS` supports EFS and FSx for ONTAP. `K8S` supports EFS only and requires `subnet_ids`. This field is not supported for GCP deployments.",
 						Attributes: map[string]schema.Attribute{
 							"file_system_type": schema.StringAttribute{
 								Required:            true,
@@ -347,14 +348,14 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							},
 							"throughput_mibps_per_file_system": schema.Int64Attribute{
 								Required:            true,
-								MarkdownDescription: "Throughput in MiBps per file system",
+								MarkdownDescription: "Throughput in MiBps per file system. EFS requires a value between 10 and 1024.",
 								Validators: []validator.Int64{
 									int64validator.AtLeast(1),
 								},
 							},
 							"file_system_count": schema.Int64Attribute{
 								Required:            true,
-								MarkdownDescription: "Number of file systems",
+								MarkdownDescription: "Number of file systems. EFS requires exactly one file system.",
 								Validators: []validator.Int64{
 									int64validator.AtLeast(1),
 								},
@@ -372,6 +373,23 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 									listvalidator.SizeAtLeast(1),
 								},
 							},
+							"subnet_ids": schema.ListAttribute{
+								ElementType:         types.StringType,
+								Optional:            true,
+								Computed:            true,
+								MarkdownDescription: "AWS subnet IDs used for EFS mount targets. Required for `K8S` `FSWAL` deployments and must contain at least three unique, non-blank IDs covering all selected availability zones. Omit for `IAAS`. Changing configured subnet IDs requires instance replacement.",
+								PlanModifiers: []planmodifier.List{
+									listplanmodifier.RequiresReplaceIfConfigured(),
+									listplanmodifier.UseStateForUnknown(),
+								},
+								Validators: []validator.List{
+									listvalidator.UniqueValues(),
+									listvalidator.SizeAtLeast(3),
+									listvalidator.ValueStringsAre(
+										stringvalidator.RegexMatches(regexp.MustCompile(`\S`), "must contain a non-whitespace character"),
+									),
+								},
+							},
 						},
 					},
 				},
@@ -382,7 +400,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 				Attributes: map[string]schema.Attribute{
 					"wal_mode": schema.StringAttribute{
 						Required:            true,
-						MarkdownDescription: "Write-Ahead Log storage mode. `EBSWAL` uses block storage and `S3WAL` uses object storage; the underlying service depends on the target environment. `FSWAL` is AWS `IAAS` only, requires `file_system_param`, and is not supported with `K8S`. See the [WAL mode documentation](https://docs.automq.com/automq-cloud/manage-instances/create-instance/choose-wal-mode) for details.",
+						MarkdownDescription: "Write-Ahead Log storage mode. `EBSWAL` uses block storage and `S3WAL` uses object storage; the underlying service depends on the target environment. `FSWAL` requires `file_system_param`; AWS `K8S` deployments support `FSWAL` only with EFS and file-system subnet IDs. See the [WAL mode documentation](https://docs.automq.com/automq-cloud/manage-instances/create-instance/choose-wal-mode) for details.",
 						Validators: []validator.String{
 							stringvalidator.OneOf("EBSWAL", "S3WAL", "FSWAL"),
 						},
@@ -786,13 +804,15 @@ func validateWalModeContract(ctx context.Context, plan *models.KafkaInstanceReso
 	if plan.Features != nil {
 		walMode, walModeSet := knownStringValue(plan.Features.WalMode)
 		if walModeSet && strings.EqualFold(walMode, "FSWAL") {
+			var fileSystemParam *models.FileSystemParamModel
 			if !hasFileSystemParam {
 				diagnostics.AddError(
 					"Invalid Configuration",
 					"file_system_param configuration is required when wal_mode is FSWAL",
 				)
 			} else {
-				fileSystemParam, fileSystemDiags := models.FileSystemParamObjectToModel(ctx, plan.ComputeSpecs.FileSystemParam)
+				var fileSystemDiags diag.Diagnostics
+				fileSystemParam, fileSystemDiags = models.FileSystemParamObjectToModel(ctx, plan.ComputeSpecs.FileSystemParam)
 				diagnostics.Append(fileSystemDiags...)
 				if fileSystemDiags.HasError() {
 					return diagnostics
@@ -818,13 +838,40 @@ func validateWalModeContract(ctx context.Context, plan *models.KafkaInstanceReso
 						"file_system_count is required when wal_mode is FSWAL",
 					)
 				}
+				if fileSystemType, known := knownStringValue(fileSystemParam.FileSystemType); known &&
+					strings.EqualFold(fileSystemType, "EFS_PROVISIONED") {
+					if throughput, known := knownInt64Value(fileSystemParam.ThroughputMibpsPerFileSystem); known &&
+						(throughput < 10 || throughput > 1024) {
+						diagnostics.AddError(
+							"Invalid Configuration",
+							"When compute_specs.file_system_param.file_system_type is EFS_PROVISIONED, compute_specs.file_system_param.throughput_mibps_per_file_system must be between 10 and 1024.",
+						)
+					}
+					if fileSystemCount, known := knownInt64Value(fileSystemParam.FileSystemCount); known &&
+						fileSystemCount != 1 {
+						diagnostics.AddError(
+							"Invalid Configuration",
+							"When compute_specs.file_system_param.file_system_type is EFS_PROVISIONED, compute_specs.file_system_param.file_system_count must be 1.",
+						)
+					}
+				}
 			}
 
-			if deployType, ok := knownStringValue(plan.ComputeSpecs.DeployType); ok && strings.EqualFold(deployType, "K8S") {
-				diagnostics.AddError(
-					"Invalid Configuration",
-					"FSWAL is not supported with K8S deployment type",
-				)
+			if deployType, ok := knownStringValue(plan.ComputeSpecs.DeployType); ok &&
+				strings.EqualFold(deployType, "K8S") && fileSystemParam != nil {
+				if fileSystemType, known := knownStringValue(fileSystemParam.FileSystemType); known &&
+					!strings.EqualFold(fileSystemType, "EFS_PROVISIONED") {
+					diagnostics.AddError(
+						"Invalid Configuration",
+						"When compute_specs.deploy_type is K8S and features.wal_mode is FSWAL, compute_specs.file_system_param.file_system_type must be EFS_PROVISIONED.",
+					)
+				}
+				if fileSystemParam.SubnetIDs.IsNull() {
+					diagnostics.AddError(
+						"Invalid Configuration",
+						"When compute_specs.deploy_type is K8S and features.wal_mode is FSWAL, compute_specs.file_system_param.subnet_ids must be provided.",
+					)
+				}
 			}
 		} else if hasFileSystemParam {
 			diagnostics.AddError(

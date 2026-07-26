@@ -299,6 +299,9 @@ func TestSpecificationUpdateParamMatchesBackendPatchContract(t *testing.T) {
 	if _, ok := fileSystemType.FieldByName("SecurityGroups"); ok {
 		t.Fatalf("FileSystemUpdateParam must not include backend-managed security_groups")
 	}
+	if _, ok := fileSystemType.FieldByName("SubnetIds"); ok {
+		t.Fatalf("FileSystemUpdateParam must not include create-only subnet_ids")
+	}
 }
 
 func TestFileSystemUpdateParamChangedOnlyConsidersPatchFields(t *testing.T) {
@@ -309,6 +312,11 @@ func TestFileSystemUpdateParamChangedOnlyConsidersPatchFields(t *testing.T) {
 		SecurityGroups: types.ListValueMust(types.StringType, []attr.Value{
 			types.StringValue("sg-state"),
 		}),
+		SubnetIDs: types.ListValueMust(types.StringType, []attr.Value{
+			types.StringValue("subnet-a"),
+			types.StringValue("subnet-b"),
+			types.StringValue("subnet-c"),
+		}),
 	}
 
 	planCreateOnlyChanged := &models.FileSystemParamModel{
@@ -318,9 +326,14 @@ func TestFileSystemUpdateParamChangedOnlyConsidersPatchFields(t *testing.T) {
 		SecurityGroups: types.ListValueMust(types.StringType, []attr.Value{
 			types.StringValue("sg-plan"),
 		}),
+		SubnetIDs: types.ListValueMust(types.StringType, []attr.Value{
+			types.StringValue("subnet-d"),
+			types.StringValue("subnet-e"),
+			types.StringValue("subnet-f"),
+		}),
 	}
 	if fileSystemUpdateParamChanged(planCreateOnlyChanged, state) {
-		t.Fatalf("file system type and security_groups changes must not be treated as PATCH updates")
+		t.Fatalf("file system type, security_groups, and subnet_ids changes must not be treated as PATCH updates")
 	}
 
 	planThroughputChanged := &models.FileSystemParamModel{
@@ -924,7 +937,7 @@ func TestValidateKafkaInstanceConfiguration_FSWALValid(t *testing.T) {
 			FileSystemParam: testFileSystemObject(t, &models.FileSystemParamModel{
 				FileSystemType:               types.StringValue("EFS_PROVISIONED"),
 				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
-				FileSystemCount:              types.Int64Value(2),
+				FileSystemCount:              types.Int64Value(1),
 				SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-test")}),
 			}),
 		},
@@ -936,6 +949,150 @@ func TestValidateKafkaInstanceConfiguration_FSWALValid(t *testing.T) {
 	diags := validateInstanceContract(context.Background(), plan)
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics for valid FSWAL configuration: %v", diags)
+	}
+}
+
+func TestValidateKafkaInstanceConfiguration_K8SEFSWALValid(t *testing.T) {
+	plan := testK8SFSWALPlan(t, "EFS_PROVISIONED", types.ListValueMust(types.StringType, []attr.Value{
+		types.StringValue("subnet-a"),
+		types.StringValue("subnet-b"),
+		types.StringValue("subnet-c"),
+	}))
+
+	if diags := validateInstanceContract(context.Background(), plan); diags.HasError() {
+		t.Fatalf("unexpected diagnostics for valid K8S EFS WAL configuration: %v", diags)
+	}
+}
+
+func TestValidateKafkaInstanceConfiguration_K8SEFSWALConstraints(t *testing.T) {
+	subnetIDs := types.ListValueMust(types.StringType, []attr.Value{
+		types.StringValue("subnet-a"),
+		types.StringValue("subnet-b"),
+		types.StringValue("subnet-c"),
+	})
+	tests := []struct {
+		name       string
+		throughput int64
+		count      int64
+		wantDetail string
+	}{
+		{
+			name:       "throughput below minimum",
+			throughput: 9,
+			count:      1,
+			wantDetail: "must be between 10 and 1024",
+		},
+		{
+			name:       "throughput above maximum",
+			throughput: 1025,
+			count:      1,
+			wantDetail: "must be between 10 and 1024",
+		},
+		{
+			name:       "more than one file system",
+			throughput: 100,
+			count:      2,
+			wantDetail: "file_system_count must be 1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plan := testK8SFSWALPlan(t, "EFS_PROVISIONED", subnetIDs)
+			plan.ComputeSpecs.FileSystemParam = testFileSystemObject(t, &models.FileSystemParamModel{
+				FileSystemType:               types.StringValue("EFS_PROVISIONED"),
+				ThroughputMibpsPerFileSystem: types.Int64Value(tt.throughput),
+				FileSystemCount:              types.Int64Value(tt.count),
+				SecurityGroups:               types.ListNull(types.StringType),
+				SubnetIDs:                    subnetIDs,
+			})
+
+			diags := validateInstanceContract(context.Background(), plan)
+			if !diags.HasError() {
+				t.Fatalf("expected diagnostics for invalid EFS configuration")
+			}
+			for _, d := range diags {
+				if strings.Contains(d.Detail(), tt.wantDetail) {
+					return
+				}
+			}
+			t.Fatalf("expected error containing %q, got: %v", tt.wantDetail, diags)
+		})
+	}
+}
+
+func TestValidateKafkaInstanceConfiguration_K8SFSWALRequiresSubnetIDs(t *testing.T) {
+	plan := testK8SFSWALPlan(t, "EFS_PROVISIONED", types.ListNull(types.StringType))
+
+	diags := validateInstanceContract(context.Background(), plan)
+	if !diags.HasError() {
+		t.Fatal("expected diagnostics when K8S FSWAL omits subnet_ids")
+	}
+	for _, d := range diags {
+		if strings.Contains(d.Detail(), "file_system_param.subnet_ids") {
+			return
+		}
+	}
+	t.Fatalf("expected error mentioning file_system_param.subnet_ids, got: %v", diags)
+}
+
+func TestValidateKafkaInstanceConfiguration_K8SFSWALRequiresEFS(t *testing.T) {
+	plan := testK8SFSWALPlan(t, "ONTAP_V2", types.ListValueMust(types.StringType, []attr.Value{
+		types.StringValue("subnet-a"),
+		types.StringValue("subnet-b"),
+		types.StringValue("subnet-c"),
+	}))
+
+	diags := validateInstanceContract(context.Background(), plan)
+	if !diags.HasError() {
+		t.Fatal("expected diagnostics when K8S FSWAL uses ONTAP_V2")
+	}
+	for _, d := range diags {
+		if strings.Contains(d.Detail(), "EFS_PROVISIONED") {
+			return
+		}
+	}
+	t.Fatalf("expected error mentioning EFS_PROVISIONED, got: %v", diags)
+}
+
+func TestValidateKafkaInstanceConfiguration_K8SFSWALDefersUnknownSubnetIDs(t *testing.T) {
+	plan := testK8SFSWALPlan(t, "EFS_PROVISIONED", types.ListUnknown(types.StringType))
+
+	if diags := validateInstanceContract(context.Background(), plan); diags.HasError() {
+		t.Fatalf("unknown subnet_ids should be deferred until known: %v", diags)
+	}
+}
+
+func testK8SFSWALPlan(t *testing.T, fileSystemType string, subnetIDs types.List) *models.KafkaInstanceResourceModel {
+	t.Helper()
+	return &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			ReservedAku:         types.Int64Value(6),
+			DeployType:          types.StringValue("K8S"),
+			KubernetesClusterID: types.StringValue("cluster-1"),
+			InstanceTypes: types.ListValueMust(types.StringType, []attr.Value{
+				types.StringValue("m7i.large"),
+			}),
+			KubernetesNodeGroups: testNodeGroupList(t, []models.NodeGroupModel{{
+				ID: types.StringValue("node-group-1"),
+			}}),
+			KubernetesLBSubnets: types.ListValueMust(types.StringType, []attr.Value{
+				types.StringValue("subnet-lb"),
+			}),
+			Networks: testNetworkList(t, []models.NetworkModel{
+				{Zone: types.StringValue("us-east-1a"), Subnets: types.ListNull(types.StringType)},
+				{Zone: types.StringValue("us-east-1b"), Subnets: types.ListNull(types.StringType)},
+				{Zone: types.StringValue("us-east-1c"), Subnets: types.ListNull(types.StringType)},
+			}),
+			FileSystemParam: testFileSystemObject(t, &models.FileSystemParamModel{
+				FileSystemType:               types.StringValue(fileSystemType),
+				ThroughputMibpsPerFileSystem: types.Int64Value(100),
+				FileSystemCount:              types.Int64Value(1),
+				SecurityGroups:               types.ListNull(types.StringType),
+				SubnetIDs:                    subnetIDs,
+			}),
+		},
+		Features: &models.FeaturesModel{WalMode: types.StringValue("FSWAL")},
 	}
 }
 
@@ -1170,6 +1327,82 @@ func TestFileSystemParamValidators(t *testing.T) {
 	}
 	requireConfiguredOnlyListReplacement(t, securityGroupsAttr.PlanModifiers)
 }
+
+func TestFileSystemSubnetIDsSchema(t *testing.T) {
+	s := getKafkaInstanceResourceSchema(t)
+	computeAttr, ok := s.Attributes["compute_specs"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("compute_specs attribute has unexpected type %T", s.Attributes["compute_specs"])
+	}
+	fileSystemAttr, ok := computeAttr.Attributes["file_system_param"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("file_system_param attribute has unexpected type %T", computeAttr.Attributes["file_system_param"])
+	}
+	if !strings.Contains(fileSystemAttr.MarkdownDescription, "K8S") ||
+		!strings.Contains(fileSystemAttr.MarkdownDescription, "EFS") {
+		t.Fatalf("file_system_param description should document K8S EFS support: %q", fileSystemAttr.MarkdownDescription)
+	}
+
+	subnetIDsAttr, ok := fileSystemAttr.Attributes["subnet_ids"].(schema.ListAttribute)
+	if !ok {
+		t.Fatalf("subnet_ids attribute has unexpected type %T", fileSystemAttr.Attributes["subnet_ids"])
+	}
+	if !subnetIDsAttr.Optional || !subnetIDsAttr.Computed {
+		t.Fatal("subnet_ids should be optional and computed")
+	}
+	if !hasListRequiresReplace(subnetIDsAttr.PlanModifiers) {
+		t.Fatalf("expected subnet_ids to require replacement, modifiers: %v", subnetIDsAttr.PlanModifiers)
+	}
+	requireConfiguredOnlyListReplacement(t, subnetIDsAttr.PlanModifiers)
+
+	validate := func(value types.List) bool {
+		t.Helper()
+		hasError := false
+		for _, v := range subnetIDsAttr.Validators {
+			req := validator.ListRequest{
+				ConfigValue: value,
+				Path:        path.Root("compute_specs").AtName("file_system_param").AtName("subnet_ids"),
+			}
+			resp := validator.ListResponse{}
+			v.ValidateList(context.Background(), req, &resp)
+			hasError = hasError || resp.Diagnostics.HasError()
+		}
+		return hasError
+	}
+
+	valid := types.ListValueMust(types.StringType, []attr.Value{
+		types.StringValue("subnet-a"),
+		types.StringValue("subnet-b"),
+		types.StringValue("subnet-c"),
+	})
+	if validate(valid) {
+		t.Fatal("valid subnet_ids should pass all schema validators")
+	}
+	invalidValues := map[string]types.List{
+		"fewer than three": types.ListValueMust(types.StringType, []attr.Value{
+			types.StringValue("subnet-a"),
+			types.StringValue("subnet-b"),
+		}),
+		"duplicate": types.ListValueMust(types.StringType, []attr.Value{
+			types.StringValue("subnet-a"),
+			types.StringValue("subnet-a"),
+			types.StringValue("subnet-c"),
+		}),
+		"blank": types.ListValueMust(types.StringType, []attr.Value{
+			types.StringValue("subnet-a"),
+			types.StringValue(" "),
+			types.StringValue("subnet-c"),
+		}),
+	}
+	for name, value := range invalidValues {
+		t.Run(name, func(t *testing.T) {
+			if !validate(value) {
+				t.Fatalf("%s subnet_ids should fail schema validation", name)
+			}
+		})
+	}
+}
+
 func TestSecurityGroupsValidator(t *testing.T) {
 	s := getKafkaInstanceResourceSchema(t)
 	computeAttrRaw, ok := s.Attributes["compute_specs"].(schema.SingleNestedAttribute)
@@ -1320,7 +1553,7 @@ func TestValidateKafkaInstanceConfiguration_FSWALWithUnknownSecurityGroups(t *te
 			FileSystemParam: testFileSystemObject(t, &models.FileSystemParamModel{
 				FileSystemType:               types.StringValue("EFS_PROVISIONED"),
 				ThroughputMibpsPerFileSystem: types.Int64Value(1000),
-				FileSystemCount:              types.Int64Value(2),
+				FileSystemCount:              types.Int64Value(1),
 				SecurityGroups:               types.ListUnknown(types.StringType), // Unknown during planning
 			}),
 		},

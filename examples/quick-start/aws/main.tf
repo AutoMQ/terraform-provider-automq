@@ -43,6 +43,7 @@ resource "automq_kafka_instance" "k8s" {
     kubernetes_node_groups           = local.is_k8s ? var.kubernetes_node_groups : null
     kubernetes_namespace             = local.is_k8s ? var.kubernetes_namespace : null
     kubernetes_service_account       = local.is_k8s ? var.kubernetes_service_account : null
+    file_system_param                = var.file_system_param
   }
 
   features = {

@@ -17,6 +17,12 @@ func TestInstanceCreateParamMarshalMatchesNewContract(t *testing.T) {
 			Region:              stringPtr("us-east-1"),
 			Vpc:                 stringPtr("vpc-123"),
 			DataBuckets:         []BucketProfileParam{{BucketName: "data-bucket"}},
+			FileSystem: &FileSystemParam{
+				FileSystemType:               stringPtr("EFS_PROVISIONED"),
+				ThroughputMiBpsPerFileSystem: 100,
+				FileSystemCount:              1,
+				SubnetIds:                    []string{"subnet-a", "subnet-b", "subnet-c"},
+			},
 		},
 		Features: &InstanceFeatureParam{
 			MetricsExporter: &InstanceMetricsExporterParam{
@@ -63,6 +69,17 @@ func TestInstanceCreateParamMarshalMatchesNewContract(t *testing.T) {
 			t.Errorf("expected spec.%s to be present", key)
 		}
 	}
+	fileSystem, ok := spec["fileSystemForFsWal"].(map[string]any)
+	if !ok {
+		t.Fatalf("spec.fileSystemForFsWal missing or wrong type: %T", spec["fileSystemForFsWal"])
+	}
+	fileSystemSubnets, ok := fileSystem["subnetIds"].([]any)
+	if !ok || len(fileSystemSubnets) != 3 ||
+		fileSystemSubnets[0] != "subnet-a" ||
+		fileSystemSubnets[1] != "subnet-b" ||
+		fileSystemSubnets[2] != "subnet-c" {
+		t.Fatalf("expected spec.fileSystemForFsWal.subnetIds, got %v", fileSystem["subnetIds"])
+	}
 
 	features, ok := payload["features"].(map[string]any)
 	if !ok {
@@ -92,6 +109,30 @@ func TestInstanceCreateParamMarshalMatchesNewContract(t *testing.T) {
 	}
 	if _, ok := features["schemaRegistry"]; ok {
 		t.Fatalf("schemaRegistry object should not be exposed in API payload")
+	}
+}
+
+func TestInstanceVOUnmarshalFileSystemSubnetIds(t *testing.T) {
+	const payload = `{
+		"instanceId": "inst-1",
+		"spec": {
+			"fileSystemForFsWal": {
+				"fileSystemType": "EFS_PROVISIONED",
+				"subnetIds": ["subnet-a", "subnet-b", "subnet-c"]
+			}
+		}
+	}`
+
+	var instance InstanceVO
+	if err := json.Unmarshal([]byte(payload), &instance); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if instance.Spec == nil || instance.Spec.FileSystem == nil {
+		t.Fatalf("expected spec.fileSystemForFsWal to be decoded")
+	}
+	got := instance.Spec.FileSystem.SubnetIds
+	if len(got) != 3 || got[0] != "subnet-a" || got[1] != "subnet-b" || got[2] != "subnet-c" {
+		t.Fatalf("unexpected file system subnet IDs: %v", got)
 	}
 }
 

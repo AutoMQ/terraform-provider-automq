@@ -138,7 +138,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 					},
 					"file_system_param": schema.SingleNestedAttribute{
 						Computed:            true,
-						MarkdownDescription: "AWS `IAAS` file system configuration for `FSWAL` mode.",
+						MarkdownDescription: "AWS file system configuration for `FSWAL` mode. AWS `K8S` deployments support EFS only.",
 						Attributes: map[string]schema.Attribute{
 							"file_system_type": schema.StringAttribute{
 								Computed:            true,
@@ -157,6 +157,11 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 								Computed:            true,
 								MarkdownDescription: "AWS security groups for file systems.",
 							},
+							"subnet_ids": schema.ListAttribute{
+								ElementType:         types.StringType,
+								Computed:            true,
+								MarkdownDescription: "AWS subnet IDs configured for EFS mount targets.",
+							},
 						},
 					},
 				},
@@ -167,7 +172,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 				Attributes: map[string]schema.Attribute{
 					"wal_mode": schema.StringAttribute{
 						Computed:            true,
-						MarkdownDescription: "Write-Ahead Log storage mode. `EBSWAL` uses block storage, `S3WAL` uses object storage, and `FSWAL` is available only for AWS `IAAS` file-system deployments.",
+						MarkdownDescription: "Write-Ahead Log storage mode. `EBSWAL` uses block storage, `S3WAL` uses object storage, and `FSWAL` supports AWS `IAAS` or AWS `K8S` with EFS.",
 					},
 					"instance_configs": schema.MapAttribute{
 						ElementType:         types.StringType,
