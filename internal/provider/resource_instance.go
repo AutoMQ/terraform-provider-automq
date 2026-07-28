@@ -377,7 +377,7 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 								ElementType:         types.StringType,
 								Optional:            true,
 								Computed:            true,
-								MarkdownDescription: "AWS subnet IDs used for EFS mount targets. Required for `K8S` `FSWAL` deployments and must contain at least three unique, non-blank IDs covering all selected availability zones. Omit for `IAAS`. Changing configured subnet IDs requires instance replacement.",
+								MarkdownDescription: "AWS subnet IDs used for EFS mount targets. Required for `K8S` `FSWAL` deployments and must contain at least three unique, non-blank IDs covering all selected availability zones. This field is optional for `IAAS` deployments. Changing configured subnet IDs requires instance replacement.",
 								PlanModifiers: []planmodifier.List{
 									listplanmodifier.RequiresReplaceIfConfigured(),
 									listplanmodifier.UseStateForUnknown(),

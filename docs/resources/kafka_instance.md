@@ -158,7 +158,7 @@ Changing this field requires resource replacement.
 Optional:
 
 - `security_groups` (List of String) AWS security groups for the file systems. Omit this field to let the Control Plane manage them. If specified, it must contain at least one security group. Changing configured security groups requires instance replacement.
-- `subnet_ids` (List of String) AWS subnet IDs used for EFS mount targets. Required for `K8S` `FSWAL` deployments and must contain at least three unique, non-blank IDs covering all selected availability zones. Omit for `IAAS`. Changing configured subnet IDs requires instance replacement.
+- `subnet_ids` (List of String) AWS subnet IDs used for EFS mount targets. Required for `K8S` `FSWAL` deployments and must contain at least three unique, non-blank IDs covering all selected availability zones. This field is optional for `IAAS` deployments. Changing configured subnet IDs requires instance replacement.
 
 
 <a id="nestedatt--compute_specs--kubernetes_node_groups"></a>
