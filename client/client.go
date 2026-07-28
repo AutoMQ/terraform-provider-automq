@@ -156,11 +156,11 @@ func buildQueryParams(queryParams map[string]string) string {
 }
 
 func (c *Client) doRequest(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
-	if environmentID, ok := ctx.Value(EnvIdKey).(string); ok && environmentID != "" {
-		path = environmentScopedPath(path, environmentID)
-	} else if !isEnvironmentPath(path) {
+	environmentID, _ := ctx.Value(EnvIdKey).(string)
+	if environmentID == "" && !isEnvironmentPath(path) {
 		return nil, &ErrorResponse{Code: 0, ErrorMessage: "Error getting environment ID from context"}
 	}
+	path = apiPath(path, environmentID)
 	req, err := http.NewRequest(method, c.HostURL+path, body)
 	if err != nil {
 		return nil, err
@@ -212,16 +212,19 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body io.Rea
 
 func isEnvironmentPath(path string) bool {
 	requestPath, _, _ := strings.Cut(path, "?")
-	return requestPath == "/api/v1/environments" || strings.HasPrefix(requestPath, "/api/v1/environments/")
+	return requestPath == "/environments" || strings.HasPrefix(requestPath, "/environments/")
 }
 
-func environmentScopedPath(path, environmentID string) string {
+func apiPath(path, environmentID string) string {
 	requestPath, query, hasQuery := strings.Cut(path, "?")
-	if strings.HasPrefix(requestPath, "/api/v1/") &&
-		!strings.HasPrefix(requestPath, "/api/v1/environments/") &&
-		requestPath != "/api/v1/environments" {
-		requestPath = "/api/v1/environments/" + url.PathEscape(environmentID) + strings.TrimPrefix(requestPath, "/api/v1")
+	if !strings.HasPrefix(requestPath, "/") {
+		requestPath = "/" + requestPath
 	}
+	prefix := "/api/v1"
+	if environmentID != "" {
+		prefix += "/environments/" + url.PathEscape(environmentID)
+	}
+	requestPath = prefix + requestPath
 	if hasQuery {
 		return requestPath + "?" + query
 	}

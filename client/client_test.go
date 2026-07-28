@@ -73,7 +73,7 @@ func TestEnvironmentScopedRequestPath(t *testing.T) {
 		legacyEnvironmentHeader = r.Header.Get("X-automq-environment-id")
 	})
 	ctx := context.WithValue(context.Background(), EnvIdKey, "env-123")
-	if _, err := client.Get(ctx, "/api/v1/instances", map[string]string{"name": "test instance"}); err != nil {
+	if _, err := client.Get(ctx, "/instances", map[string]string{"name": "test instance"}); err != nil {
 		t.Fatalf("Get() error = %v", err)
 	}
 
@@ -90,7 +90,7 @@ func TestGlobalRequestPathDoesNotRequireEnvironment(t *testing.T) {
 	client := requestCaptureClient(t, func(r *http.Request) {
 		requestPath = r.URL.RequestURI()
 	})
-	if _, err := client.Get(context.Background(), "/api/v1/environments/env-123", nil); err != nil {
+	if _, err := client.Get(context.Background(), "/environments/env-123", nil); err != nil {
 		t.Fatalf("Get() error = %v", err)
 	}
 
@@ -107,7 +107,7 @@ func TestEnvironmentOwnedRequestStillRequiresEnvironment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClient() error = %v", err)
 	}
-	_, err = client.Get(context.Background(), "/api/v1/instances", nil)
+	_, err = client.Get(context.Background(), "/instances", nil)
 	if err == nil || !strings.Contains(err.Error(), "Error getting environment ID from context") {
 		t.Fatalf("Get() error = %v", err)
 	}

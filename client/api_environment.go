@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	environmentCollectionPath = "/api/v1/environments"
-	environmentItemPath       = "/api/v1/environments/%s"
+	environmentCollectionPath = "/environments"
+	environmentItemPath       = "/environments/%s"
 )
 
 func (c *Client) CreateEnvironment(ctx context.Context, param EnvironmentCreateParam) (*EnvironmentVO, error) {

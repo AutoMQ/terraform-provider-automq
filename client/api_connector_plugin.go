@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	pluginCollectionPath = "/api/v1/connect/plugins"
-	pluginItemPath       = "/api/v1/connect/plugins/%s"
+	pluginCollectionPath = "/connect/plugins"
+	pluginItemPath       = "/connect/plugins/%s"
 )
 
 func (c *Client) CreateConnectPlugin(ctx context.Context, param ConnectPluginCreateParam) (*ConnectPluginVO, error) {

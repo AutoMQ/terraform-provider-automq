@@ -7,12 +7,12 @@ import (
 )
 
 const (
-	kafkaLinksPath            = "/api/v1/instances/%s/kafka-links"
-	kafkaLinkPath             = "/api/v1/instances/%s/kafka-links/%s"
-	kafkaLinkMirrorTopicsPath = "/api/v1/instances/%s/kafka-links/%s/kafka-link-mirror-topics"
-	kafkaLinkMirrorTopicPath  = "/api/v1/instances/%s/kafka-links/%s/kafka-link-mirror-topics/%s"
-	kafkaLinkMirrorGroupsPath = "/api/v1/instances/%s/kafka-links/%s/kafka-link-mirror-groups"
-	kafkaLinkMirrorGroupPath  = "/api/v1/instances/%s/kafka-links/%s/kafka-link-mirror-groups/%s"
+	kafkaLinksPath            = "/instances/%s/kafka-links"
+	kafkaLinkPath             = "/instances/%s/kafka-links/%s"
+	kafkaLinkMirrorTopicsPath = "/instances/%s/kafka-links/%s/kafka-link-mirror-topics"
+	kafkaLinkMirrorTopicPath  = "/instances/%s/kafka-links/%s/kafka-link-mirror-topics/%s"
+	kafkaLinkMirrorGroupsPath = "/instances/%s/kafka-links/%s/kafka-link-mirror-groups"
+	kafkaLinkMirrorGroupPath  = "/instances/%s/kafka-links/%s/kafka-link-mirror-groups/%s"
 )
 
 func (c *Client) CreateKafkaLink(ctx context.Context, instanceID string, param KafkaLinkCreateParam) (*KafkaLinkVO, error) {
