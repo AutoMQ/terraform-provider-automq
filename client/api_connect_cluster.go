@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	connectClusterCollectionPath = "/api/v1/connect/clusters"
-	connectClusterItemPath       = "/api/v1/connect/clusters/%s"
+	connectClusterCollectionPath = "/connect/clusters"
+	connectClusterItemPath       = "/connect/clusters/%s"
 )
 
 func (c *Client) CreateConnectCluster(ctx context.Context, param ConnectClusterCreateParam) (*ConnectClusterVO, error) {

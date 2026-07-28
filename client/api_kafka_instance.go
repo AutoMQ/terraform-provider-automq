@@ -7,12 +7,12 @@ import (
 )
 
 const (
-	InstancePath             = "/api/v1/instances"
-	InstanceConfigPath       = "/api/v1/instances/%s/configurations"
-	GetInstancePath          = "/api/v1/instances/%s"
-	DeleteInstancePath       = "/api/v1/instances/%s"
-	GetInstanceEndpointsPath = "/api/v1/instances/%s/endpoints"
-	UpdateInstancePath       = "/api/v1/instances/%s"
+	InstancePath             = "/instances"
+	InstanceConfigPath       = "/instances/%s/configurations"
+	GetInstancePath          = "/instances/%s"
+	DeleteInstancePath       = "/instances/%s"
+	GetInstanceEndpointsPath = "/instances/%s/endpoints"
+	UpdateInstancePath       = "/instances/%s"
 )
 
 func (c *Client) CreateKafkaInstance(ctx context.Context, kafka InstanceCreateParam) (*InstanceSummaryVO, error) {

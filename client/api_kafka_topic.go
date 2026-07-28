@@ -7,11 +7,11 @@ import (
 )
 
 const (
-	TopicPath                     = "/api/v1/instances/%s/topics"
-	GetKafkaTopicPath             = "/api/v1/instances/%s/topics/%s"
-	DeleteKafkaTopicPath          = "/api/v1/instances/%s/topics/%s"
-	UpdateKafkaTopicConfigPath    = "/api/v1/instances/%s/topics/%s/configurations"
-	UpdateKafkaTopicPartitionPath = "/api/v1/instances/%s/topics/%s/partition-counts"
+	TopicPath                     = "/instances/%s/topics"
+	GetKafkaTopicPath             = "/instances/%s/topics/%s"
+	DeleteKafkaTopicPath          = "/instances/%s/topics/%s"
+	UpdateKafkaTopicConfigPath    = "/instances/%s/topics/%s/configurations"
+	UpdateKafkaTopicPartitionPath = "/instances/%s/topics/%s/partition-counts"
 )
 
 func (c *Client) CreateKafkaTopic(ctx context.Context, instanceId string, topic TopicCreateParam) (*TopicVO, error) {

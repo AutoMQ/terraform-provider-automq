@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	KafkaAclPath  = "/api/v1/instances/%s/acls"
-	DeleteAclPath = "/api/v1/instances/%s/acls/batch:delete"
+	KafkaAclPath  = "/instances/%s/acls"
+	DeleteAclPath = "/instances/%s/acls/batch:delete"
 )
 
 func (c *Client) CreateKafkaAcls(ctx context.Context, instanceId string, param KafkaAclBindingParams) (*KafkaAclBindingVO, error) {
