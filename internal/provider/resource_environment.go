@@ -84,6 +84,8 @@ func (r *EnvironmentResource) Schema(_ context.Context, _ resource.SchemaRequest
 			},
 			"ops_bucket":      schema.StringAttribute{Computed: true, MarkdownDescription: "Operations bucket assigned to the environment."},
 			"organization_id": schema.StringAttribute{Computed: true, MarkdownDescription: "Organization identifier that owns the environment."},
+			"client_id":       schema.StringAttribute{Computed: true, Sensitive: true, MarkdownDescription: "Client identifier generated when the environment is created. This value is not returned by subsequent read requests."},
+			"client_secret":   schema.StringAttribute{Computed: true, Sensitive: true, MarkdownDescription: "Client secret generated when the environment is created. This value is not returned by subsequent read requests."},
 			"created_at":      schema.StringAttribute{Computed: true, MarkdownDescription: "Environment creation timestamp in RFC 3339 format."},
 			"updated_at":      schema.StringAttribute{Computed: true, MarkdownDescription: "Environment update timestamp in RFC 3339 format."},
 		},

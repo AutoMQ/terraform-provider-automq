@@ -26,4 +26,6 @@ type EnvironmentVO struct {
 	Region         string     `json:"region"`
 	Scope          string     `json:"scope"`
 	OrganizationID *string    `json:"organizationId,omitempty"`
+	ClientID       *string    `json:"clientId,omitempty"`
+	ClientSecret   *string    `json:"clientSecret,omitempty"`
 }

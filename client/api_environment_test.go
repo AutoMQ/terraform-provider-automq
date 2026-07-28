@@ -34,7 +34,7 @@ func TestEnvironmentAPIUsesGlobalPaths(t *testing.T) {
 		requests = append(requests, capturedRequest{method: req.Method, path: req.URL.Path, body: string(body)})
 		responseBody := `{}`
 		if req.Method == http.MethodPost {
-			responseBody = `{"envId":"env-123","name":"production"}`
+			responseBody = `{"envId":"env-123","name":"production","clientId":"client-id","clientSecret":"client-secret"}`
 		}
 		return &http.Response{
 			StatusCode: http.StatusOK,
@@ -55,6 +55,12 @@ func TestEnvironmentAPIUsesGlobalPaths(t *testing.T) {
 	}
 	if created.EnvID != "env-123" {
 		t.Fatalf("created environment ID = %q", created.EnvID)
+	}
+	if created.ClientID == nil || *created.ClientID != "client-id" {
+		t.Fatalf("created client ID = %v", created.ClientID)
+	}
+	if created.ClientSecret == nil || *created.ClientSecret != "client-secret" {
+		t.Fatalf("created client secret = %v", created.ClientSecret)
 	}
 	if _, err := client.GetEnvironment(ctx, "env-123"); err != nil {
 		t.Fatalf("GetEnvironment() error = %v", err)
