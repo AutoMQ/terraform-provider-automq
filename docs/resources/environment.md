@@ -35,19 +35,13 @@ resource "automq_environment" "example" {
 ### Optional
 
 - `description` (String) Environment description.
-- `product` (String) AutoMQ product deployed in the environment. Defaults to `kafka`.
 
 ### Read-Only
 
 - `created_at` (String) Environment creation timestamp in RFC 3339 format.
-- `creator` (String) Identifier of the environment creator.
-- `creator_name` (String) Display name of the environment creator.
 - `id` (String) Environment identifier assigned by AutoMQ.
 - `ops_bucket` (String) Operations bucket assigned to the environment.
 - `organization_id` (String) Organization identifier that owns the environment.
-- `organization_name` (String) Organization name that owns the environment.
-- `state` (String) Environment state: `Pending`, `Installed`, or `Active`.
-- `stateless` (Boolean) Whether the environment is stateless.
 - `updated_at` (String) Environment update timestamp in RFC 3339 format.
 
 ## Import

@@ -12,7 +12,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
@@ -83,22 +82,10 @@ func (r *EnvironmentResource) Schema(_ context.Context, _ resource.SchemaRequest
 				MarkdownDescription: "Cloud account scope, such as an AWS account ID or Google Cloud project ID.",
 				PlanModifiers:       immutable,
 			},
-			"product": schema.StringAttribute{
-				Optional:            true,
-				Computed:            true,
-				Default:             stringdefault.StaticString("kafka"),
-				MarkdownDescription: "AutoMQ product deployed in the environment. Defaults to `kafka`.",
-				PlanModifiers:       immutable,
-			},
-			"state":             schema.StringAttribute{Computed: true, MarkdownDescription: "Environment state: `Pending`, `Installed`, or `Active`."},
-			"ops_bucket":        schema.StringAttribute{Computed: true, MarkdownDescription: "Operations bucket assigned to the environment."},
-			"organization_id":   schema.StringAttribute{Computed: true, MarkdownDescription: "Organization identifier that owns the environment."},
-			"organization_name": schema.StringAttribute{Computed: true, MarkdownDescription: "Organization name that owns the environment."},
-			"creator":           schema.StringAttribute{Computed: true, MarkdownDescription: "Identifier of the environment creator."},
-			"creator_name":      schema.StringAttribute{Computed: true, MarkdownDescription: "Display name of the environment creator."},
-			"stateless":         schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether the environment is stateless."},
-			"created_at":        schema.StringAttribute{Computed: true, MarkdownDescription: "Environment creation timestamp in RFC 3339 format."},
-			"updated_at":        schema.StringAttribute{Computed: true, MarkdownDescription: "Environment update timestamp in RFC 3339 format."},
+			"ops_bucket":      schema.StringAttribute{Computed: true, MarkdownDescription: "Operations bucket assigned to the environment."},
+			"organization_id": schema.StringAttribute{Computed: true, MarkdownDescription: "Organization identifier that owns the environment."},
+			"created_at":      schema.StringAttribute{Computed: true, MarkdownDescription: "Environment creation timestamp in RFC 3339 format."},
+			"updated_at":      schema.StringAttribute{Computed: true, MarkdownDescription: "Environment update timestamp in RFC 3339 format."},
 		},
 	}
 }

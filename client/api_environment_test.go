@@ -49,7 +49,6 @@ func TestEnvironmentAPIUsesGlobalPaths(t *testing.T) {
 		CloudProvider: "aws",
 		Region:        "us-east-1",
 		Scope:         "123456789012",
-		Product:       "kafka",
 	})
 	if err != nil {
 		t.Fatalf("CreateEnvironment() error = %v", err)
@@ -89,8 +88,11 @@ func TestEnvironmentAPIUsesGlobalPaths(t *testing.T) {
 	if err := json.Unmarshal([]byte(requests[0].body), &createBody); err != nil {
 		t.Fatalf("Unmarshal(create body) error = %v", err)
 	}
-	if createBody.Scope != "123456789012" || createBody.Product != "kafka" {
+	if createBody.Scope != "123456789012" {
 		t.Fatalf("create body = %#v", createBody)
+	}
+	if strings.Contains(requests[0].body, `"product"`) {
+		t.Fatalf("create body unexpectedly exposes product: %s", requests[0].body)
 	}
 	if !strings.Contains(requests[2].body, `"description":null`) {
 		t.Fatalf("update body = %s, want explicit null description", requests[2].body)
