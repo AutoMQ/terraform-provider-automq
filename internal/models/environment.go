@@ -16,6 +16,8 @@ type EnvironmentResourceModel struct {
 	Scope          types.String `tfsdk:"scope"`
 	OpsBucket      types.String `tfsdk:"ops_bucket"`
 	OrganizationID types.String `tfsdk:"organization_id"`
+	ClientID       types.String `tfsdk:"client_id"`
+	ClientSecret   types.String `tfsdk:"client_secret"`
 	CreatedAt      types.String `tfsdk:"created_at"`
 	UpdatedAt      types.String `tfsdk:"updated_at"`
 }
@@ -46,6 +48,14 @@ func FlattenEnvironment(environment *client.EnvironmentVO, state *EnvironmentRes
 	state.Scope = types.StringValue(environment.Scope)
 	state.OpsBucket = stringPointerValue(environment.OpsBucket)
 	state.OrganizationID = stringPointerValue(environment.OrganizationID)
+	// Credentials are returned only by create. Preserve the prior state when
+	// subsequent get requests omit them.
+	if environment.ClientID != nil {
+		state.ClientID = types.StringValue(*environment.ClientID)
+	}
+	if environment.ClientSecret != nil {
+		state.ClientSecret = types.StringValue(*environment.ClientSecret)
+	}
 	if environment.CreatedAt != nil {
 		state.CreatedAt = types.StringValue(environment.CreatedAt.Format(time.RFC3339))
 	}

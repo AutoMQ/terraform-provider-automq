@@ -35,6 +35,8 @@ func TestFlattenEnvironment(t *testing.T) {
 	createdAt := time.Date(2026, time.July, 28, 1, 2, 3, 0, time.UTC)
 	description := "Production environment"
 	opsBucket := "automq-ops"
+	clientID := "client-id"
+	clientSecret := "client-secret"
 	model := EnvironmentResourceModel{}
 
 	FlattenEnvironment(&client.EnvironmentVO{
@@ -46,10 +48,25 @@ func TestFlattenEnvironment(t *testing.T) {
 		OpsBucket:     &opsBucket,
 		Region:        "us-east-1",
 		Scope:         "123456789012",
+		ClientID:      &clientID,
+		ClientSecret:  &clientSecret,
 	}, &model)
 
 	assert.Equal(t, "env-123", model.ID.ValueString())
 	assert.Equal(t, "production", model.Name.ValueString())
 	assert.Equal(t, "aws", model.CloudProvider.ValueString())
+	assert.Equal(t, "client-id", model.ClientID.ValueString())
+	assert.Equal(t, "client-secret", model.ClientSecret.ValueString())
 	assert.Equal(t, "2026-07-28T01:02:03Z", model.CreatedAt.ValueString())
+
+	FlattenEnvironment(&client.EnvironmentVO{
+		EnvID:         "env-123",
+		Name:          "production",
+		CloudProvider: "aws",
+		Region:        "us-east-1",
+		Scope:         "123456789012",
+	}, &model)
+
+	assert.Equal(t, "client-id", model.ClientID.ValueString())
+	assert.Equal(t, "client-secret", model.ClientSecret.ValueString())
 }

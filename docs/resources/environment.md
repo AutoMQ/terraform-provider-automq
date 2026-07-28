@@ -38,6 +38,8 @@ resource "automq_environment" "example" {
 
 ### Read-Only
 
+- `client_id` (String, Sensitive) Client identifier generated when the environment is created. This value is not returned by subsequent read requests.
+- `client_secret` (String, Sensitive) Client secret generated when the environment is created. This value is not returned by subsequent read requests.
 - `created_at` (String) Environment creation timestamp in RFC 3339 format.
 - `id` (String) Environment identifier assigned by AutoMQ.
 - `ops_bucket` (String) Operations bucket assigned to the environment.
