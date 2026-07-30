@@ -75,6 +75,7 @@ Read-Only:
 - `reserved_node_count` (Number) Number of reserved nodes for the instance.
 - `schedule_spec` (String) Kubernetes scheduling specification. This value is not populated from API responses.
 - `security_groups` (List of String) AWS security groups for the instance. This field does not apply to GCP environments.
+- `vpc` (String) Cloud VPC identifier in which the instance is deployed.
 
 <a id="nestedatt--compute_specs--data_buckets"></a>
 ### Nested Schema for `compute_specs.data_buckets`

@@ -25,6 +25,11 @@ variable "environment_id" {
   type        = string
 }
 
+variable "vpc" {
+  description = "VPC ID in which the Kafka instance is deployed"
+  type        = string
+}
+
 variable "instance_name" {
   description = "Kafka instance name"
   type        = string

@@ -4,7 +4,7 @@ package provider
 //
 // Scenarios & required inputs:
 //   VM tests (e.g., TestAccKafkaInstance_VM_Scenario)
-//     - endpoint, access_key_id, secret_key, environment_id
+//     - endpoint, access_key_id, secret_key, environment_id, vpc
 //     - vm.zone (or AUTMQ_VM_ZONE) and at least one subnet ID (AUTMQ_VM_SUBNET_IDS / AUTMQ_VM_SUBNET_ID / AUTMQ_TEST_SUBNET_ID)
 //
 //   K8S tests (TestAccKafkaInstance_K8S_Scenario)
@@ -45,6 +45,7 @@ type accConfig struct {
 	AccessKeyID     string                   `json:"access_key_id"`
 	SecretKey       string                   `json:"secret_key"`
 	EnvironmentID   string                   `json:"environment_id"`
+	Vpc             string                   `json:"vpc"`
 	Region          string                   `json:"region"`
 	Networks        []accNetwork             `json:"networks"`
 	K8S             accK8SConfig             `json:"k8s"`
@@ -124,6 +125,7 @@ type accSecurity struct {
 
 type accInstanceConfig struct {
 	EnvironmentID         string
+	Vpc                   string
 	Name                  string
 	Description           string
 	Version               string
@@ -186,6 +188,7 @@ func parseAccConfigFromFile(path string) (accConfig, error) {
 		AccessKeyID     string                   `json:"access_key_id"`
 		SecretKey       string                   `json:"secret_key"`
 		EnvironmentID   string                   `json:"environment_id"`
+		Vpc             string                   `json:"vpc"`
 		Region          string                   `json:"region"`
 		Version         string                   `json:"version"`
 		UpgradeVersion  string                   `json:"upgrade_version"`
@@ -202,6 +205,7 @@ func parseAccConfigFromFile(path string) (accConfig, error) {
 		AccessKeyID:    strings.TrimSpace(raw.AccessKeyID),
 		SecretKey:      strings.TrimSpace(raw.SecretKey),
 		EnvironmentID:  strings.TrimSpace(raw.EnvironmentID),
+		Vpc:            strings.TrimSpace(raw.Vpc),
 		Region:         strings.TrimSpace(raw.Region),
 		Version:        strings.TrimSpace(raw.Version),
 		UpgradeVersion: strings.TrimSpace(raw.UpgradeVersion),
@@ -281,6 +285,9 @@ func (c accConfig) missingRequired() []string {
 	}
 	if c.EnvironmentID == "" {
 		missing = append(missing, "environment_id")
+	}
+	if c.Vpc == "" {
+		missing = append(missing, "vpc")
 	}
 	if len(c.Networks) == 0 {
 		missing = append(missing, "networks")
@@ -1000,6 +1007,9 @@ func renderKafkaInstanceConfig(env accConfig, cfg accInstanceConfig) string {
 	if cfg.DeployType == "" {
 		cfg.DeployType = "IAAS"
 	}
+	if cfg.Vpc == "" {
+		cfg.Vpc = env.Vpc
+	}
 
 	var b strings.Builder
 
@@ -1021,6 +1031,7 @@ func renderKafkaInstanceConfig(env accConfig, cfg accInstanceConfig) string {
 	fmt.Fprintf(&b, "  version        = %q\n", cfg.Version)
 
 	b.WriteString("  compute_specs = {\n")
+	fmt.Fprintf(&b, "    vpc          = %q\n", cfg.Vpc)
 	fmt.Fprintf(&b, "    reserved_aku = %d\n", cfg.ReservedAKU)
 	if cfg.DeployType != "" {
 		fmt.Fprintf(&b, "    deploy_type  = %q\n", cfg.DeployType)
