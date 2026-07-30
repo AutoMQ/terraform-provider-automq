@@ -81,6 +81,7 @@ func testExpandKafkaInstanceResourceScenarios(t *testing.T) {
 				ComputeSpecs: &ComputeSpecsModel{
 					ReservedAku: types.Int64Value(4),
 					DeployType:  types.StringValue("IAAS"),
+					Vpc:         types.StringValue("vpc-123"),
 					DataBuckets: types.ListValueMust(
 						DataBucketObjectType,
 						[]attr.Value{
@@ -133,6 +134,7 @@ func testExpandKafkaInstanceResourceScenarios(t *testing.T) {
 				Spec: client.SpecificationParam{
 					ReservedAku: 4,
 					DeployType:  stringPtr("IAAS"),
+					Vpc:         stringPtr("vpc-123"),
 					Networks: []client.InstanceNetworkParam{
 						{
 							Zone:   "zone-1",
@@ -626,6 +628,24 @@ func testFlattenKafkaInstanceModelPreservesCertificateFieldsWhenAPIOmitsThem(t *
 	assert.Equal(t, types.StringValue("ca-pem"), security.CertificateAuthority)
 	assert.Equal(t, types.StringValue("chain-pem"), security.CertificateChain)
 	assert.Equal(t, types.StringValue("key-pem"), security.PrivateKey)
+}
+
+func TestFlattenKafkaInstanceModelVpc(t *testing.T) {
+	vpc := "vpc-123"
+	resource := &KafkaInstanceResourceModel{}
+	diags := FlattenKafkaInstanceModel(context.Background(), &client.InstanceVO{
+		Spec: &client.SpecificationVO{Vpc: &vpc},
+	}, resource)
+
+	assert.False(t, diags.HasError())
+	assert.Equal(t, types.StringValue("vpc-123"), resource.ComputeSpecs.Vpc)
+
+	// Preserve the configured VPC if an older read endpoint omits it.
+	diags = FlattenKafkaInstanceModel(context.Background(), &client.InstanceVO{
+		Spec: &client.SpecificationVO{},
+	}, resource)
+	assert.False(t, diags.HasError())
+	assert.Equal(t, types.StringValue("vpc-123"), resource.ComputeSpecs.Vpc)
 }
 
 func testFlattenKafkaInstanceModelFSWAL(t *testing.T) {

@@ -34,6 +34,11 @@ func TestKafkaInstanceDataSourceSchema(t *testing.T) {
 	}
 	fileSystemParam, exists := computeSpecsNested.Attributes["file_system_param"]
 	assert.True(t, exists, "file_system_param should exist in compute_specs")
+	vpc, exists := computeSpecsNested.Attributes["vpc"]
+	assert.True(t, exists, "vpc should exist in compute_specs")
+	vpcAttr, ok := vpc.(schema.StringAttribute)
+	assert.True(t, ok, "vpc should be a string attribute")
+	assert.True(t, vpcAttr.Computed, "vpc should be computed")
 
 	// Verify file_system_param attributes
 	fileSystemParamNested, ok := fileSystemParam.(schema.SingleNestedAttribute)
@@ -169,6 +174,7 @@ resource "automq_kafka_instance" "test" {
   version        = %q
 
   compute_specs = {
+    vpc          = %q
     reserved_aku = %d
     networks = [
       {
@@ -194,6 +200,7 @@ resource "automq_kafka_instance" "test" {
 		name,
 		description,
 		version,
+		env.Vpc,
 		reservedAku,
 		zone,
 		subnet,

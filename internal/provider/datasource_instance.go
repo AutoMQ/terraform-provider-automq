@@ -86,6 +86,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 						Computed:            true,
 						MarkdownDescription: "Deployment platform for the instance. Availability depends on the target environment's cloud provider and Control Plane version.",
 					},
+					"vpc":                              schema.StringAttribute{Computed: true, MarkdownDescription: "Cloud VPC identifier in which the instance is deployed."},
 					"dns_zone":                         schema.StringAttribute{Computed: true, MarkdownDescription: "DNS zone used when creating custom records."},
 					"kubernetes_cluster_id":            schema.StringAttribute{Computed: true, MarkdownDescription: "Identifier for the target Kubernetes cluster."},
 					"kubernetes_namespace":             schema.StringAttribute{Computed: true, MarkdownDescription: "Kubernetes namespace for the instance deployment."},

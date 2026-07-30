@@ -1796,6 +1796,17 @@ func TestCreateOnlyComputeAttributesHaveRequiresReplace(t *testing.T) {
 		t.Fatalf("expected deploy_type to default to IAAS")
 	}
 
+	vpcAttr, ok := computeAttr.Attributes["vpc"].(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("vpc has unexpected type %T", computeAttr.Attributes["vpc"])
+	}
+	if !vpcAttr.Required || vpcAttr.Optional || vpcAttr.Computed {
+		t.Fatalf("vpc should be required-only")
+	}
+	if !hasStringRequiresReplace(vpcAttr.PlanModifiers) {
+		t.Fatalf("expected vpc to require replacement")
+	}
+
 	clusterIDAttr, ok := computeAttr.Attributes["kubernetes_cluster_id"].(schema.StringAttribute)
 	if !ok {
 		t.Fatalf("kubernetes_cluster_id has unexpected type %T", computeAttr.Attributes["kubernetes_cluster_id"])

@@ -128,6 +128,7 @@ resource "automq_kafka_instance" "k8s" {
   version        = var.automq_version
 
   compute_specs = {
+    vpc          = var.vpc
     reserved_aku = var.reserved_aku
     deploy_type  = var.deploy_type
 
@@ -235,6 +236,7 @@ resource "automq_kafka_instance" "gke" {
   version        = var.automq_version
 
   compute_specs = {
+    vpc          = var.vpc
     reserved_aku = var.reserved_aku
     deploy_type  = "K8S"
 
