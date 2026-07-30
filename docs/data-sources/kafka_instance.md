@@ -61,7 +61,7 @@ Read-Only:
 - `data_buckets` (Attributes List) Inline bucket configuration replacing legacy bucket profiles. (see [below for nested schema](#nestedatt--compute_specs--data_buckets))
 - `deploy_type` (String) Deployment platform for the instance. Availability depends on the target environment's cloud provider and Control Plane version.
 - `dns_zone` (String) DNS zone used when creating custom records.
-- `file_system_param` (Attributes) AWS `IAAS` file system configuration for `FSWAL` mode. (see [below for nested schema](#nestedatt--compute_specs--file_system_param))
+- `file_system_param` (Attributes) AWS file system configuration for `FSWAL` mode. AWS `K8S` deployments support EFS only. (see [below for nested schema](#nestedatt--compute_specs--file_system_param))
 - `instance_role` (String) Data Plane cloud identity used by the Kafka instance, such as an AWS IAM Role ARN or GCP GSA full resource name.
 - `instance_types` (List of String) Instance type list for the nodes.
 - `kubernetes_cluster_id` (String) Identifier for the target Kubernetes cluster.
@@ -92,6 +92,7 @@ Read-Only:
 - `file_system_count` (Number) Number of file systems
 - `file_system_type` (String) File system type. Supported values: EFS_PROVISIONED (Amazon Elastic File System), ONTAP_V2 (Amazon FSx for NetApp ONTAP). EFS offers superior elasticity and lower costs for small-scale deployments; FSx for NetApp ONTAP features lower write latency and a more favorable cost advantage at large scales.
 - `security_groups` (List of String) AWS security groups for file systems.
+- `subnet_ids` (List of String) AWS subnet IDs configured for EFS mount targets.
 - `throughput_mibps_per_file_system` (Number) Throughput in MiBps per file system
 
 
@@ -135,7 +136,7 @@ Read-Only:
 - `schema_registry_enabled` (Boolean) Whether Schema Registry is enabled for this Kafka instance.
 - `security` (Attributes) Security configuration for the Kafka instance. (see [below for nested schema](#nestedatt--features--security))
 - `table_topic` (Attributes) Table topic configuration (warehouse/catalog settings). (see [below for nested schema](#nestedatt--features--table_topic))
-- `wal_mode` (String) Write-Ahead Log storage mode. `EBSWAL` uses block storage, `S3WAL` uses object storage, and `FSWAL` is available only for AWS `IAAS` file-system deployments.
+- `wal_mode` (String) Write-Ahead Log storage mode. `EBSWAL` uses block storage, `S3WAL` uses object storage, and `FSWAL` supports AWS `IAAS` or AWS `K8S` with EFS.
 
 <a id="nestedatt--features--metrics_exporter"></a>
 ### Nested Schema for `features.metrics_exporter`

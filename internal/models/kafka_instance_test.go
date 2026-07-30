@@ -255,6 +255,11 @@ func testExpandKafkaInstanceResourceScenarios(t *testing.T) {
 						ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 						FileSystemCount:              types.Int64Value(2),
 						SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-12345")}),
+						SubnetIDs: types.ListValueMust(types.StringType, []attr.Value{
+							types.StringValue("subnet-a"),
+							types.StringValue("subnet-b"),
+							types.StringValue("subnet-c"),
+						}),
 					}),
 				},
 				Features: &FeaturesModel{
@@ -271,6 +276,7 @@ func testExpandKafkaInstanceResourceScenarios(t *testing.T) {
 						ThroughputMiBpsPerFileSystem: 1000,
 						FileSystemCount:              2,
 						SecurityGroups:               []string{"sg-12345"},
+						SubnetIds:                    []string{"subnet-a", "subnet-b", "subnet-c"},
 					},
 				},
 				Features: &client.InstanceFeatureParam{
@@ -290,6 +296,7 @@ func testExpandKafkaInstanceResourceScenarios(t *testing.T) {
 						ThroughputMibpsPerFileSystem: types.Int64Value(500),
 						FileSystemCount:              types.Int64Value(1),
 						SecurityGroups:               types.ListNull(types.StringType),
+						SubnetIDs:                    types.ListNull(types.StringType),
 					}),
 				},
 				Features: &FeaturesModel{
@@ -306,6 +313,7 @@ func testExpandKafkaInstanceResourceScenarios(t *testing.T) {
 						ThroughputMiBpsPerFileSystem: 500,
 						FileSystemCount:              1,
 						SecurityGroups:               nil, // Should not be included when null/empty
+						SubnetIds:                    nil,
 					},
 				},
 				Features: &client.InstanceFeatureParam{
@@ -405,6 +413,7 @@ func TestKafkaInstanceReadbackPreservationContracts(t *testing.T) {
 	t.Run("certificate fields preserved when api omits them", testFlattenKafkaInstanceModelPreservesCertificateFieldsWhenAPIOmitsThem)
 	t.Run("file system type deserialization", testFlattenKafkaInstanceModelFileSystemTypeDeserialization)
 	t.Run("file system type state preservation", testFlattenKafkaInstanceModelFileSystemTypeStatePreservation)
+	t.Run("file system subnet state preservation", testFlattenKafkaInstanceModelSubnetIDsStatePreservation)
 	t.Run("pricing fields preserve previous state", testFlattenKafkaInstanceModelPricingFieldsPreservePreviousState)
 }
 
@@ -649,6 +658,7 @@ func testFlattenKafkaInstanceModelFSWAL(t *testing.T) {
 						ThroughputMiBpsPerFileSystem: int32Ptr(1000),
 						FileSystemCount:              int32Ptr(2),
 						SecurityGroups:               []string{"sg-12345"},
+						SubnetIds:                    []string{"subnet-a", "subnet-b", "subnet-c"},
 					},
 				},
 				Features: &client.InstanceFeatureVO{
@@ -668,6 +678,11 @@ func testFlattenKafkaInstanceModelFSWAL(t *testing.T) {
 						ThroughputMibpsPerFileSystem: types.Int64Value(1000),
 						FileSystemCount:              types.Int64Value(2),
 						SecurityGroups:               types.ListValueMust(types.StringType, []attr.Value{types.StringValue("sg-12345")}),
+						SubnetIDs: types.ListValueMust(types.StringType, []attr.Value{
+							types.StringValue("subnet-a"),
+							types.StringValue("subnet-b"),
+							types.StringValue("subnet-c"),
+						}),
 					}),
 				},
 				Features: &FeaturesModel{
@@ -690,6 +705,7 @@ func testFlattenKafkaInstanceModelFSWAL(t *testing.T) {
 						ThroughputMiBpsPerFileSystem: int32Ptr(500),
 						FileSystemCount:              int32Ptr(1),
 						SecurityGroups:               nil,
+						SubnetIds:                    nil,
 					},
 				},
 				Features: &client.InstanceFeatureVO{
@@ -709,6 +725,7 @@ func testFlattenKafkaInstanceModelFSWAL(t *testing.T) {
 						ThroughputMibpsPerFileSystem: types.Int64Value(500),
 						FileSystemCount:              types.Int64Value(1),
 						SecurityGroups:               types.ListNull(types.StringType),
+						SubnetIDs:                    types.ListNull(types.StringType),
 					}),
 				},
 				Features: &FeaturesModel{
@@ -785,6 +802,8 @@ func testFlattenKafkaInstanceModelFSWAL(t *testing.T) {
 						actualFileSystem.FileSystemCount)
 					assert.Equal(t, expectedFileSystem.SecurityGroups,
 						actualFileSystem.SecurityGroups)
+					assert.Equal(t, expectedFileSystem.SubnetIDs,
+						actualFileSystem.SubnetIDs)
 				}
 			}
 
@@ -1318,6 +1337,102 @@ func testFlattenKafkaInstanceModelFileSystemTypeStatePreservation(t *testing.T) 
 	assert.NotNil(t, fileSystem)
 	// State should be preserved when API doesn't return the value
 	assert.Equal(t, types.StringValue("EFS_PROVISIONED"), fileSystem.FileSystemType)
+}
+
+// Old Instance API responses omitted subnetIds, so refresh retains only known
+// configured placement and never persists an unknown planned value.
+func testFlattenKafkaInstanceModelSubnetIDsStatePreservation(t *testing.T) {
+	knownSubnetIDs := types.ListValueMust(types.StringType, []attr.Value{
+		types.StringValue("subnet-a"),
+		types.StringValue("subnet-b"),
+		types.StringValue("subnet-c"),
+	})
+	apiSubnetIDs := types.ListValueMust(types.StringType, []attr.Value{
+		types.StringValue("subnet-api"),
+	})
+	knownSecurityGroups := types.ListValueMust(types.StringType, []attr.Value{
+		types.StringValue("sg-known"),
+	})
+	newFileSystemVO := func(subnetIDs []string) *client.FileSystemVO {
+		return &client.FileSystemVO{
+			FileSystemType:               strPtr("EFS_PROVISIONED"),
+			ThroughputMiBpsPerFileSystem: int32Ptr(100),
+			FileSystemCount:              int32Ptr(1),
+			SubnetIds:                    subnetIDs,
+		}
+	}
+
+	tests := []struct {
+		name              string
+		previousSubnetIDs types.List
+		apiFileSystem     *client.FileSystemVO
+		expectedSubnetIDs types.List
+	}{
+		{
+			name:              "known previous with empty API subnet list is preserved",
+			previousSubnetIDs: knownSubnetIDs,
+			apiFileSystem:     newFileSystemVO([]string{}),
+			expectedSubnetIDs: knownSubnetIDs,
+		},
+		{
+			name:              "unknown previous with empty API subnet list becomes null",
+			previousSubnetIDs: types.ListUnknown(types.StringType),
+			apiFileSystem:     newFileSystemVO([]string{}),
+			expectedSubnetIDs: types.ListNull(types.StringType),
+		},
+		{
+			name:              "known previous with omitted API file system is preserved",
+			previousSubnetIDs: knownSubnetIDs,
+			apiFileSystem:     nil,
+			expectedSubnetIDs: knownSubnetIDs,
+		},
+		{
+			name:              "unknown previous with omitted API file system becomes null",
+			previousSubnetIDs: types.ListUnknown(types.StringType),
+			apiFileSystem:     nil,
+			expectedSubnetIDs: types.ListNull(types.StringType),
+		},
+		{
+			name:              "non-empty API subnet list overrides previous",
+			previousSubnetIDs: knownSubnetIDs,
+			apiFileSystem:     newFileSystemVO([]string{"subnet-api"}),
+			expectedSubnetIDs: apiSubnetIDs,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resource := &KafkaInstanceResourceModel{
+				ComputeSpecs: &ComputeSpecsModel{
+					FileSystemParam: testFileSystemObject(t, &FileSystemParamModel{
+						FileSystemType:               types.StringValue("EFS_PROVISIONED"),
+						ThroughputMibpsPerFileSystem: types.Int64Value(100),
+						FileSystemCount:              types.Int64Value(1),
+						SecurityGroups:               knownSecurityGroups,
+						SubnetIDs:                    tt.previousSubnetIDs,
+					}),
+				},
+			}
+			instance := &client.InstanceVO{
+				InstanceId: strPtr("test"),
+				Spec: &client.SpecificationVO{
+					FileSystem: tt.apiFileSystem,
+				},
+			}
+
+			diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+			assert.False(t, diags.HasError())
+			fileSystem, fsDiags := FileSystemParamObjectToModel(context.Background(), resource.ComputeSpecs.FileSystemParam)
+			assert.False(t, fsDiags.HasError())
+			if assert.NotNil(t, fileSystem) {
+				assert.Equal(t, types.StringValue("EFS_PROVISIONED"), fileSystem.FileSystemType)
+				assert.Equal(t, types.Int64Value(100), fileSystem.ThroughputMibpsPerFileSystem)
+				assert.Equal(t, types.Int64Value(1), fileSystem.FileSystemCount)
+				assert.Equal(t, knownSecurityGroups, fileSystem.SecurityGroups)
+				assert.Equal(t, tt.expectedSubnetIDs, fileSystem.SubnetIDs)
+			}
+		})
+	}
 }
 
 // TestExpandKafkaInstanceResource_FileSystemTypeVariations tests different file_system_type values

@@ -107,7 +107,7 @@ Optional:
 - `data_buckets` (Attributes List) Inline bucket configuration replacing legacy bucket profiles. Omit this field to let backend manage the data bucket. Changing configured data bucket settings requires instance replacement. (see [below for nested schema](#nestedatt--compute_specs--data_buckets))
 - `deploy_type` (String) Deployment platform for the instance. Supported values are `IAAS` and `K8S`; availability depends on the target environment. AWS supports `IAAS` on EC2 and `K8S` on EKS. GCP supports `K8S` on GKE Standard with Control Plane 8.3.8 or later; GCP `IAAS` and GKE Autopilot are not supported. Changing deployment type requires instance replacement.
 - `dns_zone` (String) DNS zone used when creating custom records. Changing a configured DNS zone requires instance replacement.
-- `file_system_param` (Attributes) AWS `IAAS` file system configuration for `FSWAL` mode. This field is not supported for `K8S` or GCP deployments. (see [below for nested schema](#nestedatt--compute_specs--file_system_param))
+- `file_system_param` (Attributes) AWS file system configuration for `FSWAL` mode. `IAAS` supports EFS and FSx for ONTAP. `K8S` supports EFS only and requires `subnet_ids`. This field is not supported for GCP deployments. (see [below for nested schema](#nestedatt--compute_specs--file_system_param))
 - `instance_role` (String) Data Plane cloud identity used by the Kafka instance. Omit this field to let the Control Plane manage the identity. For AWS, use an IAM Role ARN such as `arn:aws:iam::<account-id>:role/<role-name>`. For GCP, use a GSA full resource name such as `projects/<project>/serviceAccounts/<email>`. Changing a configured identity requires instance replacement.
 - `instance_types` (List of String) Instance type list for the nodes. Maximum 1 entry. Required when `deploy_type` is `K8S`, or when `pricing_mode` is `UsageBased` and `deploy_type` is `IAAS`. Can be updated in place for `IAAS` deployments; changing it for `K8S` deployments requires instance replacement.
 - `kubernetes_cluster_id` (String) Identifier for the target Kubernetes cluster when `deploy_type` is `K8S`. For GCP, use the full GKE resource name `projects/<project>/locations/<location>/clusters/<name>`. Changing the Kubernetes cluster requires instance replacement.
@@ -146,18 +146,19 @@ Optional:
 
 Required:
 
-- `file_system_count` (Number) Number of file systems
+- `file_system_count` (Number) Number of file systems. EFS requires exactly one file system.
 - `file_system_type` (String) File system type. Supported values:
 
 * `EFS_PROVISIONED` - Amazon Elastic File System (EFS), require control panel version ≥ 8.2.0
 * `ONTAP_V2` - Amazon FSx for NetApp ONTAP
 
 Changing this field requires resource replacement.
-- `throughput_mibps_per_file_system` (Number) Throughput in MiBps per file system
+- `throughput_mibps_per_file_system` (Number) Throughput in MiBps per file system. EFS requires a value between 10 and 1024.
 
 Optional:
 
 - `security_groups` (List of String) AWS security groups for the file systems. Omit this field to let the Control Plane manage them. If specified, it must contain at least one security group. Changing configured security groups requires instance replacement.
+- `subnet_ids` (List of String) AWS subnet IDs used for EFS mount targets. Required for `K8S` `FSWAL` deployments and must contain at least three unique, non-blank IDs covering all selected availability zones. This field is optional for `IAAS` deployments. Changing configured subnet IDs requires instance replacement.
 
 
 <a id="nestedatt--compute_specs--kubernetes_node_groups"></a>
@@ -175,7 +176,7 @@ Required:
 Required:
 
 - `security` (Attributes) (see [below for nested schema](#nestedatt--features--security))
-- `wal_mode` (String) Write-Ahead Log storage mode. `EBSWAL` uses block storage and `S3WAL` uses object storage; the underlying service depends on the target environment. `FSWAL` is AWS `IAAS` only, requires `file_system_param`, and is not supported with `K8S`. See the [WAL mode documentation](https://docs.automq.com/automq-cloud/manage-instances/create-instance/choose-wal-mode) for details.
+- `wal_mode` (String) Write-Ahead Log storage mode. `EBSWAL` uses block storage and `S3WAL` uses object storage; the underlying service depends on the target environment. `FSWAL` requires `file_system_param`; AWS `K8S` deployments support `FSWAL` only with EFS and file-system subnet IDs. See the [WAL mode documentation](https://docs.automq.com/automq-cloud/manage-instances/create-instance/choose-wal-mode) for details.
 
 Optional:
 

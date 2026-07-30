@@ -65,6 +65,7 @@ type FileSystemParam struct {
 	ThroughputMiBpsPerFileSystem int32    `json:"throughputMiBpsPerFileSystem"`
 	FileSystemCount              int32    `json:"fileSystemCount"`
 	SecurityGroups               []string `json:"securityGroups,omitempty"`
+	SubnetIds                    []string `json:"subnetIds,omitempty"`
 }
 
 type FileSystemUpdateParam struct {
@@ -277,6 +278,7 @@ type FileSystemVO struct {
 	ThroughputMiBpsPerFileSystem *int32   `json:"throughputMiBpsPerFileSystem,omitempty"`
 	FileSystemCount              *int32   `json:"fileSystemCount,omitempty"`
 	SecurityGroups               []string `json:"securityGroups,omitempty"`
+	SubnetIds                    []string `json:"subnetIds,omitempty"`
 }
 
 type InstanceFeatureVO struct {

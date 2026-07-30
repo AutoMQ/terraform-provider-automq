@@ -14,6 +14,8 @@ GCP `IAAS` deployments and GKE Autopilot are not supported.
 
 > **Note**: `K8S` scheduling with `instance_types`, `kubernetes_load_balancer_subnets`, and `schedule_spec` requires AutoMQ Control Plane 8.3.6 or later.
 
+AWS `K8S` deployments can use EFS-backed `FSWAL` by setting `compute_specs.file_system_param.file_system_type` to `EFS_PROVISIONED` and providing at least three `subnet_ids` that cover the selected availability zones. The target Control Plane must include K8S EFS WAL support.
+
 ## Requirements
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
