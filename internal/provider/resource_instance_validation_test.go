@@ -6,11 +6,53 @@ import (
 
 	frameworkresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
-	"github.com/hashicorp/terraform-plugin-framework/types"
+	testingresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
-func TestKafkaInstanceReservedAKUValidation(t *testing.T) {
+func TestKafkaInstanceReservedAKUThreePlansSuccessfully(t *testing.T) {
+	testingresource.UnitTest(t, testingresource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []testingresource.TestStep{{
+			PlanOnly:           true,
+			ExpectNonEmptyPlan: true,
+			Config: `
+provider "automq" {
+  automq_byoc_endpoint      = "http://localhost:8080"
+  automq_byoc_access_key_id = "test-access-key"
+  automq_byoc_secret_key    = "test-secret-key"
+}
+
+resource "automq_kafka_instance" "test" {
+  environment_id = "env-test"
+  name            = "aku-three"
+  deploy_profile  = "default"
+  version         = "1.4.0"
+
+  compute_specs = {
+    reserved_aku = 3
+    networks = [{
+      zone    = "us-east-1a"
+      subnets = ["subnet-test"]
+    }]
+    bucket_profiles = [{
+      id = "bucket-profile-test"
+    }]
+  }
+
+  features = {
+    wal_mode = "EBSWAL"
+    security = {
+      authentication_methods   = ["anonymous"]
+      transit_encryption_modes = ["plaintext"]
+    }
+  }
+}
+`,
+		}},
+	})
+}
+
+func TestKafkaInstanceReservedAKUHasNoValidation(t *testing.T) {
 	var schemaResponse frameworkresource.SchemaResponse
 	(&KafkaInstanceResource{}).Schema(context.Background(), frameworkresource.SchemaRequest{}, &schemaResponse)
 
@@ -22,41 +64,7 @@ func TestKafkaInstanceReservedAKUValidation(t *testing.T) {
 	if !ok {
 		t.Fatal("reserved_aku is not an int64 attribute")
 	}
-	if len(reservedAKU.Validators) != 1 {
-		t.Fatalf("expected one reserved_aku validator, got %d", len(reservedAKU.Validators))
-	}
-
-	testCases := []struct {
-		value int64
-		valid bool
-	}{
-		{value: 3, valid: false},
-		{value: 6, valid: true},
-		{value: 8, valid: true},
-		{value: 10, valid: true},
-		{value: 12, valid: true},
-		{value: 14, valid: true},
-		{value: 15, valid: false},
-		{value: 16, valid: true},
-		{value: 18, valid: true},
-		{value: 20, valid: true},
-		{value: 22, valid: true},
-		{value: 24, valid: true},
-		{value: 26, valid: false},
-	}
-
-	for _, testCase := range testCases {
-		t.Run(types.Int64Value(testCase.value).String(), func(t *testing.T) {
-			request := validator.Int64Request{ConfigValue: types.Int64Value(testCase.value)}
-			var response validator.Int64Response
-			reservedAKU.Validators[0].ValidateInt64(context.Background(), request, &response)
-
-			if testCase.valid && response.Diagnostics.HasError() {
-				t.Fatalf("expected %d AKU to be valid, got: %v", testCase.value, response.Diagnostics)
-			}
-			if !testCase.valid && !response.Diagnostics.HasError() {
-				t.Fatalf("expected %d AKU to be rejected", testCase.value)
-			}
-		})
+	if len(reservedAKU.Validators) != 0 {
+		t.Fatalf("expected reserved_aku to have no validators, got %d", len(reservedAKU.Validators))
 	}
 }

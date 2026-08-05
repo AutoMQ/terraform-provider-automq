@@ -99,13 +99,13 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 			},
 		},
 		{
-			name: "Minimal configuration",
+			name: "Minimal configuration with AKU 3",
 			input: KafkaInstanceResourceModel{
 				Name:          types.StringValue("minimal-instance"),
 				DeployProfile: types.StringValue("minimal-profile"),
 				Version:       types.StringValue("1.0.0"),
 				ComputeSpecs: &ComputeSpecsModel{
-					ReservedAku: types.Int64Value(1),
+					ReservedAku: types.Int64Value(3),
 				},
 			},
 			expected: client.InstanceCreateParam{
@@ -113,7 +113,7 @@ func TestExpandKafkaInstanceResource(t *testing.T) {
 				DeployProfile: "minimal-profile",
 				Version:       "1.0.0",
 				Spec: client.SpecificationParam{
-					ReservedAku: 1,
+					ReservedAku: 3,
 					NodeConfig:  &client.NodeConfigParam{},
 				},
 			},
