@@ -9,7 +9,10 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -608,6 +611,49 @@ func TestInstanceUpdateStatePreservation(t *testing.T) {
 
 // Refresh tests cover the runtime readback path shared by Create/Read/Update.
 func TestInstanceRefreshState(t *testing.T) {
+	t.Run("imported instance refresh writes typed instance configs", func(t *testing.T) {
+		api := &stubKafkaInstanceAPI{
+			instance: &client.InstanceVO{
+				InstanceId: testStringPtr("inst-imported"),
+				Name:       testStringPtr("imported"),
+				State:      testStringPtr(models.StateCreating),
+				Features: &client.InstanceFeatureVO{
+					WalMode: testStringPtr("S3WAL"),
+				},
+			},
+		}
+		instanceResource := &KafkaInstanceResource{api: api}
+		var schemaResp resource.SchemaResponse
+		instanceResource.Schema(context.Background(), resource.SchemaRequest{}, &schemaResp)
+		require.False(t, schemaResp.Diagnostics.HasError(), "unexpected schema diagnostics: %v", schemaResp.Diagnostics)
+
+		importResp := resource.ImportStateResponse{State: tfsdk.State{
+			Schema: schemaResp.Schema,
+			Raw:    tftypes.NewValue(schemaResp.Schema.Type().TerraformType(context.Background()), nil),
+		}}
+		instanceResource.ImportState(context.Background(), resource.ImportStateRequest{
+			ID: "env-imported@inst-imported",
+		}, &importResp)
+		require.False(t, importResp.Diagnostics.HasError(), "unexpected import diagnostics: %v", importResp.Diagnostics)
+
+		var state models.KafkaInstanceResourceModel
+		stateDiags := importResp.State.Get(context.Background(), &state)
+		require.False(t, stateDiags.HasError(), "failed to decode prepared import state: %v", stateDiags)
+		assert.Equal(t, types.StringValue("env-imported"), state.EnvironmentID)
+		assert.Equal(t, types.StringValue("inst-imported"), state.InstanceID)
+		assert.Equal(t, types.StringType, state.Tags.ElementType(context.Background()))
+		assert.Empty(t, state.Tags.Elements())
+		require.NotNil(t, state.Features)
+		assert.Equal(t, types.StringType, state.Features.InstanceConfigs.ElementType(context.Background()))
+		assert.Empty(t, state.Features.InstanceConfigs.Elements())
+
+		found, diags := refreshKafkaInstanceState(context.Background(), instanceResource, "inst-imported", &state)
+		require.True(t, found)
+		require.False(t, diags.HasError(), "unexpected refresh diagnostics: %v", diags)
+		writeDiags := importResp.State.Set(context.Background(), &state)
+		require.False(t, writeDiags.HasError(), "import refresh state write failed: %v", writeDiags)
+	})
+
 	t.Run("running instance refreshes endpoints", func(t *testing.T) {
 		api := &stubKafkaInstanceAPI{
 			instance: &client.InstanceVO{

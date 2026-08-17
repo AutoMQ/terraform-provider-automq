@@ -1207,6 +1207,11 @@ func (r *KafkaInstanceResource) ImportState(ctx context.Context, req resource.Im
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("environment_id"), environmentId)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), instanceId)...)
+	// Import has no configuration context, and the instance read API does not
+	// return these user-owned maps. Seed their schema types so refresh can safely
+	// preserve them without producing DynamicPseudoType state values.
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("tags"), map[string]string{})...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("features").AtName("instance_configs"), map[string]string{})...)
 }
 
 func shouldRefreshInstanceEndpoints(instance *client.InstanceVO) bool {
