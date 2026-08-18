@@ -2,6 +2,8 @@ package provider
 
 import (
 	"fmt"
+	"strings"
+	"terraform-provider-automq/client"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -77,6 +79,34 @@ func TestAccKafkaAclResource(t *testing.T) {
 			),
 		})
 	}
+	steps = append(steps, resource.TestStep{
+		ResourceName:      "automq_kafka_acl.test",
+		ImportState:       true,
+		ImportStateVerify: true,
+		ImportStateIdFunc: func(s *terraform.State) (string, error) {
+			rs, ok := s.RootModule().Resources["automq_kafka_acl.test"]
+			if !ok {
+				return "", fmt.Errorf("Not found: %s", "automq_kafka_acl.test")
+			}
+			acl := client.KafkaAclBindingParam{
+				AccessControlParam: client.KafkaControlParam{
+					User:           strings.TrimPrefix(rs.Primary.Attributes["principal"], "User:"),
+					OperationGroup: rs.Primary.Attributes["operation_group"],
+					PermissionType: rs.Primary.Attributes["permission"],
+				},
+				ResourcePatternParam: client.KafkaResourcePatternParam{
+					ResourceType: rs.Primary.Attributes["resource_type"],
+					Name:         rs.Primary.Attributes["resource_name"],
+					PatternType:  rs.Primary.Attributes["pattern_type"],
+				},
+			}
+			identity, err := client.FormatKafkaAclImportIdentity(acl)
+			if err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("%s@%s@%s", rs.Primary.Attributes["environment_id"], rs.Primary.Attributes["kafka_instance_id"], identity), nil
+		},
+	})
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },

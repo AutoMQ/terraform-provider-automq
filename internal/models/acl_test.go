@@ -47,6 +47,8 @@ func TestExpandKafkaACLResource(t *testing.T) {
 		assert.Equal(t, test.expected.AccessControlParam.OperationGroup, request.AccessControlParam.OperationGroup)
 		assert.Equal(t, test.expected.AccessControlParam.PermissionType, request.AccessControlParam.PermissionType)
 		assert.Equal(t, test.expected.AccessControlParam.User, request.AccessControlParam.User)
+		assert.NotNil(t, request.AccessControlParam.Host)
+		assert.Equal(t, "*", *request.AccessControlParam.Host)
 		assert.Equal(t, test.expected.ResourcePatternParam.Name, request.ResourcePatternParam.Name)
 		assert.Equal(t, test.expected.ResourcePatternParam.PatternType, request.ResourcePatternParam.PatternType)
 		assert.Equal(t, test.expected.ResourcePatternParam.ResourceType, request.ResourcePatternParam.ResourceType)

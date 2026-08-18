@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -93,4 +94,87 @@ func ParseAclID(aclID string) (user string, resourceType string, permissionType 
 		return "", "", "", "", fmt.Errorf("invalid aclID")
 	}
 	return parts[0], parts[1], parts[2], parts[3], nil
+}
+
+func FormatKafkaAclImportIdentity(param KafkaAclBindingParam) (string, error) {
+	if err := validateKafkaAclImportIdentity(param); err != nil {
+		return "", err
+	}
+	parts := []string{
+		param.AccessControlParam.User,
+		param.ResourcePatternParam.ResourceType,
+		param.AccessControlParam.PermissionType,
+		param.ResourcePatternParam.Name,
+		param.ResourcePatternParam.PatternType,
+		param.AccessControlParam.OperationGroup,
+	}
+	for i, part := range parts {
+		if part == "" {
+			return "", fmt.Errorf("ACL import identity field %d must not be empty", i+1)
+		}
+		parts[i] = url.QueryEscape(part)
+	}
+	return strings.Join(parts, "|"), nil
+}
+
+func ParseKafkaAclImportIdentity(identity string) (KafkaAclBindingParam, error) {
+	parts := strings.Split(identity, "|")
+	if len(parts) != 6 {
+		return KafkaAclBindingParam{}, fmt.Errorf("invalid ACL import identity: expected 6 fields, got %d", len(parts))
+	}
+	for i, part := range parts {
+		decoded, err := url.QueryUnescape(part)
+		if err != nil {
+			return KafkaAclBindingParam{}, fmt.Errorf("invalid ACL import identity field %d: %w", i+1, err)
+		}
+		if decoded == "" {
+			return KafkaAclBindingParam{}, fmt.Errorf("ACL import identity field %d must not be empty", i+1)
+		}
+		parts[i] = decoded
+	}
+	param := KafkaAclBindingParam{
+		AccessControlParam: KafkaControlParam{
+			User:           parts[0],
+			PermissionType: parts[2],
+			OperationGroup: parts[5],
+		},
+		ResourcePatternParam: KafkaResourcePatternParam{
+			ResourceType: parts[1],
+			Name:         parts[3],
+			PatternType:  parts[4],
+		},
+	}
+	if err := validateKafkaAclImportIdentity(param); err != nil {
+		return KafkaAclBindingParam{}, err
+	}
+	return param, nil
+}
+
+func validateKafkaAclImportIdentity(param KafkaAclBindingParam) error {
+	resourceType := param.ResourcePatternParam.ResourceType
+	switch resourceType {
+	case "TOPIC", "GROUP", "CLUSTER", "TRANSACTIONAL_ID":
+	default:
+		return fmt.Errorf("invalid ACL resource type %q", resourceType)
+	}
+
+	permissionType := param.AccessControlParam.PermissionType
+	if permissionType != "ALLOW" && permissionType != "DENY" {
+		return fmt.Errorf("invalid ACL permission type %q", permissionType)
+	}
+
+	patternType := param.ResourcePatternParam.PatternType
+	if patternType != "LITERAL" && patternType != "PREFIXED" {
+		return fmt.Errorf("invalid ACL pattern type %q", patternType)
+	}
+
+	operationGroup := param.AccessControlParam.OperationGroup
+	if resourceType == "TOPIC" {
+		if operationGroup != "ALL" && operationGroup != "PRODUCE" && operationGroup != "CONSUME" {
+			return fmt.Errorf("invalid ACL operation group %q for TOPIC", operationGroup)
+		}
+	} else if operationGroup != "ALL" {
+		return fmt.Errorf("ACL operation group for %s must be ALL", resourceType)
+	}
+	return nil
 }

@@ -5,6 +5,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 	"terraform-provider-automq/client"
 	"terraform-provider-automq/internal/framework"
 	"terraform-provider-automq/internal/models"
@@ -16,11 +17,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &KafkaAclResource{}
+var _ resource.ResourceWithImportState = &KafkaAclResource{}
 
 func NewKafkaAclResource() resource.Resource {
 	return &KafkaAclResource{}
@@ -55,7 +58,7 @@ func (r *KafkaAclResource) Schema(ctx context.Context, req resource.SchemaReques
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"id": schema.StringAttribute{
-				MarkdownDescription: "The Kafka ACL Resource ID is returned upon successful creation of the ACL.",
+				MarkdownDescription: "Provider-generated Kafka ACL identity derived from the user, resource type, permission, and resource name.",
 				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -172,9 +175,13 @@ func (r *KafkaAclResource) Read(ctx context.Context, req resource.ReadRequest, r
 
 	ctx = context.WithValue(ctx, client.EnvIdKey, state.EnvironmentID.ValueString())
 
-	aclId := state.ID.ValueString()
 	instance := state.KafkaInstance.ValueString()
-	out, err := r.client.GetKafkaAcls(ctx, instance, aclId)
+	target := client.KafkaAclBindingParam{}
+	resp.Diagnostics.Append(models.ExpandKafkaACLResource(state, &target)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	out, err := r.client.GetKafkaAcl(ctx, instance, target)
 	if err != nil {
 		if framework.IsNotFoundError(err) {
 			resp.State.RemoveResource(ctx)
@@ -213,4 +220,39 @@ func (r *KafkaAclResource) Delete(ctx context.Context, req resource.DeleteReques
 		resp.Diagnostics.AddError("Failed to delete Kafka ACL", err.Error())
 		return
 	}
+}
+
+func (r *KafkaAclResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	idParts := strings.SplitN(req.ID, "@", 3)
+	if len(idParts) != 3 || idParts[0] == "" || idParts[1] == "" || idParts[2] == "" {
+		resp.Diagnostics.AddError(
+			"Invalid Import ID",
+			fmt.Sprintf("The import ID must be in the format <environment_id>@<kafka_instance_id>@<acl_identity>. Got: %s", req.ID),
+		)
+		return
+	}
+
+	acl, err := client.ParseKafkaAclImportIdentity(idParts[2])
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid ACL Import Identity", err.Error())
+		return
+	}
+	aclID, err := client.GenerateAclID(acl)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to Generate ACL ID", err.Error())
+		return
+	}
+
+	state := models.KafkaAclResourceModel{
+		EnvironmentID:  types.StringValue(idParts[0]),
+		KafkaInstance:  types.StringValue(idParts[1]),
+		ID:             types.StringValue(aclID),
+		ResourceType:   types.StringValue(acl.ResourcePatternParam.ResourceType),
+		ResourceName:   types.StringValue(acl.ResourcePatternParam.Name),
+		PatternType:    types.StringValue(acl.ResourcePatternParam.PatternType),
+		Principal:      types.StringValue("User:" + acl.AccessControlParam.User),
+		OperationGroup: types.StringValue(acl.AccessControlParam.OperationGroup),
+		Permission:     types.StringValue(acl.AccessControlParam.PermissionType),
+	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
