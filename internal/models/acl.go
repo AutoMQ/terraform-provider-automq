@@ -22,8 +22,10 @@ type KafkaAclResourceModel struct {
 }
 
 func ExpandKafkaACLResource(acl KafkaAclResourceModel, request *client.KafkaAclBindingParam) diag.Diagnostics {
+	wildcardHost := "*"
 	request.AccessControlParam = client.KafkaControlParam{}
 	request.ResourcePatternParam = client.KafkaResourcePatternParam{}
+	request.AccessControlParam.Host = &wildcardHost
 	request.AccessControlParam.OperationGroup = acl.OperationGroup.ValueString()
 	request.AccessControlParam.PermissionType = acl.Permission.ValueString()
 
