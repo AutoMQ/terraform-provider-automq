@@ -202,6 +202,28 @@ func TestSignRequest(t *testing.T) {
 	}
 }
 
+func TestSignRequestUsesCmpCanonicalQueryEncoding(t *testing.T) {
+	req, err := http.NewRequest(http.MethodGet, "https://cmp.example.com/api/v1/acls", nil)
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	query := req.URL.Query()
+	query.Set("asterisk", "*")
+	query.Set("space", "foo bar")
+	query.Set("tilde", "~")
+	req.URL.RawQuery = query.Encode()
+
+	signer := buildSigner()
+	if _, err := signer.Sign(req, nil, "cmp", "private", epochTime()); err != nil {
+		t.Fatalf("sign request: %v", err)
+	}
+
+	const expected = "asterisk=*&space=foo+bar&tilde=%7E"
+	if req.URL.RawQuery != expected {
+		t.Fatalf("canonical query = %q, want %q", req.URL.RawQuery, expected)
+	}
+}
+
 func TestPresign_UnsignedPayload(t *testing.T) {
 	req, body := buildRequest("service-name", "private", "hello")
 	signer := buildSigner()

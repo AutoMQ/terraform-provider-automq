@@ -54,6 +54,9 @@ func TestAccKafkaAclResource(t *testing.T) {
 		// Permission variation tests
 		{"topic_literal_all_deny", "TOPIC", "test-topic-deny", "LITERAL", "ALL", "DENY"},
 		{"group_literal_all_deny", "GROUP", "test-group-deny", "LITERAL", "ALL", "DENY"},
+
+		// Keep wildcard last so the import step exercises wildcard ACL refresh.
+		{"topic_literal_all_wildcard", "TOPIC", "*", "LITERAL", "ALL", "ALLOW"},
 	}
 
 	steps := make([]resource.TestStep, 0, len(testCases))
@@ -87,6 +90,9 @@ func TestAccKafkaAclResource(t *testing.T) {
 			rs, ok := s.RootModule().Resources["automq_kafka_acl.test"]
 			if !ok {
 				return "", fmt.Errorf("Not found: %s", "automq_kafka_acl.test")
+			}
+			if resourceName := rs.Primary.Attributes["resource_name"]; resourceName != "*" {
+				return "", fmt.Errorf("wildcard import precondition failed: resource_name is %q, want %q", resourceName, "*")
 			}
 			acl := client.KafkaAclBindingParam{
 				AccessControlParam: client.KafkaControlParam{

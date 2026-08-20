@@ -60,6 +60,36 @@ func TestGetKafkaAclReturnsExactLogicalMatch(t *testing.T) {
 	assert.Equal(t, "orders", actual.ResourcePattern.Name)
 }
 
+func TestGetKafkaAclWithWildcardResourceNameReturnsExactMatch(t *testing.T) {
+	wildcardHost := "*"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "*", r.URL.Query().Get("fuzzyResourceName"))
+
+		response := PageNumResultKafkaAclBindingVO{
+			List: []KafkaAclBindingVO{
+				newTestKafkaAcl(wildcardHost, "orders", "LITERAL", "PRODUCE"),
+				newTestKafkaAcl(wildcardHost, "*", "LITERAL", "PRODUCE"),
+			},
+		}
+		require.NoError(t, json.NewEncoder(w).Encode(response))
+	}))
+	defer server.Close()
+
+	api, err := NewClient(context.Background(), server.URL, AuthCredentials{AccessKeyID: "key", SecretAccessKey: "secret"})
+	require.NoError(t, err)
+	api.MaxRetries = 0
+	target := KafkaAclBindingParam{
+		AccessControlParam:   KafkaControlParam{User: "orders-writer", OperationGroup: "PRODUCE", PermissionType: "ALLOW"},
+		ResourcePatternParam: KafkaResourcePatternParam{ResourceType: "TOPIC", Name: "*", PatternType: "LITERAL"},
+	}
+	ctx := context.WithValue(context.Background(), EnvIdKey, "env-test")
+
+	actual, err := api.GetKafkaAcl(ctx, "kf-test", target)
+	require.NoError(t, err)
+	require.NotNil(t, actual)
+	assert.Equal(t, "*", actual.ResourcePattern.Name)
+}
+
 func TestGetKafkaAclFollowsPagination(t *testing.T) {
 	totalPages := int64(2)
 	wildcardHost := "*"
