@@ -91,6 +91,9 @@ func TestAccKafkaAclResource(t *testing.T) {
 			if !ok {
 				return "", fmt.Errorf("Not found: %s", "automq_kafka_acl.test")
 			}
+			if resourceName := rs.Primary.Attributes["resource_name"]; resourceName != "*" {
+				return "", fmt.Errorf("wildcard import precondition failed: resource_name is %q, want %q", resourceName, "*")
+			}
 			acl := client.KafkaAclBindingParam{
 				AccessControlParam: client.KafkaControlParam{
 					User:           strings.TrimPrefix(rs.Primary.Attributes["principal"], "User:"),

@@ -60,16 +60,10 @@ func TestGetKafkaAclReturnsExactLogicalMatch(t *testing.T) {
 	assert.Equal(t, "orders", actual.ResourcePattern.Name)
 }
 
-func TestGetKafkaAclWithWildcardResourceNameAvoidsSignatureMismatch(t *testing.T) {
+func TestGetKafkaAclWithWildcardResourceNameReturnsExactMatch(t *testing.T) {
 	wildcardHost := "*"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if _, exists := r.URL.Query()["fuzzyResourceName"]; exists {
-			w.WriteHeader(http.StatusUnauthorized)
-			require.NoError(t, json.NewEncoder(w).Encode(APIError{
-				ErrorModel: ErrorModel{Code: "Iam.IncorrectApiSignature"},
-			}))
-			return
-		}
+		assert.Equal(t, "*", r.URL.Query().Get("fuzzyResourceName"))
 
 		response := PageNumResultKafkaAclBindingVO{
 			List: []KafkaAclBindingVO{

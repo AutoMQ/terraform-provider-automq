@@ -417,7 +417,7 @@ func (ctx *signingCtx) handlePresignRemoval() {
 }
 
 func (ctx *signingCtx) buildCanonicalString() {
-	ctx.Request.URL.RawQuery = strings.Replace(ctx.Query.Encode(), "+", "%20", -1)
+	ctx.Request.URL.RawQuery = encodeCmpCanonicalQuery(ctx.Query)
 
 	uri := getURIPath(ctx.Request.URL)
 
@@ -429,6 +429,14 @@ func (ctx *signingCtx) buildCanonicalString() {
 		ctx.signedHeaders,
 		ctx.bodyDigest,
 	}, "\n")
+}
+
+// encodeCmpCanonicalQuery mirrors the Java URLEncoder rules used by the CMP verifier.
+func encodeCmpCanonicalQuery(query url.Values) string {
+	encoded := query.Encode()
+	encoded = strings.ReplaceAll(encoded, "%2A", "*")
+	encoded = strings.ReplaceAll(encoded, "~", "%7E")
+	return encoded
 }
 
 func (ctx *signingCtx) buildStringToSign() {
