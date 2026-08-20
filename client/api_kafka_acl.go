@@ -67,11 +67,13 @@ func (c *Client) GetKafkaAcl(ctx context.Context, instanceId string, target Kafk
 	const pageSize = 100
 	matches := make([]KafkaAclBindingVO, 0, 1)
 	queryParams := map[string]string{
-		"exactUser":         target.AccessControlParam.User,
-		"resourceTypes":     target.ResourcePatternParam.ResourceType,
-		"permissionType":    target.AccessControlParam.PermissionType,
-		"fuzzyResourceName": target.ResourcePatternParam.Name,
-		"size":              strconv.Itoa(pageSize),
+		"exactUser":      target.AccessControlParam.User,
+		"resourceTypes":  target.ResourcePatternParam.ResourceType,
+		"permissionType": target.AccessControlParam.PermissionType,
+		"size":           strconv.Itoa(pageSize),
+	}
+	if target.ResourcePatternParam.Name != "*" {
+		queryParams["fuzzyResourceName"] = target.ResourcePatternParam.Name
 	}
 	for pageNumber := 1; ; pageNumber++ {
 		queryParams["page"] = strconv.Itoa(pageNumber)

@@ -54,6 +54,9 @@ func TestAccKafkaAclResource(t *testing.T) {
 		// Permission variation tests
 		{"topic_literal_all_deny", "TOPIC", "test-topic-deny", "LITERAL", "ALL", "DENY"},
 		{"group_literal_all_deny", "GROUP", "test-group-deny", "LITERAL", "ALL", "DENY"},
+
+		// Keep wildcard last so the import step exercises wildcard ACL refresh.
+		{"topic_literal_all_wildcard", "TOPIC", "*", "LITERAL", "ALL", "ALLOW"},
 	}
 
 	steps := make([]resource.TestStep, 0, len(testCases))
