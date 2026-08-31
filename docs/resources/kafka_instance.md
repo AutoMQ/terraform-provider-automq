@@ -28,6 +28,7 @@ resource "automq_kafka_instance" "example" {
   }
 
   compute_specs = {
+    vpc          = "vpc-example123"
     reserved_aku = 6
     pricing_mode = "SubscriptionBased"
     deploy_type  = "IAAS"
@@ -101,6 +102,7 @@ variable "automq_environment_id" {
 Required:
 
 - `networks` (Attributes List) Cloud placement information for the instance. Specify either one or three availability zones and any applicable subnet identifiers. Identifier formats depend on the target environment. (see [below for nested schema](#nestedatt--compute_specs--networks))
+- `vpc` (String) Cloud VPC identifier in which the instance is deployed.
 
 Optional:
 

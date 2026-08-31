@@ -1,0 +1,72 @@
+package models
+
+import (
+	"testing"
+	"time"
+
+	"terraform-provider-automq/client"
+
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestExpandEnvironment(t *testing.T) {
+	model := EnvironmentResourceModel{
+		Name:          types.StringValue("production"),
+		Description:   types.StringValue("Production environment"),
+		CloudProvider: types.StringValue("aws"),
+		Region:        types.StringValue("us-east-1"),
+		Scope:         types.StringValue("123456789012"),
+	}
+
+	create := ExpandEnvironmentCreate(model)
+	assert.Equal(t, "production", create.Name)
+	assert.Equal(t, "Production environment", *create.Description)
+	assert.Equal(t, "aws", create.CloudProvider)
+	assert.Equal(t, "us-east-1", create.Region)
+	assert.Equal(t, "123456789012", create.Scope)
+
+	update := ExpandEnvironmentUpdate(model)
+	assert.Equal(t, "production", update.Name)
+	assert.Equal(t, "Production environment", *update.Description)
+}
+
+func TestFlattenEnvironment(t *testing.T) {
+	createdAt := time.Date(2026, time.July, 28, 1, 2, 3, 0, time.UTC)
+	description := "Production environment"
+	opsBucket := "automq-ops"
+	clientID := "client-id"
+	clientSecret := "client-secret"
+	model := EnvironmentResourceModel{}
+
+	FlattenEnvironment(&client.EnvironmentVO{
+		EnvID:         "env-123",
+		CreatedAt:     &createdAt,
+		Name:          "production",
+		Description:   &description,
+		CloudProvider: "aws",
+		OpsBucket:     &opsBucket,
+		Region:        "us-east-1",
+		Scope:         "123456789012",
+		ClientID:      &clientID,
+		ClientSecret:  &clientSecret,
+	}, &model)
+
+	assert.Equal(t, "env-123", model.ID.ValueString())
+	assert.Equal(t, "production", model.Name.ValueString())
+	assert.Equal(t, "aws", model.CloudProvider.ValueString())
+	assert.Equal(t, "client-id", model.ClientID.ValueString())
+	assert.Equal(t, "client-secret", model.ClientSecret.ValueString())
+	assert.Equal(t, "2026-07-28T01:02:03Z", model.CreatedAt.ValueString())
+
+	FlattenEnvironment(&client.EnvironmentVO{
+		EnvID:         "env-123",
+		Name:          "production",
+		CloudProvider: "aws",
+		Region:        "us-east-1",
+		Scope:         "123456789012",
+	}, &model)
+
+	assert.Equal(t, "client-id", model.ClientID.ValueString())
+	assert.Equal(t, "client-secret", model.ClientSecret.ValueString())
+}

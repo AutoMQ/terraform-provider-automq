@@ -1,6 +1,6 @@
 # Terraform Provider AutoMQ
 
-Manage Kafka instances, topics, users, ACLs, and mirroring in an existing AutoMQ BYOC environment. Terraform sends these requests to the environment's Control Plane API; the cloud provider and region are selected when the environment is installed.
+Manage AutoMQ environments and their Kafka resources through the public AutoMQ Cloud Control Plane API.
 
 ## Cloud Support
 
@@ -24,7 +24,7 @@ AWS `K8S` deployments can use EFS-backed `FSWAL` by setting `compute_specs.file_
 ## Getting Started
 
 1. Install the provider plugin via the Terraform Registry (`automq/automq`).
-2. Collect your AutoMQ BYOC endpoint plus Service Account Access Key credentials from the AutoMQ console.
+2. Create a Service Account Access Key in the AutoMQ console.
 3. Configure the provider:
 
 ```terraform
@@ -38,13 +38,12 @@ terraform {
 }
 
 provider "automq" {
-  automq_byoc_endpoint      = var.automq_byoc_endpoint
   automq_byoc_access_key_id = var.automq_byoc_access_key_id
   automq_byoc_secret_key    = var.automq_byoc_secret_key
 }
 ```
 
-> Tip: set `AUTOMQ_BYOC_ENDPOINT`, `AUTOMQ_BYOC_ACCESS_KEY_ID`, and `AUTOMQ_BYOC_SECRET_KEY` environment variables to avoid hard-coding credentials.
+The API endpoint defaults to `https://console.automq.cloud`. Set `automq_byoc_endpoint` or `AUTOMQ_BYOC_ENDPOINT` only when using a custom endpoint. Credentials can also be supplied through `AUTOMQ_BYOC_ACCESS_KEY` and `AUTOMQ_BYOC_SECRET_KEY`.
 
 ## Examples
 
@@ -84,6 +83,7 @@ Then commit the changes to `go.mod` and `go.sum`.
 
 ### Available Resources
 
+- **`automq_environment`** – Create and manage AutoMQ environments
 - **`automq_kafka_instance`** – Provision and manage Kafka instances (clusters) with compute specs, security, and feature configurations
 - **`automq_kafka_topic`** – Create and configure Kafka topics with partitions and custom settings
 - **`automq_kafka_user`** – Manage Kafka users for authentication

@@ -156,18 +156,17 @@ func buildQueryParams(queryParams map[string]string) string {
 }
 
 func (c *Client) doRequest(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
+	environmentID, _ := ctx.Value(EnvIdKey).(string)
+	if environmentID == "" && !isEnvironmentPath(path) {
+		return nil, &ErrorResponse{Code: 0, ErrorMessage: "Error getting environment ID from context"}
+	}
+	path = apiPath(path, environmentID)
 	req, err := http.NewRequest(method, c.HostURL+path, body)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept-Language", "en")
-	environmentID, ok := ctx.Value(EnvIdKey).(string)
-	if ok {
-		req.Header.Set("X-automq-environment-id", environmentID)
-	} else {
-		return nil, &ErrorResponse{Code: 0, ErrorMessage: "Error getting environment ID from context"}
-	}
 
 	var seeker io.ReadSeeker
 	if sr, ok := body.(io.ReadSeeker); ok {
@@ -209,4 +208,25 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body io.Rea
 		return nil, &ErrorResponse{Code: res.StatusCode, APIError: apiError}
 	}
 	return data, nil
+}
+
+func isEnvironmentPath(path string) bool {
+	requestPath, _, _ := strings.Cut(path, "?")
+	return requestPath == "/environments" || strings.HasPrefix(requestPath, "/environments/")
+}
+
+func apiPath(path, environmentID string) string {
+	requestPath, query, hasQuery := strings.Cut(path, "?")
+	if !strings.HasPrefix(requestPath, "/") {
+		requestPath = "/" + requestPath
+	}
+	prefix := "/api/v1"
+	if environmentID != "" {
+		prefix += "/environments/" + url.PathEscape(environmentID)
+	}
+	requestPath = prefix + requestPath
+	if hasQuery {
+		return requestPath + "?" + query
+	}
+	return requestPath
 }

@@ -195,6 +195,11 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							stringplanmodifier.RequiresReplace(),
 						},
 					},
+					"vpc": schema.StringAttribute{
+						Required:            true,
+						MarkdownDescription: "Cloud VPC identifier in which the instance is deployed.",
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+					},
 					"dns_zone": schema.StringAttribute{
 						Optional:            true,
 						Computed:            true,

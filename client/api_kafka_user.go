@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	KafkaUserPath       = "/api/v1/instances/%s/users"
-	DeleteKafkaUserPath = "/api/v1/instances/%s/users/%s"
+	KafkaUserPath       = "/instances/%s/users"
+	DeleteKafkaUserPath = "/instances/%s/users/%s"
 )
 
 // CreateUser creates a new user

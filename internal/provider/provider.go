@@ -42,6 +42,8 @@ type AutoMQProvider struct {
 	version string
 }
 
+const defaultAutoMQEndpoint = "https://console.automq.cloud"
+
 // autoMQProviderModel describes the provider data model.
 type autoMQProviderModel struct {
 	BYOCAccessKey types.String `tfsdk:"automq_byoc_access_key_id"`
@@ -56,7 +58,7 @@ func (p *AutoMQProvider) Metadata(ctx context.Context, req provider.MetadataRequ
 
 func (p *AutoMQProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Configures access to an existing AutoMQ BYOC environment through its Control Plane API.",
+		MarkdownDescription: "Configures access to the AutoMQ Cloud Control Plane API.",
 		Attributes: map[string]schema.Attribute{
 			"automq_byoc_access_key_id": schema.StringAttribute{
 				MarkdownDescription: "Set the Access Key Id of Service Account. You can create and manage Access Keys by using the AutoMQ Cloud BYOC Console. Learn more about AutoMQ Cloud BYOC Console access [here](https://docs.automq.com/automq-cloud/manage-identities-and-access/service-accounts).",
@@ -69,7 +71,7 @@ func (p *AutoMQProvider) Schema(ctx context.Context, req provider.SchemaRequest,
 				Sensitive:           true,
 			},
 			"automq_byoc_endpoint": schema.StringAttribute{
-				MarkdownDescription: "Control Plane API endpoint for the installed AutoMQ BYOC environment. Obtain this endpoint after the environment installation completes.",
+				MarkdownDescription: "AutoMQ Cloud Control Plane API endpoint. Defaults to `https://console.automq.cloud`; override it for testing or a custom deployment.",
 				Optional:            true,
 			},
 		},
@@ -121,6 +123,9 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	byoc_endpoint := os.Getenv("AUTOMQ_BYOC_ENDPOINT")
 	byoc_access_key := os.Getenv("AUTOMQ_BYOC_ACCESS_KEY")
 	byoc_secret_key := os.Getenv("AUTOMQ_BYOC_SECRET_KEY")
+	if byoc_endpoint == "" {
+		byoc_endpoint = defaultAutoMQEndpoint
+	}
 
 	if !data.BYOCEndpoint.IsNull() {
 		byoc_endpoint = data.BYOCEndpoint.ValueString()
@@ -209,6 +214,7 @@ func (p *AutoMQProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 func (p *AutoMQProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
+		NewEnvironmentResource,
 		NewKafkaInstanceResource,
 		NewKafkaTopicResource,
 		NewKafkaUserResource,

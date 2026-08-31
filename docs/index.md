@@ -1,7 +1,7 @@
 ---
 page_title: "Provider: AutoMQ"
 description: |-
-    Manage resources in an existing AutoMQ BYOC environment through its Control Plane API, including Kafka instances, topics, users, ACLs, and mirroring.
+    Manage AutoMQ environments and their Kafka resources through the public AutoMQ Cloud Control Plane API.
 ---
 
 # AutoMQ Provider
@@ -13,7 +13,7 @@ description: |-
 
 ## Overview
 
-Use the AutoMQ Terraform Provider to manage resources in an existing AutoMQ BYOC (Bring Your Own Cloud) environment. Terraform sends requests to the environment's Control Plane API and uses `environment_id` to select the target environment; the cloud provider and region are selected when the environment is installed.
+Use the AutoMQ Terraform Provider to create AutoMQ environments and manage resources within them. Requests are sent to the public AutoMQ Cloud Control Plane API, and environment-owned resources use `environment_id` to select their target environment.
 
 ### Cloud Support
 
@@ -37,6 +37,7 @@ GCP `IAAS` deployments and GKE Autopilot are not supported.
 
 | Resource | Description |
 |----------|-------------|
+| `automq_environment` | AutoMQ environment lifecycle and cloud placement |
 | `automq_kafka_instance` | Kafka cluster with compute, networking, and feature configuration |
 | `automq_kafka_topic` | Kafka topics with partition and configuration management |
 | `automq_kafka_user` | Kafka users for SASL authentication |
@@ -53,15 +54,14 @@ GCP `IAAS` deployments and GKE Autopilot are not supported.
 
 ## Prerequisites
 
-The AutoMQ Provider manages an already installed AutoMQ BYOC environment. Before using this provider, you need to:
+Before using the AutoMQ Provider, you need to:
 
-1. **Install an AutoMQ BYOC environment** on your cloud account. Follow the [AWS installation guide](https://docs.automq.com/automq-cloud/getting-started/install-byoc-environment/aws/install-env-from-marketplace) or the guide for your cloud provider.
-2. **Create a Service Account** and download the Access Key. Navigate to **Service Accounts** in the AutoMQ console left navigation, click **Create Service Account**, and download the credentials. See [Service Accounts documentation](https://docs.automq.com/automq-cloud/manage-identities-and-access/service-accounts).
-3. **Collect the following values**:
-   - `automq_byoc_endpoint` – The control plane endpoint shown after installation, e.g. `http://<hostname>:8080`
+1. **Create a Service Account** and download the Access Key. Navigate to **Service Accounts** in the AutoMQ console left navigation, click **Create Service Account**, and download the credentials. See [Service Accounts documentation](https://docs.automq.com/automq-cloud/manage-identities-and-access/service-accounts).
+2. **Collect the following values**:
    - `automq_byoc_access_key_id` – From the Service Account Access Key
    - `automq_byoc_secret_key` – From the Service Account Access Key
-   - `environment_id` – Found on the AutoMQ console **System Settings** page, e.g. `env-xxxxx`
+
+The API endpoint defaults to `https://console.automq.cloud`. Existing environments can be referenced by ID, or created with `automq_environment` and passed to child resources through its `id` attribute.
 
 
 ## Example Usage
@@ -77,13 +77,8 @@ terraform {
 }
 
 provider "automq" {
-  automq_byoc_endpoint      = var.automq_byoc_endpoint      # optionally use AUTOMQ_BYOC_ENDPOINT environment variable
-  automq_byoc_access_key_id = var.automq_byoc_access_key_id # optionally use AUTOMQ_BYOC_ACCESS_KEY_ID environment variable
+  automq_byoc_access_key_id = var.automq_byoc_access_key_id # optionally use AUTOMQ_BYOC_ACCESS_KEY environment variable
   automq_byoc_secret_key    = var.automq_byoc_secret_key    # optionally use AUTOMQ_BYOC_SECRET_KEY environment variable
-}
-
-variable "automq_byoc_endpoint" {
-  type = string
 }
 
 variable "automq_byoc_access_key_id" {
@@ -133,6 +128,7 @@ resource "automq_kafka_instance" "k8s" {
   version        = var.automq_version
 
   compute_specs = {
+    vpc          = var.vpc
     reserved_aku = var.reserved_aku
     deploy_type  = var.deploy_type
 
@@ -241,6 +237,7 @@ resource "automq_kafka_instance" "gke" {
   version        = var.automq_version
 
   compute_specs = {
+    vpc          = var.vpc
     reserved_aku = var.reserved_aku
     deploy_type  = "K8S"
 
@@ -275,7 +272,7 @@ resource "automq_kafka_instance" "gke" {
 ### Optional
 
 - `automq_byoc_access_key_id` (String, Sensitive) Set the Access Key Id of Service Account. You can create and manage Access Keys by using the AutoMQ Cloud BYOC Console. Learn more about AutoMQ Cloud BYOC Console access [here](https://docs.automq.com/automq-cloud/manage-identities-and-access/service-accounts).
-- `automq_byoc_endpoint` (String) Control Plane API endpoint for the installed AutoMQ BYOC environment. Obtain this endpoint after the environment installation completes.
+- `automq_byoc_endpoint` (String) AutoMQ Cloud Control Plane API endpoint. Defaults to `https://console.automq.cloud`; override it for testing or a custom deployment.
 - `automq_byoc_secret_key` (String, Sensitive) Set the Secret Access Key of Service Account. You can create and manage Access Keys by using the AutoMQ Cloud BYOC Console. Learn more about AutoMQ Cloud BYOC Console access [here](https://docs.automq.com/automq-cloud/manage-identities-and-access/service-accounts).
 
 ## Helpful Links/Information
