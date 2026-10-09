@@ -84,6 +84,7 @@ type ComputeSpecsModel struct {
 	KubernetesLBSubnets   types.List   `tfsdk:"kubernetes_load_balancer_subnets"`
 	ScheduleSpec          types.String `tfsdk:"schedule_spec"`
 	InstanceRole          types.String `tfsdk:"instance_role"`
+	KeyPair               types.String `tfsdk:"key_pair"`
 	DataBuckets           types.List   `tfsdk:"data_buckets"`
 	SecurityGroups        types.List   `tfsdk:"security_groups"`
 	FileSystemParam       types.Object `tfsdk:"file_system_param"`
@@ -720,6 +721,10 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 			role := instance.ComputeSpecs.InstanceRole.ValueString()
 			request.Spec.InstanceRole = &role
 		}
+		if !instance.ComputeSpecs.KeyPair.IsNull() && !instance.ComputeSpecs.KeyPair.IsUnknown() {
+			keyPair := instance.ComputeSpecs.KeyPair.ValueString()
+			request.Spec.KeyPair = &keyPair
+		}
 		// Kubernetes Node Groups
 		nodeGroupModels, nodeGroupDiags := NodeGroupListToModels(ctx, instance.ComputeSpecs.KubernetesNodeGroups)
 		if nodeGroupDiags.HasError() {
@@ -1130,6 +1135,7 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 				KubernetesLBSubnets:   types.ListNull(types.StringType),
 				ScheduleSpec:          types.StringNull(),
 				InstanceRole:          types.StringNull(),
+				KeyPair:               types.StringNull(),
 				FileSystemParam:       types.ObjectNull(FileSystemParamObjectType.AttrTypes),
 			}
 		}
@@ -1152,7 +1158,7 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 			resource.ComputeSpecs.ReservedNodeCount = types.Int64Null()
 		}
 		var prevDeploy, prevDnsZone *types.String
-		var prevClusterID, prevNamespace, prevServiceAccount, prevInstanceRole *types.String
+		var prevClusterID, prevNamespace, prevServiceAccount, prevInstanceRole, prevKeyPair *types.String
 		if previousSpecs != nil {
 			prevDeploy = &previousSpecs.DeployType
 			prevDnsZone = &previousSpecs.DnsZone
@@ -1160,6 +1166,7 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 			prevNamespace = &previousSpecs.KubernetesNamespace
 			prevServiceAccount = &previousSpecs.KubernetesServiceAcct
 			prevInstanceRole = &previousSpecs.InstanceRole
+			prevKeyPair = &previousSpecs.KeyPair
 		}
 		resource.ComputeSpecs.DeployType = coalesceStringAttr(instance.Spec.DeployType, prevDeploy)
 		resource.ComputeSpecs.DnsZone = coalesceStringAttr(instance.Spec.DnsZone, prevDnsZone)
@@ -1183,6 +1190,7 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 			resource.ComputeSpecs.ScheduleSpec = types.StringNull()
 		}
 		resource.ComputeSpecs.InstanceRole = coalesceStringAttr(instance.Spec.InstanceRole, prevInstanceRole)
+		resource.ComputeSpecs.KeyPair = coalesceStringAttr(instance.Spec.KeyPair, prevKeyPair)
 		// Instance Types (from NodeConfig)
 		shouldRetainInstanceTypes := strings.EqualFold(resource.ComputeSpecs.DeployType.ValueString(), "K8S") ||
 			(strings.EqualFold(resource.ComputeSpecs.PricingMode.ValueString(), "UsageBased") && strings.EqualFold(resource.ComputeSpecs.DeployType.ValueString(), "IAAS"))

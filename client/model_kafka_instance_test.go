@@ -11,6 +11,7 @@ func TestInstanceCreateParamMarshalMatchesNewContract(t *testing.T) {
 		Version: "1.0.0",
 		Spec: SpecificationParam{
 			ReservedAku:         6,
+			KeyPair:             stringPtr("existing-key-pair"),
 			KubernetesLBSubnets: []string{"subnet-1"},
 			ScheduleSpec:        stringPtr("nodeSelector: {}"),
 			Provider:            stringPtr("aws"),
@@ -59,6 +60,9 @@ func TestInstanceCreateParamMarshalMatchesNewContract(t *testing.T) {
 	}
 	if spec["scheduleSpec"] != "nodeSelector: {}" {
 		t.Errorf("expected spec.scheduleSpec to be present, got %v", spec["scheduleSpec"])
+	}
+	if spec["keyPair"] != "existing-key-pair" {
+		t.Errorf("expected spec.keyPair to be present, got %v", spec["keyPair"])
 	}
 	if subnets, ok := spec["kubernetesLoadBalancerSubnets"].([]any); !ok || len(subnets) != 1 || subnets[0] != "subnet-1" {
 		t.Errorf("expected spec.kubernetesLoadBalancerSubnets to be present, got %v", spec["kubernetesLoadBalancerSubnets"])
@@ -109,6 +113,29 @@ func TestInstanceCreateParamMarshalMatchesNewContract(t *testing.T) {
 	}
 	if _, ok := features["schemaRegistry"]; ok {
 		t.Fatalf("schemaRegistry object should not be exposed in API payload")
+	}
+}
+
+func TestInstanceCreateParamMarshalOmitsUnsetKeyPair(t *testing.T) {
+	encoded, err := json.Marshal(InstanceCreateParam{
+		Name:    "example",
+		Version: "1.0.0",
+		Spec:    SpecificationParam{ReservedAku: 6},
+	})
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(encoded, &payload); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	spec, ok := payload["spec"].(map[string]any)
+	if !ok {
+		t.Fatalf("spec field missing or wrong type: %T", payload["spec"])
+	}
+	if _, exists := spec["keyPair"]; exists {
+		t.Fatalf("spec.keyPair should be omitted when unset")
 	}
 }
 

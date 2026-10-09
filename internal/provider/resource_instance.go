@@ -319,6 +319,15 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							stringplanmodifier.UseStateForUnknown(),
 						},
 					},
+					"key_pair": schema.StringAttribute{
+						Computed:            true,
+						Optional:            true,
+						MarkdownDescription: "Cloud key pair used by the instance. Omit this field to let the Control Plane create a key pair automatically. If specified, the existing key pair is used. The effective key pair is returned after creation. Changing a configured key pair requires instance replacement.",
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplaceIfConfigured(),
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
 					"security_groups": schema.ListAttribute{
 						ElementType:         types.StringType,
 						Optional:            true,
