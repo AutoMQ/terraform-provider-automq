@@ -64,6 +64,7 @@ Read-Only:
 - `file_system_param` (Attributes) AWS file system configuration for `FSWAL` mode. AWS `K8S` deployments support EFS only. (see [below for nested schema](#nestedatt--compute_specs--file_system_param))
 - `instance_role` (String) Data Plane cloud identity used by the Kafka instance, such as an AWS IAM Role ARN or GCP GSA full resource name.
 - `instance_types` (List of String) Instance type list for the nodes.
+- `key_pair` (String) Cloud key pair used by the instance.
 - `kubernetes_cluster_id` (String) Identifier for the target Kubernetes cluster.
 - `kubernetes_load_balancer_subnets` (List of String) Subnet IDs used by the Kubernetes load balancer.
 - `kubernetes_namespace` (String) Kubernetes namespace for the instance deployment.

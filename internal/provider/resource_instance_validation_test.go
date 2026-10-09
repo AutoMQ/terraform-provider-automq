@@ -278,6 +278,7 @@ func TestSpecificationUpdateParamMatchesBackendPatchContract(t *testing.T) {
 		"KubernetesServiceAccount",
 		"KubernetesLBSubnets",
 		"InstanceRole",
+		"KeyPair",
 		"DataBuckets",
 	}
 	for _, fieldName := range forbiddenFields {
@@ -660,6 +661,18 @@ func TestImmutableAttributesHaveRequiresReplace(t *testing.T) {
 		t.Fatalf("expected instance_role to require replacement, modifiers: %v", instanceRoleAttr.PlanModifiers)
 	}
 	requireConfiguredOnlyStringReplacement(t, instanceRoleAttr.PlanModifiers)
+
+	keyPairAttrRaw, ok := computeAttr.Attributes["key_pair"].(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("key_pair attribute has unexpected type %T", computeAttr.Attributes["key_pair"])
+	}
+	if !keyPairAttrRaw.Optional || !keyPairAttrRaw.Computed {
+		t.Fatalf("key_pair should be optional and computed")
+	}
+	if !hasStringRequiresReplace(keyPairAttrRaw.PlanModifiers) {
+		t.Fatalf("expected key_pair to require replacement, modifiers: %v", keyPairAttrRaw.PlanModifiers)
+	}
+	requireConfiguredOnlyStringReplacement(t, keyPairAttrRaw.PlanModifiers)
 
 	scheduleSpecAttr, ok := computeAttr.Attributes["schedule_spec"].(schema.StringAttribute)
 	if !ok {

@@ -93,6 +93,7 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 					"kubernetes_load_balancer_subnets": schema.ListAttribute{Computed: true, ElementType: types.StringType, MarkdownDescription: "Subnet IDs used by the Kubernetes load balancer."},
 					"schedule_spec":                    schema.StringAttribute{Computed: true, MarkdownDescription: "Kubernetes scheduling specification. This value is not populated from API responses."},
 					"instance_role":                    schema.StringAttribute{Computed: true, MarkdownDescription: "Data Plane cloud identity used by the Kafka instance, such as an AWS IAM Role ARN or GCP GSA full resource name."},
+					"key_pair":                         schema.StringAttribute{Computed: true, MarkdownDescription: "Cloud key pair used by the instance."},
 					"networks": schema.ListNestedAttribute{
 						Computed:            true,
 						MarkdownDescription: "To configure the network settings for an instance, you need to specify the availability zone(s) and subnet information. Currently, you can set either one availability zone or three availability zones.",

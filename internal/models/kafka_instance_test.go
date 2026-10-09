@@ -392,6 +392,7 @@ func TestKafkaInstanceExpandContracts(t *testing.T) {
 	t.Run("usage based pricing", testExpandKafkaInstanceResourceUsageBasedPricing)
 	t.Run("subscription based pricing", testExpandKafkaInstanceResourceCommittedPricing)
 	t.Run("null pricing fields", testExpandKafkaInstanceResourceNullPricingFields)
+	t.Run("key pair", testExpandKafkaInstanceResourceKeyPair)
 }
 
 func TestKafkaInstanceFlattenContracts(t *testing.T) {
@@ -406,6 +407,42 @@ func TestKafkaInstanceFlattenContracts(t *testing.T) {
 	t.Run("usage based k8s retains instance types", testFlattenKafkaInstanceModelRetainsInstanceTypesForUsageBasedK8S)
 	t.Run("pricing readback usage based", testFlattenKafkaInstanceModelUsageBasedPricing)
 	t.Run("pricing readback subscription based", testFlattenKafkaInstanceModelCommittedPricing)
+	t.Run("key pair readback", testFlattenKafkaInstanceModelKeyPair)
+}
+
+func testExpandKafkaInstanceResourceKeyPair(t *testing.T) {
+	request := &client.InstanceCreateParam{}
+	instance := KafkaInstanceResourceModel{
+		Name:    types.StringValue("test-instance"),
+		Version: types.StringValue("1.0.0"),
+		ComputeSpecs: &ComputeSpecsModel{
+			KeyPair: types.StringValue("existing-key-pair"),
+		},
+	}
+
+	err := ExpandKafkaInstanceResource(context.Background(), instance, request)
+
+	assert.NoError(t, err)
+	if assert.NotNil(t, request.Spec.KeyPair) {
+		assert.Equal(t, "existing-key-pair", *request.Spec.KeyPair)
+	}
+}
+
+func testFlattenKafkaInstanceModelKeyPair(t *testing.T) {
+	resource := &KafkaInstanceResourceModel{}
+	instance := &client.InstanceVO{
+		InstanceId: strPtr("test-instance"),
+		Spec: &client.SpecificationVO{
+			KeyPair: strPtr("effective-key-pair"),
+		},
+	}
+
+	diags := FlattenKafkaInstanceModel(context.Background(), instance, resource)
+
+	assert.False(t, diags.HasError())
+	if assert.NotNil(t, resource.ComputeSpecs) {
+		assert.Equal(t, types.StringValue("effective-key-pair"), resource.ComputeSpecs.KeyPair)
+	}
 }
 
 func TestKafkaInstanceReadbackPreservationContracts(t *testing.T) {

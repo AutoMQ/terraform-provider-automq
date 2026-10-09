@@ -301,6 +301,14 @@ func TestKafkaInstanceDataSourceSchema_PricingFields(t *testing.T) {
 		t.Fatalf("kubernetes_load_balancer_subnets has unexpected type %T", loadBalancerSubnets)
 	}
 	assert.True(t, loadBalancerSubnetsAttr.IsComputed(), "kubernetes_load_balancer_subnets should be computed")
+
+	keyPair, exists := computeSpecsNested.Attributes["key_pair"]
+	assert.True(t, exists, "key_pair should exist in compute_specs")
+	keyPairAttr, ok := keyPair.(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("key_pair has unexpected type %T", keyPair)
+	}
+	assert.True(t, keyPairAttr.IsComputed(), "key_pair should be computed")
 }
 
 func TestApplyInstanceConfigsToDataSourceModelInitializesMissingFeatures(t *testing.T) {
