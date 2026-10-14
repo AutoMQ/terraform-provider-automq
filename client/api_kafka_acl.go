@@ -36,33 +36,6 @@ func (c *Client) DeleteKafkaAcls(ctx context.Context, instanceId string, param K
 	return nil
 }
 
-func (c *Client) GetKafkaAcls(ctx context.Context, instanceId string, aclId string) (*KafkaAclBindingVO, error) {
-	localVarPath := fmt.Sprintf(KafkaAclPath, instanceId)
-	user, resourceType, permissionType, resourceName, err := ParseAclID(aclId)
-	if err != nil {
-		return nil, err
-	}
-	queryParams := make(map[string]string)
-	queryParams["exactUser"] = user
-	queryParams["resourceTypes"] = resourceType
-	queryParams["permissionType"] = permissionType
-	queryParams["fuzzyResourceName"] = resourceName
-
-	body, err := c.Get(ctx, localVarPath, queryParams)
-	if err != nil {
-		return nil, err
-	}
-	acl := PageNumResultKafkaAclBindingVO{}
-	err = json.Unmarshal(body, &acl)
-	if err != nil {
-		return nil, err
-	}
-	if len(acl.List) == 0 {
-		return nil, &ErrorResponse{Code: 404, ErrorMessage: "acl not found"}
-	}
-	return &acl.List[0], nil
-}
-
 func (c *Client) GetKafkaAcl(ctx context.Context, instanceId string, target KafkaAclBindingParam) (*KafkaAclBindingVO, error) {
 	const pageSize = 100
 	matches := make([]KafkaAclBindingVO, 0, 1)
