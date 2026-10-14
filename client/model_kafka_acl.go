@@ -88,14 +88,6 @@ func GenerateAclID(param interface{}) (string, error) {
 	}
 }
 
-func ParseAclID(aclID string) (user string, resourceType string, permissionType string, resourceName string, err error) {
-	parts := strings.Split(aclID, "|")
-	if len(parts) != 4 {
-		return "", "", "", "", fmt.Errorf("invalid aclID")
-	}
-	return parts[0], parts[1], parts[2], parts[3], nil
-}
-
 func FormatKafkaAclImportIdentity(param KafkaAclBindingParam) (string, error) {
 	if err := validateKafkaAclImportIdentity(param); err != nil {
 		return "", err
