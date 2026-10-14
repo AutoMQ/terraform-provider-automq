@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 )
 
 const (
@@ -37,20 +38,25 @@ func (c *Client) DeleteKafkaUser(ctx context.Context, instanceId string, userNam
 
 func (c *Client) GetKafkaUser(ctx context.Context, instanceId string, userName string) (*KafkaUserVO, error) {
 	path := fmt.Sprintf(KafkaUserPath, instanceId)
-	queryParams := make(map[string]string)
-	queryParams["userNames"] = userName
-	body, err := c.Get(ctx, path, queryParams)
-	if err != nil {
-		return nil, err
+	for page := 1; ; page++ {
+		body, err := c.Get(ctx, path, map[string]string{
+			"userNames": userName,
+			"page":      strconv.Itoa(page),
+		})
+		if err != nil {
+			return nil, err
+		}
+		var userPage PageNumResultKafkaUserVO
+		if err := json.Unmarshal(body, &userPage); err != nil {
+			return nil, err
+		}
+		for _, user := range userPage.List {
+			if user.Name == userName {
+				return &user, nil
+			}
+		}
+		if userPage.TotalPage == nil || int64(page) >= *userPage.TotalPage || len(userPage.List) == 0 {
+			return nil, &ErrorResponse{Code: 404, ErrorMessage: "user not found"}
+		}
 	}
-	userPage := PageNumResultKafkaUserVO{}
-	err = json.Unmarshal(body, &userPage)
-	if err != nil {
-		return nil, err
-	}
-	if len(userPage.List) == 0 {
-		return nil, &ErrorResponse{Code: 404, ErrorMessage: "user not found"}
-	}
-	user := userPage.List[0]
-	return &user, nil
 }
