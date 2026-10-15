@@ -36,16 +36,19 @@ func TestAccKafkaAclResource(t *testing.T) {
 		{"topic_literal_all", "TOPIC", "test-topic", "LITERAL", "ALL", "ALLOW"},
 		{"topic_literal_produce", "TOPIC", "test-topic", "LITERAL", "PRODUCE", "ALLOW"},
 		{"topic_literal_consume", "TOPIC", "test-topic", "LITERAL", "CONSUME", "ALLOW"},
+		{"topic_literal_describe", "TOPIC", "test-topic", "LITERAL", "DESCRIBE", "ALLOW"},
 		{"topic_prefixed_all", "TOPIC", "test-t", "PREFIXED", "ALL", "ALLOW"},
 		{"topic_prefixed_produce", "TOPIC", "test-t", "PREFIXED", "PRODUCE", "ALLOW"},
 		{"topic_prefixed_consume", "TOPIC", "test-t", "PREFIXED", "CONSUME", "ALLOW"},
 
 		// GROUP tests
 		{"group_literal_all", "GROUP", "test-group", "LITERAL", "ALL", "ALLOW"},
+		{"group_literal_describe", "GROUP", "test-group", "LITERAL", "DESCRIBE", "ALLOW"},
 		{"group_prefixed_all", "GROUP", "test-g", "PREFIXED", "ALL", "ALLOW"},
 
 		// CLUSTER tests
 		{"cluster_literal_all", "CLUSTER", "kafka-cluster", "LITERAL", "ALL", "ALLOW"},
+		{"cluster_literal_describe", "CLUSTER", "kafka-cluster", "LITERAL", "DESCRIBE", "ALLOW"},
 
 		// TRANSACTIONAL_ID tests
 		{"txn_literal_all", "TRANSACTIONAL_ID", "test-txn", "LITERAL", "ALL", "ALLOW"},
