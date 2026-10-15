@@ -30,6 +30,18 @@ resource "automq_kafka_acl" "group" {
   permission      = "ALLOW"
 }
 
+resource "automq_kafka_acl" "monitor_groups" {
+  environment_id    = var.environment_id
+  kafka_instance_id = var.kafka_instance_id
+
+  resource_type   = "GROUP"
+  resource_name   = "*"
+  pattern_type    = "LITERAL"
+  principal       = "User:monitor"
+  operation_group = "DESCRIBE"
+  permission      = "ALLOW"
+}
+
 resource "automq_kafka_acl" "cluster" {
   environment_id    = var.environment_id
   kafka_instance_id = var.kafka_instance_id

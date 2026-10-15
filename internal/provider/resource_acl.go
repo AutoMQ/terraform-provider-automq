@@ -91,10 +91,10 @@ func (r *KafkaAclResource) Schema(ctx context.Context, req resource.SchemaReques
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"operation_group": schema.StringAttribute{
-				MarkdownDescription: "Set the authorized operation group. For the Topic resource type, the supported operations are `ALL` (all permissions), `PRODUCE` (produce messages only), and `CONSUME` (consume messages only). For other resource types, only `ALL` (all permissions) is supported.",
+				MarkdownDescription: "Set the authorized operation group. `TOPIC` supports `ALL`, `PRODUCE`, `CONSUME`, and `DESCRIBE`; `GROUP` and `CLUSTER` support `ALL` and `DESCRIBE`; `TRANSACTIONAL_ID` supports only `ALL`. `DESCRIBE` grants Kafka `DESCRIBE` and, for topics and clusters, `DESCRIBE_CONFIGS`. It does not grant message read or resource modification permissions.",
 				Required:            true,
 				Validators: []validator.String{
-					stringvalidator.OneOf("ALL", "PRODUCE", "CONSUME"),
+					stringvalidator.OneOf("ALL", "PRODUCE", "CONSUME", "DESCRIBE"),
 				},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
