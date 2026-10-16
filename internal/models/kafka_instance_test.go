@@ -48,6 +48,40 @@ func testSecurityObject(t *testing.T, model *SecurityModel) types.Object {
 	return value
 }
 
+func TestBrokerZonesCreateAndReadback(t *testing.T) {
+	ctx := context.Background()
+	plan := KafkaInstanceResourceModel{
+		Name:    types.StringValue("broker-zones"),
+		Version: types.StringValue("5.6.0"),
+		ComputeSpecs: &ComputeSpecsModel{
+			BrokerZones: types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-b")}),
+		},
+	}
+	request := &client.InstanceCreateParam{}
+	assert.NoError(t, ExpandKafkaInstanceResource(ctx, plan, request))
+	assert.Equal(t, []string{"zone-b"}, request.Spec.BrokerZones)
+
+	state := &KafkaInstanceResourceModel{ComputeSpecs: &ComputeSpecsModel{BrokerZones: types.SetNull(types.StringType)}}
+	response := &client.InstanceVO{Spec: &client.SpecificationVO{BrokerZones: []string{"zone-b"}}}
+	diags := FlattenKafkaInstanceModel(ctx, response, state)
+	assert.False(t, diags.HasError(), "readback diagnostics: %v", diags)
+	var zones []string
+	diags = state.ComputeSpecs.BrokerZones.ElementsAs(ctx, &zones, false)
+	assert.False(t, diags.HasError())
+	assert.Equal(t, []string{"zone-b"}, zones)
+
+	// Legacy responses omit brokerZones; the effective selection is every network zone.
+	zoneA, zoneB := "zone-a", "zone-b"
+	response.Spec = &client.SpecificationVO{Networks: []client.InstanceZoneNetworkVO{
+		{Zone: &zoneA}, {Zone: &zoneB},
+	}}
+	diags = FlattenKafkaInstanceModel(ctx, response, state)
+	assert.False(t, diags.HasError(), "legacy readback diagnostics: %v", diags)
+	diags = state.ComputeSpecs.BrokerZones.ElementsAs(ctx, &zones, false)
+	assert.False(t, diags.HasError())
+	assert.ElementsMatch(t, []string{"zone-a", "zone-b"}, zones)
+}
+
 func testMetricsExporterObject(t *testing.T, model *MetricsExporterModel) types.Object {
 	t.Helper()
 	value, diags := MetricsExporterModelToObject(context.Background(), model)

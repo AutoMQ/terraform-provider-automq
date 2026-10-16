@@ -58,6 +58,7 @@ output "example-id" {
 
 Read-Only:
 
+- `broker_zones` (Set of String) Effective availability zones for dedicated Brokers.
 - `data_buckets` (Attributes List) Inline bucket configuration replacing legacy bucket profiles. (see [below for nested schema](#nestedatt--compute_specs--data_buckets))
 - `deploy_type` (String) Deployment platform for the instance. Availability depends on the target environment's cloud provider and Control Plane version.
 - `dns_zone` (String) DNS zone used when creating custom records.

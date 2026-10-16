@@ -20,6 +20,7 @@ type SpecificationParam struct {
 	ReservedNodeCount        *int32                     `json:"reservedNodeCount,omitempty"`
 	NodeConfig               *NodeConfigParam           `json:"nodeConfig,omitempty"`
 	Networks                 []InstanceNetworkParam     `json:"networks,omitempty"`
+	BrokerZones              []string                   `json:"brokerZones,omitempty"`
 	KubernetesNodeGroups     []KubernetesNodeGroupParam `json:"kubernetesNodeGroups,omitempty"`
 	SecurityGroups           []string                   `json:"securityGroups,omitempty"`
 	Template                 *string                    `json:"template,omitempty"`
@@ -234,6 +235,7 @@ type SpecificationVO struct {
 	ReservedNodeCount        *int32                   `json:"reservedNodeCount,omitempty"`
 	CurrentAku               *int32                   `json:"currentAku,omitempty"`
 	Networks                 []InstanceZoneNetworkVO  `json:"networks,omitempty"`
+	BrokerZones              []string                 `json:"brokerZones,omitempty"`
 	KubernetesNodeGroups     []KubernetesNodeGroupVO  `json:"kubernetesNodeGroups,omitempty"`
 	BucketProfiles           []BucketProfileSummaryVO `json:"bucketProfiles,omitempty"`
 	DataBuckets              []BucketProfileVO        `json:"dataBuckets,omitempty"`

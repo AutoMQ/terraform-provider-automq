@@ -75,6 +75,7 @@ type ComputeSpecsModel struct {
 	ReservedNodeCount     types.Int64  `tfsdk:"reserved_node_count"`
 	InstanceTypes         types.List   `tfsdk:"instance_types"`
 	Networks              types.List   `tfsdk:"networks"`
+	BrokerZones           types.Set    `tfsdk:"broker_zones"`
 	KubernetesNodeGroups  types.List   `tfsdk:"kubernetes_node_groups"`
 	DeployType            types.String `tfsdk:"deploy_type"`
 	DnsZone               types.String `tfsdk:"dns_zone"`
@@ -761,6 +762,14 @@ func ExpandKafkaInstanceResource(ctx context.Context, instance KafkaInstanceReso
 			}
 			request.Spec.Networks = networks
 		}
+		if !instance.ComputeSpecs.BrokerZones.IsNull() && !instance.ComputeSpecs.BrokerZones.IsUnknown() {
+			var brokerZones []string
+			diags := instance.ComputeSpecs.BrokerZones.ElementsAs(ctx, &brokerZones, false)
+			if diags.HasError() {
+				return fmt.Errorf("failed to parse compute_specs.broker_zones: %v", diags.Errors())
+			}
+			request.Spec.BrokerZones = brokerZones
+		}
 		if !instance.ComputeSpecs.DataBuckets.IsNull() && !instance.ComputeSpecs.DataBuckets.IsUnknown() {
 			dataBucketModels, dataBucketDiags := DataBucketListToModels(ctx, instance.ComputeSpecs.DataBuckets)
 			if dataBucketDiags.HasError() {
@@ -1124,6 +1133,7 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 				ReservedNodeCount:     types.Int64Null(),
 				InstanceTypes:         types.ListNull(types.StringType),
 				Networks:              types.ListNull(NetworkObjectType),
+				BrokerZones:           types.SetNull(types.StringType),
 				KubernetesNodeGroups:  types.ListNull(NodeGroupObjectType),
 				DataBuckets:           types.ListNull(DataBucketObjectType),
 				SecurityGroups:        types.ListNull(types.StringType),
@@ -1234,6 +1244,34 @@ func FlattenKafkaInstanceModel(ctx context.Context, instance *client.InstanceVO,
 					resource.ComputeSpecs.Networks = networksValue
 				}
 			}
+		}
+		if instance.Spec.BrokerZones != nil {
+			brokerZones, valueDiags := types.SetValueFrom(ctx, types.StringType, instance.Spec.BrokerZones)
+			diags.Append(valueDiags...)
+			if !valueDiags.HasError() {
+				resource.ComputeSpecs.BrokerZones = brokerZones
+			}
+		} else if instance.Spec.Networks != nil {
+			// Older Control Planes omit brokerZones; their effective range is every network zone.
+			zones := make(map[string]struct{})
+			for _, network := range instance.Spec.Networks {
+				if network.Zone != nil {
+					zones[*network.Zone] = struct{}{}
+				}
+			}
+			brokerZones := make([]string, 0, len(zones))
+			for zone := range zones {
+				brokerZones = append(brokerZones, zone)
+			}
+			value, valueDiags := types.SetValueFrom(ctx, types.StringType, brokerZones)
+			diags.Append(valueDiags...)
+			if !valueDiags.HasError() {
+				resource.ComputeSpecs.BrokerZones = value
+			}
+		} else if previousSpecs != nil {
+			resource.ComputeSpecs.BrokerZones = previousSpecs.BrokerZones
+		} else {
+			resource.ComputeSpecs.BrokerZones = types.SetNull(types.StringType)
 		}
 
 		var previousDataBuckets []DataBucketModel
