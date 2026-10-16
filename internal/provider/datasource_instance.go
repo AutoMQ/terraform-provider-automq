@@ -111,6 +111,11 @@ func (r *KafkaInstanceDataSource) Schema(_ context.Context, _ datasource.SchemaR
 							},
 						},
 					},
+					"broker_zones": schema.SetAttribute{
+						Computed:            true,
+						ElementType:         types.StringType,
+						MarkdownDescription: "Effective availability zones for dedicated Brokers.",
+					},
 					"kubernetes_node_groups": schema.ListNestedAttribute{
 						Computed:            true,
 						MarkdownDescription: "Kubernetes node groups configuration",

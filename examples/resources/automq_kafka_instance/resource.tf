@@ -22,6 +22,8 @@ resource "automq_kafka_instance" "example" {
       }
     ]
 
+    # broker_zones = ["us-east-1a"] # Optional on Data Plane 5.6.0+. Values must come from networks[*].zone; create-time only.
+
     data_buckets = [
       {
         bucket_name = "automq-data-bucket"

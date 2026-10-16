@@ -232,6 +232,17 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							},
 						},
 					},
+					"broker_zones": schema.SetAttribute{
+						Optional:            true,
+						Computed:            true,
+						ElementType:         types.StringType,
+						MarkdownDescription: "Availability zones for dedicated Brokers, selected from `networks[*].zone`. Omit to use every network zone. Requires Data Plane 5.6.0 or later. Explicit changes require instance replacement.",
+						Validators:          []validator.Set{setvalidator.SizeAtLeast(1)},
+						PlanModifiers: []planmodifier.Set{
+							setplanmodifier.RequiresReplaceIfConfigured(),
+							setplanmodifier.UseStateForUnknown(),
+						},
+					},
 					"kubernetes_node_groups": schema.ListNestedAttribute{
 						Optional:            true,
 						DeprecationMessage:  "compute_specs.kubernetes_node_groups is deprecated and will be removed in a future release. Removing it from an existing configuration requires instance replacement; use compute_specs.instance_types and compute_specs.schedule_spec for new K8S instances.",
