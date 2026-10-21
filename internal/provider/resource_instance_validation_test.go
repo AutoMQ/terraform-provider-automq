@@ -71,6 +71,7 @@ func TestValidateConfigAcceptsUnknownNestedValues(t *testing.T) {
 					Zone:    types.StringValue("us-east-1a"),
 					Subnets: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
 				}}),
+				BrokerZones:          types.SetNull(types.StringType),
 				KubernetesNodeGroups: types.ListUnknown(models.NodeGroupObjectType),
 				KubernetesLBSubnets:  types.ListNull(types.StringType),
 				FileSystemParam:      types.ObjectUnknown(models.FileSystemParamObjectType.AttrTypes),
@@ -630,6 +631,23 @@ func TestImmutableAttributesHaveRequiresReplace(t *testing.T) {
 		t.Fatalf("compute_specs attribute has unexpected type %T", s.Attributes["compute_specs"])
 	}
 	computeAttr := computeAttrRaw
+	brokerZonesAttr, ok := computeAttr.Attributes["broker_zones"].(schema.SetAttribute)
+	if !ok || !brokerZonesAttr.Optional || brokerZonesAttr.Computed || len(brokerZonesAttr.PlanModifiers) == 0 {
+		t.Fatalf("broker_zones must be an optional, create-time set: %v", computeAttr.Attributes["broker_zones"])
+	}
+	oldZones := types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-a")})
+	deleteRequest := planmodifier.SetRequest{
+		ConfigValue: types.SetNull(types.StringType),
+		Plan:        tfsdk.Plan{Raw: tftypes.NewValue(tftypes.String, "resource")},
+		PlanValue:   types.SetNull(types.StringType),
+		State:       tfsdk.State{Raw: tftypes.NewValue(tftypes.String, "resource")},
+		StateValue:  oldZones,
+	}
+	deleteResponse := planmodifier.SetResponse{}
+	brokerZonesAttr.PlanModifiers[0].PlanModifySet(context.Background(), deleteRequest, &deleteResponse)
+	if deleteResponse.Diagnostics.HasError() || !deleteResponse.RequiresReplace {
+		t.Fatalf("removing broker_zones must replace the instance: %v", deleteResponse.Diagnostics)
+	}
 
 	// features.table_topic
 	tableTopicAttrRaw, ok := featuresAttr.Attributes["table_topic"].(schema.SingleNestedAttribute)

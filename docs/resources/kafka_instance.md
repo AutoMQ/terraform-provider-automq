@@ -39,6 +39,8 @@ resource "automq_kafka_instance" "example" {
       }
     ]
 
+    # broker_zones = ["us-east-1a"] # Optional on Data Plane 5.6.0+. Values must come from networks[*].zone; create-time only.
+
     data_buckets = [
       {
         bucket_name = "automq-data-bucket"
@@ -104,6 +106,7 @@ Required:
 
 Optional:
 
+- `broker_zones` (Set of String) Availability zones for dedicated Brokers, selected from `networks[*].zone`. Omit to use every network zone. Requires Data Plane 5.6.0 or later. Adding, changing, or removing this selection replaces the instance.
 - `data_buckets` (Attributes List) Inline bucket configuration replacing legacy bucket profiles. Omit this field to let backend manage the data bucket. Changing configured data bucket settings requires instance replacement. (see [below for nested schema](#nestedatt--compute_specs--data_buckets))
 - `deploy_type` (String) Deployment platform for the instance. Supported values are `IAAS` and `K8S`; availability depends on the target environment. AWS supports `IAAS` on EC2 and `K8S` on EKS. GCP supports `K8S` on GKE Standard with Control Plane 8.3.8 or later; GCP `IAAS` and GKE Autopilot are not supported. Changing deployment type requires instance replacement.
 - `dns_zone` (String) DNS zone used when creating custom records. Changing a configured DNS zone requires instance replacement.

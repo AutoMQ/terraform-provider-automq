@@ -232,6 +232,13 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 							},
 						},
 					},
+					"broker_zones": schema.SetAttribute{
+						Optional:            true,
+						ElementType:         types.StringType,
+						MarkdownDescription: "Availability zones for dedicated Brokers, selected from `networks[*].zone`. Omit to use every network zone. Requires Data Plane 5.6.0 or later. Adding, changing, or removing this selection replaces the instance.",
+						Validators:          []validator.Set{setvalidator.SizeAtLeast(1)},
+						PlanModifiers:       []planmodifier.Set{setplanmodifier.RequiresReplace()},
+					},
 					"kubernetes_node_groups": schema.ListNestedAttribute{
 						Optional:            true,
 						DeprecationMessage:  "compute_specs.kubernetes_node_groups is deprecated and will be removed in a future release. Removing it from an existing configuration requires instance replacement; use compute_specs.instance_types and compute_specs.schedule_spec for new K8S instances.",
@@ -1243,6 +1250,9 @@ func refreshKafkaInstanceState(ctx context.Context, r *KafkaInstanceResource, in
 	diags.Append(models.FlattenKafkaInstanceModel(ctx, instance, state)...)
 	if diags.HasError() {
 		return true, diags
+	}
+	if instance.Spec != nil && instance.Spec.BrokerZones == nil && state.ComputeSpecs != nil {
+		state.ComputeSpecs.BrokerZones = types.SetNull(types.StringType)
 	}
 	if shouldRefreshInstanceEndpoints(instance) {
 		endpoints, err := r.api.GetInstanceEndpoints(ctx, instanceId)
