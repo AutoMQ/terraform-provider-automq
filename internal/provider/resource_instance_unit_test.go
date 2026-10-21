@@ -611,6 +611,30 @@ func TestInstanceUpdateStatePreservation(t *testing.T) {
 
 // Refresh tests cover the runtime readback path shared by Create/Read/Update.
 func TestInstanceRefreshState(t *testing.T) {
+	t.Run("keeps omitted Broker zones null and reads explicit selection", func(t *testing.T) {
+		api := &stubKafkaInstanceAPI{instance: &client.InstanceVO{
+			InstanceId: testStringPtr("inst-zones"),
+			State:      testStringPtr(models.StateCreating),
+			Spec:       &client.SpecificationVO{BrokerZones: nil},
+		}}
+		resource := &KafkaInstanceResource{api: api}
+		state := models.KafkaInstanceResourceModel{ComputeSpecs: &models.ComputeSpecsModel{
+			BrokerZones: types.SetValueMust(types.StringType, []attr.Value{types.StringValue("zone-a")}),
+		}}
+		found, diags := refreshKafkaInstanceState(context.Background(), resource, "inst-zones", &state)
+		require.True(t, found)
+		require.False(t, diags.HasError(), "refresh diagnostics: %v", diags)
+		assert.True(t, state.ComputeSpecs.BrokerZones.IsNull())
+
+		api.instance.Spec.BrokerZones = []string{"zone-b"}
+		found, diags = refreshKafkaInstanceState(context.Background(), resource, "inst-zones", &state)
+		require.True(t, found)
+		require.False(t, diags.HasError(), "refresh diagnostics: %v", diags)
+		var zones []string
+		require.False(t, state.ComputeSpecs.BrokerZones.ElementsAs(context.Background(), &zones, false).HasError())
+		assert.Equal(t, []string{"zone-b"}, zones)
+	})
+
 	t.Run("imported instance refresh writes typed instance configs", func(t *testing.T) {
 		api := &stubKafkaInstanceAPI{
 			instance: &client.InstanceVO{

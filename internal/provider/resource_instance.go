@@ -234,14 +234,10 @@ func (r *KafkaInstanceResource) Schema(ctx context.Context, req resource.SchemaR
 					},
 					"broker_zones": schema.SetAttribute{
 						Optional:            true,
-						Computed:            true,
 						ElementType:         types.StringType,
-						MarkdownDescription: "Availability zones for dedicated Brokers, selected from `networks[*].zone`. Omit to use every network zone. Requires Data Plane 5.6.0 or later. Explicit changes require instance replacement.",
+						MarkdownDescription: "Availability zones for dedicated Brokers, selected from `networks[*].zone`. Omit to use every network zone. Requires Data Plane 5.6.0 or later. Adding, changing, or removing this selection replaces the instance.",
 						Validators:          []validator.Set{setvalidator.SizeAtLeast(1)},
-						PlanModifiers: []planmodifier.Set{
-							setplanmodifier.RequiresReplaceIfConfigured(),
-							setplanmodifier.UseStateForUnknown(),
-						},
+						PlanModifiers:       []planmodifier.Set{setplanmodifier.RequiresReplace()},
 					},
 					"kubernetes_node_groups": schema.ListNestedAttribute{
 						Optional:            true,
@@ -1254,6 +1250,9 @@ func refreshKafkaInstanceState(ctx context.Context, r *KafkaInstanceResource, in
 	diags.Append(models.FlattenKafkaInstanceModel(ctx, instance, state)...)
 	if diags.HasError() {
 		return true, diags
+	}
+	if instance.Spec != nil && instance.Spec.BrokerZones == nil && state.ComputeSpecs != nil {
+		state.ComputeSpecs.BrokerZones = types.SetNull(types.StringType)
 	}
 	if shouldRefreshInstanceEndpoints(instance) {
 		endpoints, err := r.api.GetInstanceEndpoints(ctx, instanceId)
