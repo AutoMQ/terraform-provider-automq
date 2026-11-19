@@ -113,8 +113,8 @@ func TestFlattenConnectCluster_RetainsEmptyWorkerConfig(t *testing.T) {
 	assert.Empty(t, state.WorkerConfig.Elements())
 }
 
-func TestConnectClusterSchedulingSpec_NormalizesEquivalentYAML(t *testing.T) {
-	input := "nodeSelector:\n  dedicated: automq-connect\ntolerations:\n- key: dedicated\n  operator: Equal\n  value: automq-connect\n  effect: NoSchedule\n"
+func TestConnectClusterSchedulingSpec_RetainsEquivalentYAML(t *testing.T) {
+	input := "\"nodeSelector\":\n  \"dedicated\": \"automq-connect\"\n\"tolerations\":\n- \"effect\": \"NoSchedule\"\n  \"key\": \"dedicated\"\n  \"operator\": \"Equal\"\n  \"value\": \"automq-connect\"\n"
 	api := "nodeSelector: {dedicated: automq-connect}\ntolerations:\n  - {key: dedicated, operator: Equal, value: automq-connect, effect: NoSchedule}\n"
 	plan := ConnectClusterResourceModel{
 		Name: types.StringValue("cluster-a"),
@@ -143,13 +143,48 @@ func TestConnectClusterSchedulingSpec_NormalizesEquivalentYAML(t *testing.T) {
 	req, diags := ExpandConnectClusterCreate(plan)
 	assert.False(t, diags.HasError())
 	assert.NotNil(t, req.Compute.Kubernetes.SchedulingSpec)
+	assert.YAMLEq(t, input, *req.Compute.Kubernetes.SchedulingSpec)
 
 	state := &ConnectClusterResourceModel{Compute: plan.Compute}
 	vo := testProvisionedClusterVO()
 	vo.SchedulingSpec = &api
-	diags = FlattenConnectCluster(vo, state)
-	assert.False(t, diags.HasError())
-	assert.Equal(t, *req.Compute.Kubernetes.SchedulingSpec, state.Compute.Kubernetes.SchedulingSpec.ValueString())
+	for i := 0; i < 3; i++ {
+		diags = FlattenConnectCluster(vo, state)
+		assert.False(t, diags.HasError())
+		assert.Equal(t, input, state.Compute.Kubernetes.SchedulingSpec.ValueString())
+	}
+}
+
+func TestRetainNormalizedYAML(t *testing.T) {
+	input := types.StringValue("nodeSelector:\n  workload: connector\n")
+	api := "nodeSelector:\n    workload: connector"
+	changed := "nodeSelector:\n    workload: other"
+	cases := []struct {
+		name     string
+		api      *string
+		existing types.String
+		want     types.String
+	}{
+		{"equivalent YAML retains original format", &api, input, input},
+		{"changed YAML updates state", &changed, input, types.StringValue(changed)},
+		{"null value accepts API YAML", &api, types.StringNull(), types.StringValue(api)},
+		{"unknown value accepts API YAML", &api, types.StringUnknown(), types.StringValue(api)},
+		{"empty string is retained", connStrPtr("{}"), types.StringValue(""), types.StringValue("")},
+		{"whitespace is retained", connStrPtr(""), types.StringValue("  \n"), types.StringValue("  \n")},
+		{"empty object is retained", connStrPtr("{}"), types.StringValue("{}\n"), types.StringValue("{}\n")},
+		{"empty list is retained", connStrPtr("[]"), types.StringValue("[]\n"), types.StringValue("[]\n")},
+		{"removed YAML updates state", connStrPtr("{}"), input, types.StringNull()},
+		{"empty API YAML with null value", connStrPtr("{}"), types.StringNull(), types.StringNull()},
+		{"empty API YAML with unknown value", connStrPtr("{}"), types.StringUnknown(), types.StringNull()},
+		{"missing API YAML retains value", nil, input, input},
+		{"missing API YAML with null value", nil, types.StringNull(), types.StringNull()},
+		{"missing API YAML with unknown value", nil, types.StringUnknown(), types.StringNull()},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, cRetainNormalizedYAML(tt.api, tt.existing))
+		})
+	}
 }
 
 func TestConnectClusterSchedulingSpec_EmptyYamlIsOmitted(t *testing.T) {

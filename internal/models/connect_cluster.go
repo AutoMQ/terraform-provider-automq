@@ -391,7 +391,11 @@ func cOptNormalizedYAML(v types.String) *string {
 
 func cRetainNormalizedYAML(api *string, existing types.String) types.String {
 	if api != nil {
-		if normalized := normalizeYAML(*api); normalized != "" {
+		normalized := normalizeYAML(*api)
+		if !existing.IsNull() && !existing.IsUnknown() && normalized == normalizeYAML(existing.ValueString()) {
+			return existing
+		}
+		if normalized != "" {
 			return types.StringValue(normalized)
 		}
 		return types.StringNull()
