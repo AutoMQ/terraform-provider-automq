@@ -51,10 +51,15 @@ func (connectClusterCapacityValidator) ValidateObject(_ context.Context, req val
 		if !knownPresent(autoscaling) {
 			return
 		}
-		auto := autoscaling.(types.Object).Attributes()
-		min, minOK := auto["min_worker_count"].(types.Int64)
-		max, maxOK := auto["max_worker_count"].(types.Int64)
-		if minOK && maxOK && !min.IsUnknown() && !max.IsUnknown() && !min.IsNull() && !max.IsNull() && max.ValueInt64() < min.ValueInt64() {
+		autoObject, ok := autoscaling.(types.Object)
+		if !ok {
+			invalid("autoscaling must be an object.")
+			return
+		}
+		auto := autoObject.Attributes()
+		minWorkerCount, minOK := auto["min_worker_count"].(types.Int64)
+		maxWorkerCount, maxOK := auto["max_worker_count"].(types.Int64)
+		if minOK && maxOK && !minWorkerCount.IsUnknown() && !maxWorkerCount.IsUnknown() && !minWorkerCount.IsNull() && !maxWorkerCount.IsNull() && maxWorkerCount.ValueInt64() < minWorkerCount.ValueInt64() {
 			invalid("max_worker_count must be greater than or equal to min_worker_count.")
 		}
 		in, out := auto["scale_in_policy"], auto["scale_out_policy"]

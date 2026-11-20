@@ -19,10 +19,16 @@ func TestConnectClusterCapacitySchema(t *testing.T) {
 	var resp resource.SchemaResponse
 	NewConnectClusterResource().Schema(ctx, resource.SchemaRequest{}, &resp)
 	assert.False(t, resp.Diagnostics.HasError())
-	capacity := resp.Schema.Attributes["capacity"].(schema.SingleNestedAttribute)
+	capacity, ok := resp.Schema.Attributes["capacity"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatal("capacity must be a single nested attribute")
+	}
 	assert.Len(t, capacity.Validators, 1)
 	for _, mode := range []string{"provisioned", "autoscaling"} {
-		nested := capacity.Attributes[mode].(schema.SingleNestedAttribute)
+		nested, ok := capacity.Attributes[mode].(schema.SingleNestedAttribute)
+		if !ok {
+			t.Fatalf("capacity.%s must be a single nested attribute", mode)
+		}
 		assert.Empty(t, nested.PlanModifiers, "capacity changes must update in place")
 		if mode == "autoscaling" {
 			assert.True(t, nested.Attributes["scale_in_policy"].IsRequired())
@@ -56,8 +62,8 @@ func TestConnectClusterCapacityRelationships(t *testing.T) {
 		return types.ObjectValueMust(policyType.AttrTypes, map[string]attr.Value{"cpu_utilization_percentage": cpu})
 	}
 	fixed := types.ObjectValueMust(fixedType.AttrTypes, map[string]attr.Value{"worker_count": types.Int64Value(2)})
-	auto := func(min, max types.Int64, in, out types.Object) types.Object {
-		return types.ObjectValueMust(autoType.AttrTypes, map[string]attr.Value{"min_worker_count": min, "max_worker_count": max, "scale_in_policy": in, "scale_out_policy": out})
+	auto := func(minWorkerCount, maxWorkerCount types.Int64, in, out types.Object) types.Object {
+		return types.ObjectValueMust(autoType.AttrTypes, map[string]attr.Value{"min_worker_count": minWorkerCount, "max_worker_count": maxWorkerCount, "scale_in_policy": in, "scale_out_policy": out})
 	}
 	validAuto := auto(types.Int64Value(1), types.Int64Value(256), policy(types.Int64Value(70)), policy(types.Int64Value(70)))
 	capacity := func(mode types.String, provisioned, autoscaling types.Object) types.Object {

@@ -297,10 +297,10 @@ func TestConnectClusterCapacityValidation(t *testing.T) {
 func TestConnectClusterCapacityTransitionsAndRefreshDoNotDrift(t *testing.T) {
 	state := &ConnectClusterResourceModel{}
 	fixed := testProvisionedClusterVO()
-	sentinel, min, max, cpu := int32(-1), int32(1), int32(256), int32(70)
+	sentinel, minWorkerCount, maxWorkerCount, cpu := int32(-1), int32(1), int32(256), int32(70)
 	auto := &client.ConnectClusterVO{
 		CapacityType: connStrPtr("AUTOSCALED"), WorkerResourceSpec: connStrPtr("TIER2"),
-		WorkerCount: &sentinel, MinWorkerCount: &min, MaxWorkerCount: &max,
+		WorkerCount: &sentinel, MinWorkerCount: &minWorkerCount, MaxWorkerCount: &maxWorkerCount,
 		ScaleInCpuPercent: &cpu, ScaleOutCpuPercent: &cpu,
 	}
 	// Includes all four transitions, repeated refresh, and stale fields left by old servers.
@@ -318,8 +318,8 @@ func TestConnectClusterCapacityTransitionsAndRefreshDoNotDrift(t *testing.T) {
 			assert.Equal(t, "autoscaling", state.Capacity.Type.ValueString())
 			assert.Nil(t, state.Capacity.Provisioned)
 			assert.Nil(t, request.Capacity.Provisioned)
-			assert.Equal(t, min, request.Capacity.Autoscaling.MinWorkerCount)
-			assert.Equal(t, max, request.Capacity.Autoscaling.MaxWorkerCount)
+			assert.Equal(t, minWorkerCount, request.Capacity.Autoscaling.MinWorkerCount)
+			assert.Equal(t, maxWorkerCount, request.Capacity.Autoscaling.MaxWorkerCount)
 			assert.Equal(t, cpu, request.Capacity.Autoscaling.ScaleInPolicy.CpuUtilizationPercentage)
 		}
 	}
