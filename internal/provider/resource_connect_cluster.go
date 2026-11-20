@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	"terraform-provider-automq/client"
 	"terraform-provider-automq/internal/framework"
@@ -125,34 +126,35 @@ func (r *ConnectClusterResource) Schema(ctx context.Context, _ resource.SchemaRe
 			},
 			"capacity": schema.SingleNestedAttribute{
 				Required:    true,
-				Description: "Worker capacity configuration for the Connect Cluster. Set `type` to `provisioned` for a fixed worker count or `autoscaling` for backend-managed scaling.",
+				Validators:  []validator.Object{connectClusterCapacityValidator{}},
+				Description: "Worker capacity configuration for the Connect Cluster. Set `type` to `provisioned` for a fixed worker count or `autoscaling` for Kubernetes HPA scaling based on Pod CPU utilization. Capacity changes update the cluster in place.",
 				Attributes: map[string]schema.Attribute{
 					"type": schema.StringAttribute{Required: true, Description: "Capacity mode. Supported values are `provisioned` and `autoscaling`.", Validators: []validator.String{stringvalidator.OneOf(capacityTypes...)}},
 					"provisioned": schema.SingleNestedAttribute{
 						Optional:    true,
-						Description: "Fixed capacity settings. Use this block when `type` is `provisioned`.",
+						Description: "Fixed capacity settings. Required only when `type` is `provisioned`. Omit the autoscaling object.",
 						Attributes: map[string]schema.Attribute{
 							"worker_resource_spec": schema.StringAttribute{Required: true, Validators: []validator.String{stringvalidator.OneOf(workerResourceSpecs...)}, Description: "Worker resource tier. Supported values are `TIER1`, `TIER2`, `TIER3`, and `TIER4`."},
-							"worker_count":         schema.Int64Attribute{Required: true, Validators: []validator.Int64{int64validator.AtLeast(1)}, Description: "Fixed number of Connect worker processes. Must be at least 1."},
+							"worker_count":         schema.Int64Attribute{Required: true, Validators: []validator.Int64{int64validator.Between(1, math.MaxInt32)}, Description: "Fixed number of Connect worker processes. Must be at least 1."},
 						},
 					},
 					"autoscaling": schema.SingleNestedAttribute{
 						Optional:    true,
-						Description: "Autoscaling capacity settings. Use this block when `type` is `autoscaling`; backend support depends on the target AutoMQ control plane.",
+						Description: "Autoscaling capacity settings. Required only when `type` is `autoscaling`. The target Kubernetes cluster must provide Metrics Server.",
 						Attributes: map[string]schema.Attribute{
 							"worker_resource_spec": schema.StringAttribute{Required: true, Validators: []validator.String{stringvalidator.OneOf(workerResourceSpecs...)}, Description: "Worker resource tier used by autoscaled workers. Supported values are `TIER1`, `TIER2`, `TIER3`, and `TIER4`."},
-							"min_worker_count":     schema.Int64Attribute{Required: true, Validators: []validator.Int64{int64validator.AtLeast(1)}, Description: "Minimum number of Connect workers. Must be at least 1."},
-							"max_worker_count":     schema.Int64Attribute{Required: true, Validators: []validator.Int64{int64validator.AtLeast(1)}, Description: "Maximum number of Connect workers. Must be greater than or equal to `min_worker_count`."},
+							"min_worker_count":     schema.Int64Attribute{Required: true, Validators: []validator.Int64{int64validator.Between(1, math.MaxInt32)}, Description: "Minimum number of Connect workers. Must be at least 1."},
+							"max_worker_count":     schema.Int64Attribute{Required: true, Validators: []validator.Int64{int64validator.Between(1, math.MaxInt32)}, Description: "Maximum number of Connect workers. Must be greater than or equal to `min_worker_count`."},
 							"scale_in_policy": schema.SingleNestedAttribute{
-								Optional: true,
+								Required: true,
 								Attributes: map[string]schema.Attribute{
-									"cpu_utilization_percentage": schema.Int64Attribute{Required: true, Validators: []validator.Int64{int64validator.Between(1, 100)}, Description: "Average CPU utilization threshold, from 1 to 100, below which AutoMQ may scale workers in."},
+									"cpu_utilization_percentage": schema.Int64Attribute{Required: true, Validators: []validator.Int64{int64validator.Between(1, 100)}, Description: "Target Pod CPU utilization as a percentage of CPU requests, from 1 to 100. Must equal the value in `scale_out_policy`."},
 								},
 							},
 							"scale_out_policy": schema.SingleNestedAttribute{
-								Optional: true,
+								Required: true,
 								Attributes: map[string]schema.Attribute{
-									"cpu_utilization_percentage": schema.Int64Attribute{Required: true, Validators: []validator.Int64{int64validator.Between(1, 100)}, Description: "Average CPU utilization threshold, from 1 to 100, above which AutoMQ may scale workers out."},
+									"cpu_utilization_percentage": schema.Int64Attribute{Required: true, Validators: []validator.Int64{int64validator.Between(1, 100)}, Description: "Target Pod CPU utilization as a percentage of CPU requests, from 1 to 100. Must equal the value in `scale_in_policy`."},
 								},
 							},
 						},

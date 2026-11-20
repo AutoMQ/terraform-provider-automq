@@ -50,3 +50,6 @@ tmp/
 # Manual test directory
 test-connector/
 terraform-provider-automq
+
+# Ignore idea
+.idea/

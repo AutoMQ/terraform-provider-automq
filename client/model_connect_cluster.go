@@ -60,10 +60,12 @@ type ConnectClusterAutoscalingParam struct {
 	WorkerResourceSpec string            `json:"workerResourceSpec"`
 	MinWorkerCount     int32             `json:"minWorkerCount"`
 	MaxWorkerCount     int32             `json:"maxWorkerCount"`
-	ScaleInPolicy      *ScalePolicyParam `json:"scaleInPolicy,omitempty"`
-	ScaleOutPolicy     *ScalePolicyParam `json:"scaleOutPolicy,omitempty"`
+	ScaleInPolicy      *ScalePolicyParam `json:"scaleInPolicy"`
+	ScaleOutPolicy     *ScalePolicyParam `json:"scaleOutPolicy"`
 }
 
+// ScalePolicyParam specifies the shared HPA target as a percentage of Pod CPU
+// requests. Both policies are required and must have the same value from 1 to 100.
 type ScalePolicyParam struct {
 	CpuUtilizationPercentage int32 `json:"cpuUtilizationPercentage"`
 }

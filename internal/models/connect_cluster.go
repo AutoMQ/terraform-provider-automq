@@ -1,6 +1,8 @@
 package models
 
 import (
+	"fmt"
+	"math"
 	"strings"
 	"terraform-provider-automq/client"
 
@@ -77,7 +79,10 @@ type ConnectClusterKubernetesModel struct {
 }
 
 func ExpandConnectClusterCreate(plan ConnectClusterResourceModel) (*client.ConnectClusterCreateParam, diag.Diagnostics) {
-	var diags diag.Diagnostics
+	diags := ValidateConnectClusterCapacity(plan.Capacity)
+	if diags.HasError() {
+		return nil, diags
+	}
 	request := &client.ConnectClusterCreateParam{
 		Name:         plan.Name.ValueString(),
 		Plugins:      expandClusterPlugins(plan.Plugins),
@@ -105,6 +110,12 @@ func ExpandConnectClusterCreate(plan ConnectClusterResourceModel) (*client.Conne
 
 func ExpandConnectClusterUpdate(plan ConnectClusterResourceModel) (*client.ConnectClusterUpdateParam, diag.Diagnostics) {
 	var diags diag.Diagnostics
+	if plan.Capacity != nil {
+		diags.Append(ValidateConnectClusterCapacity(plan.Capacity)...)
+		if diags.HasError() {
+			return nil, diags
+		}
+	}
 	request := &client.ConnectClusterUpdateParam{
 		Plugins: expandClusterPlugins(plan.Plugins),
 	}
@@ -139,12 +150,17 @@ func FlattenConnectCluster(vo *client.ConnectClusterVO, state *ConnectClusterRes
 		diags.AddError("Invalid connect cluster", "nil connect cluster received")
 		return diags
 	}
+	capacity, capacityDiags := flattenClusterCapacity(vo)
+	diags.Append(capacityDiags...)
+	if diags.HasError() {
+		return diags
+	}
 	state.ID = cToStr(vo.Id)
 	state.Name = cToStr(vo.Name)
 	state.Description = cToStr(vo.Description)
 	state.Plugins = flattenClusterPlugins(vo.Plugins)
 	state.KafkaCluster = flattenClusterKafka(vo, state.KafkaCluster)
-	state.Capacity = flattenClusterCapacity(vo, state.Capacity)
+	state.Capacity = capacity
 	state.Compute = flattenClusterCompute(vo, state.Compute)
 	state.WorkerConfig = cFlattenInterfaceMapRetainEmpty(vo.WorkerConfig, state.WorkerConfig)
 	state.MetricExporter = cFlattenMetrics(vo.MetricExporter, state.MetricExporter)
@@ -187,13 +203,13 @@ func expandClusterCapacity(capacity *ConnectClusterCapacityModel) client.Connect
 		return client.ConnectClusterCapacityParam{}
 	}
 	result := client.ConnectClusterCapacityParam{Type: capacity.Type.ValueString()}
-	if capacity.Provisioned != nil {
+	if capacity.Type.ValueString() == "provisioned" && capacity.Provisioned != nil {
 		result.Provisioned = &client.ConnectClusterProvisionedParam{
 			WorkerResourceSpec: capacity.Provisioned.WorkerResourceSpec.ValueString(),
 			WorkerCount:        int32(capacity.Provisioned.WorkerCount.ValueInt64()),
 		}
 	}
-	if capacity.Autoscaling != nil {
+	if capacity.Type.ValueString() == "autoscaling" && capacity.Autoscaling != nil {
 		result.Autoscaling = &client.ConnectClusterAutoscalingParam{
 			WorkerResourceSpec: capacity.Autoscaling.WorkerResourceSpec.ValueString(),
 			MinWorkerCount:     int32(capacity.Autoscaling.MinWorkerCount.ValueInt64()),
@@ -253,43 +269,96 @@ func flattenClusterKafka(vo *client.ConnectClusterVO, prev *ConnectClusterKafkaM
 	return prev
 }
 
-func flattenClusterCapacity(vo *client.ConnectClusterVO, prev *ConnectClusterCapacityModel) *ConnectClusterCapacityModel {
-	if prev == nil {
-		prev = &ConnectClusterCapacityModel{}
+// ValidateConnectClusterCapacity checks the complete capacity before converting Terraform
+// int64 values into API int32 values. Schema validators also run during planning.
+func ValidateConnectClusterCapacity(capacity *ConnectClusterCapacityModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+	invalid := func(detail string) { diags.AddError("Invalid Connect Cluster capacity", detail) }
+	if capacity == nil {
+		invalid("capacity is required.")
+		return diags
 	}
-	prev.Type = cRetainStrLower(vo.CapacityType, prev.Type)
-	if vo.WorkerCount != nil || vo.WorkerResourceSpec != nil || prev.Provisioned != nil {
-		if prev.Provisioned == nil {
-			prev.Provisioned = &ConnectClusterProvisionedCapacityModel{}
-		}
-		prev.Provisioned.WorkerCount = cToInt64(vo.WorkerCount)
-		prev.Provisioned.WorkerResourceSpec = cRetainStr(vo.WorkerResourceSpec, prev.Provisioned.WorkerResourceSpec)
-	}
-	if vo.MinWorkerCount != nil || vo.MaxWorkerCount != nil || prev.Autoscaling != nil {
-		if prev.Autoscaling == nil {
-			prev.Autoscaling = &ConnectClusterAutoscalingCapacityModel{}
-		}
-		prev.Autoscaling.WorkerResourceSpec = cRetainStr(vo.WorkerResourceSpec, prev.Autoscaling.WorkerResourceSpec)
-		prev.Autoscaling.MinWorkerCount = cToInt64(vo.MinWorkerCount)
-		prev.Autoscaling.MaxWorkerCount = cToInt64(vo.MaxWorkerCount)
-		if vo.ScaleInCpuPercent != nil {
-			prev.Autoscaling.ScaleInPolicy = &ConnectClusterScaleModel{CPUUtilizationPercentage: cToInt64(vo.ScaleInCpuPercent)}
-		}
-		if vo.ScaleOutCpuPercent != nil {
-			prev.Autoscaling.ScaleOutPolicy = &ConnectClusterScaleModel{CPUUtilizationPercentage: cToInt64(vo.ScaleOutCpuPercent)}
+	validateSpec := func(spec types.String) {
+		switch spec.ValueString() {
+		case "TIER1", "TIER2", "TIER3", "TIER4":
+		default:
+			invalid("worker_resource_spec must be TIER1, TIER2, TIER3, or TIER4.")
 		}
 	}
-	return prev
+	validateCount := func(name string, value types.Int64) {
+		if value.IsNull() || value.IsUnknown() || value.ValueInt64() < 1 || value.ValueInt64() > math.MaxInt32 {
+			invalid(fmt.Sprintf("%s must be an integer from 1 to %d, the API integer limit.", name, math.MaxInt32))
+		}
+	}
+	switch capacity.Type.ValueString() {
+	case "provisioned":
+		if capacity.Provisioned == nil || capacity.Autoscaling != nil {
+			invalid("provisioned capacity requires only the provisioned object.")
+			return diags
+		}
+		validateSpec(capacity.Provisioned.WorkerResourceSpec)
+		validateCount("worker_count", capacity.Provisioned.WorkerCount)
+	case "autoscaling":
+		if capacity.Autoscaling == nil || capacity.Provisioned != nil {
+			invalid("autoscaling capacity requires only the autoscaling object.")
+			return diags
+		}
+		auto := capacity.Autoscaling
+		validateSpec(auto.WorkerResourceSpec)
+		validateCount("min_worker_count", auto.MinWorkerCount)
+		validateCount("max_worker_count", auto.MaxWorkerCount)
+		if auto.MaxWorkerCount.ValueInt64() < auto.MinWorkerCount.ValueInt64() {
+			invalid("max_worker_count must be greater than or equal to min_worker_count.")
+		}
+		if auto.ScaleInPolicy == nil || auto.ScaleOutPolicy == nil {
+			invalid("scale_in_policy and scale_out_policy are both required for autoscaling.")
+			return diags
+		}
+		for _, policy := range []*ConnectClusterScaleModel{auto.ScaleInPolicy, auto.ScaleOutPolicy} {
+			cpu := policy.CPUUtilizationPercentage
+			if cpu.IsNull() || cpu.IsUnknown() || cpu.ValueInt64() < 1 || cpu.ValueInt64() > 100 {
+				invalid("cpu_utilization_percentage must be an integer from 1 to 100.")
+			}
+		}
+		if !auto.ScaleInPolicy.CPUUtilizationPercentage.Equal(auto.ScaleOutPolicy.CPUUtilizationPercentage) {
+			invalid("scale_in_policy and scale_out_policy must use the same target CPU utilization percentage.")
+		}
+	default:
+		invalid("capacity.type must be provisioned or autoscaling.")
+	}
+	return diags
 }
 
-func cRetainStrLower(api *string, existing types.String) types.String {
-	if api != nil {
-		return types.StringValue(strings.ToLower(*api))
+func flattenClusterCapacity(vo *client.ConnectClusterVO) (*ConnectClusterCapacityModel, diag.Diagnostics) {
+	capacity := &ConnectClusterCapacityModel{}
+	var diags diag.Diagnostics
+	if vo.CapacityType == nil {
+		diags.AddError("Invalid Connect Cluster capacity response", "The API response is missing capacityType.")
+		return nil, diags
 	}
-	if existing.IsNull() || existing.IsUnknown() {
-		return types.StringNull()
+	// AUTOSCALED is the API enum; lowercasing it does not produce the Terraform mode.
+	switch *vo.CapacityType {
+	case "PROVISIONED":
+		capacity.Type = types.StringValue("provisioned")
+		capacity.Provisioned = &ConnectClusterProvisionedCapacityModel{
+			WorkerResourceSpec: cToStr(vo.WorkerResourceSpec),
+			WorkerCount:        cToInt64(vo.WorkerCount),
+		}
+	case "AUTOSCALED":
+		capacity.Type = types.StringValue("autoscaling")
+		capacity.Autoscaling = &ConnectClusterAutoscalingCapacityModel{
+			WorkerResourceSpec: cToStr(vo.WorkerResourceSpec),
+			MinWorkerCount:     cToInt64(vo.MinWorkerCount),
+			MaxWorkerCount:     cToInt64(vo.MaxWorkerCount),
+			ScaleInPolicy:      &ConnectClusterScaleModel{CPUUtilizationPercentage: cToInt64(vo.ScaleInCpuPercent)},
+			ScaleOutPolicy:     &ConnectClusterScaleModel{CPUUtilizationPercentage: cToInt64(vo.ScaleOutCpuPercent)},
+		}
+	default:
+		diags.AddError("Invalid Connect Cluster capacity response", fmt.Sprintf("Unsupported capacityType %q.", *vo.CapacityType))
+		return nil, diags
 	}
-	return existing
+	diags.Append(ValidateConnectClusterCapacity(capacity)...)
+	return capacity, diags
 }
 
 func flattenClusterCompute(vo *client.ConnectClusterVO, prev *ConnectClusterComputeModel) *ConnectClusterComputeModel {
@@ -322,7 +391,11 @@ func cOptNormalizedYAML(v types.String) *string {
 
 func cRetainNormalizedYAML(api *string, existing types.String) types.String {
 	if api != nil {
-		if normalized := normalizeYAML(*api); normalized != "" {
+		normalized := normalizeYAML(*api)
+		if !existing.IsNull() && !existing.IsUnknown() && normalized == normalizeYAML(existing.ValueString()) {
+			return existing
+		}
+		if normalized != "" {
 			return types.StringValue(normalized)
 		}
 		return types.StringNull()

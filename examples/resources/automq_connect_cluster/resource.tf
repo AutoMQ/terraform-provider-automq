@@ -15,11 +15,18 @@ resource "automq_connect_cluster" "example" {
   }
 
   capacity = {
-    type = "provisioned"
+    type = "autoscaling"
 
-    provisioned = {
+    autoscaling = {
       worker_resource_spec = "TIER2"
-      worker_count         = 2
+      min_worker_count     = 2
+      max_worker_count     = 6
+      scale_in_policy = {
+        cpu_utilization_percentage = 70
+      }
+      scale_out_policy = {
+        cpu_utilization_percentage = 70
+      }
     }
   }
 
