@@ -57,10 +57,14 @@ func TestValidateKafkaInstanceConfiguration_K8SMissingCluster(t *testing.T) {
 func TestValidateKafkaInstanceConfiguration_K8SDefersUnknownCluster(t *testing.T) {
 	plan := &models.KafkaInstanceResourceModel{
 		ComputeSpecs: &models.ComputeSpecsModel{
-			DeployType:           types.StringValue("K8S"),
-			KubernetesClusterID:  types.StringUnknown(),
-			InstanceTypes:        types.ListUnknown(types.StringType),
-			KubernetesLBSubnets:  types.ListUnknown(types.StringType),
+			DeployType:          types.StringValue("K8S"),
+			KubernetesClusterID: types.StringUnknown(),
+			InstanceTypes: types.ListValueMust(types.StringType, []attr.Value{
+				types.StringValue("m5.xlarge"),
+			}),
+			KubernetesLBSubnets: types.ListValueMust(types.StringType, []attr.Value{
+				types.StringValue("subnet-1"),
+			}),
 			KubernetesNodeGroups: types.ListUnknown(models.NodeGroupObjectType),
 		},
 	}
@@ -80,18 +84,24 @@ func TestValidateConfigAcceptsUnknownNestedValues(t *testing.T) {
 			Name:          types.StringValue("test-instance"),
 			Version:       types.StringValue("5.4.2"),
 			ComputeSpecs: &models.ComputeSpecsModel{
-				ReservedAku:   types.Int64Value(6),
-				DeployType:    types.StringValue("IAAS"),
-				InstanceTypes: types.ListNull(types.StringType),
+				ReservedAku:         types.Int64Unknown(),
+				PricingMode:         types.StringValue("SubscriptionBased"),
+				DeployType:          types.StringValue("K8S"),
+				KubernetesClusterID: types.StringUnknown(),
+				InstanceTypes:       types.ListValueMust(types.StringType, []attr.Value{types.StringValue("m5.xlarge")}),
+				KubernetesLBSubnets: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
 				Networks: testNetworkList(t, []models.NetworkModel{{
 					Zone:    types.StringValue("us-east-1a"),
 					Subnets: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("subnet-1")}),
 				}}),
 				KubernetesNodeGroups: types.ListUnknown(models.NodeGroupObjectType),
-				KubernetesLBSubnets:  types.ListNull(types.StringType),
 				FileSystemParam:      types.ObjectUnknown(models.FileSystemParamObjectType.AttrTypes),
-				DataBuckets:          types.ListNull(models.DataBucketObjectType),
-				SecurityGroups:       types.ListNull(types.StringType),
+				DataBuckets: types.ListValueMust(models.DataBucketObjectType, []attr.Value{
+					types.ObjectValueMust(models.DataBucketObjectType.AttrTypes, map[string]attr.Value{
+						"bucket_name": types.StringUnknown(),
+					}),
+				}),
+				SecurityGroups: types.ListNull(types.StringType),
 			},
 			Features: &models.FeaturesModel{
 				WalMode:         types.StringValue("EBSWAL"),
