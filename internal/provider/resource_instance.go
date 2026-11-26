@@ -761,7 +761,7 @@ func validateDeployTypeContract(ctx context.Context, plan *models.KafkaInstanceR
 			}
 		}
 
-		if _, ok := knownStringValue(plan.ComputeSpecs.KubernetesClusterID); !ok {
+		if _, ok := knownStringValue(plan.ComputeSpecs.KubernetesClusterID); !ok && !plan.ComputeSpecs.KubernetesClusterID.IsUnknown() {
 			diagnostics.AddError(
 				"Invalid Configuration",
 				"When compute_specs.deploy_type is K8S, compute_specs.kubernetes_cluster_id must be provided.",
@@ -793,7 +793,7 @@ func validatePricingModeContract(plan *models.KafkaInstanceResourceModel) diag.D
 				}
 			}
 		} else if strings.EqualFold(pricingMode, "SubscriptionBased") {
-			if plan.ComputeSpecs.ReservedAku.IsNull() || plan.ComputeSpecs.ReservedAku.IsUnknown() {
+			if plan.ComputeSpecs.ReservedAku.IsNull() {
 				diagnostics.AddError(
 					"Invalid Configuration",
 					"compute_specs.reserved_aku is required when compute_specs.pricing_mode is SubscriptionBased.",
@@ -908,7 +908,7 @@ func validateManagedResourceContract(ctx context.Context, plan *models.KafkaInst
 			diagnostics.Append(bucketDiags...)
 		}
 		for i, bucket := range planBuckets {
-			if !isStringValueSet(bucket.BucketName) {
+			if !isStringValueSet(bucket.BucketName) && !bucket.BucketName.IsUnknown() {
 				diagnostics.AddError(
 					"Invalid Configuration",
 					fmt.Sprintf("compute_specs.data_buckets[%d].bucket_name must be provided when data_buckets is configured.", i),

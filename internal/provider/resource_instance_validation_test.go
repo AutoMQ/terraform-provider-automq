@@ -54,6 +54,22 @@ func TestValidateKafkaInstanceConfiguration_K8SMissingCluster(t *testing.T) {
 	}
 }
 
+func TestValidateKafkaInstanceConfiguration_K8SDefersUnknownCluster(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			DeployType:           types.StringValue("K8S"),
+			KubernetesClusterID:  types.StringUnknown(),
+			InstanceTypes:        types.ListUnknown(types.StringType),
+			KubernetesLBSubnets:  types.ListUnknown(types.StringType),
+			KubernetesNodeGroups: types.ListUnknown(models.NodeGroupObjectType),
+		},
+	}
+
+	if diags := validateInstanceContract(context.Background(), plan); diags.HasError() {
+		t.Fatalf("unknown kubernetes_cluster_id should be deferred until plan values are known: %v", diags)
+	}
+}
+
 func TestValidateConfigAcceptsUnknownNestedValues(t *testing.T) {
 	ctx := context.Background()
 	s := getKafkaInstanceResourceSchema(t)
@@ -243,6 +259,24 @@ func TestValidateKafkaInstanceConfiguration_DataBucketsMissingName(t *testing.T)
 	}
 	if !found {
 		t.Fatalf("expected data bucket error, got %v", diags)
+	}
+}
+
+func TestValidateKafkaInstanceConfiguration_DataBucketsDefersUnknownName(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			DataBuckets: types.ListValueMust(
+				models.DataBucketObjectType,
+				[]attr.Value{types.ObjectValueMust(
+					models.DataBucketObjectType.AttrTypes,
+					map[string]attr.Value{"bucket_name": types.StringUnknown()},
+				)},
+			),
+		},
+	}
+
+	if diags := validateInstanceContract(context.Background(), plan); diags.HasError() {
+		t.Fatalf("unknown bucket_name should be deferred until plan values are known: %v", diags)
 	}
 }
 
@@ -1951,6 +1985,19 @@ func TestValidateKafkaInstanceConfiguration_CommittedMissingAku(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("expected error mentioning reserved_aku, got: %v", diags)
+	}
+}
+
+func TestValidateKafkaInstanceConfiguration_CommittedDefersUnknownAku(t *testing.T) {
+	plan := &models.KafkaInstanceResourceModel{
+		ComputeSpecs: &models.ComputeSpecsModel{
+			PricingMode: types.StringValue("SubscriptionBased"),
+			ReservedAku: types.Int64Unknown(),
+		},
+	}
+
+	if diags := validateInstanceContract(context.Background(), plan); diags.HasError() {
+		t.Fatalf("unknown reserved_aku should be deferred until plan values are known: %v", diags)
 	}
 }
 
