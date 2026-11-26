@@ -47,3 +47,14 @@ func TestParseKafkaAclImportIdentityValidatesFields(t *testing.T) {
 		})
 	}
 }
+
+func TestKafkaAclDescribeImportIdentity(t *testing.T) {
+	for _, resourceType := range []string{"TOPIC", "GROUP", "CLUSTER"} {
+		identity := "monitor|" + resourceType + "|ALLOW|resource|LITERAL|DESCRIBE"
+		_, err := ParseKafkaAclImportIdentity(identity)
+		require.NoError(t, err)
+	}
+
+	_, err := ParseKafkaAclImportIdentity("monitor|TRANSACTIONAL_ID|ALLOW|resource|LITERAL|DESCRIBE")
+	require.Error(t, err)
+}

@@ -11,6 +11,8 @@ import (
 	"terraform-provider-automq/internal/models"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -24,9 +26,35 @@ import (
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &KafkaAclResource{}
 var _ resource.ResourceWithImportState = &KafkaAclResource{}
+var _ resource.ResourceWithValidateConfig = &KafkaAclResource{}
 
 func NewKafkaAclResource() resource.Resource {
 	return &KafkaAclResource{}
+}
+
+func (r *KafkaAclResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var config models.KafkaAclResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(validateKafkaAclOperationGroup(config.ResourceType, config.OperationGroup)...)
+}
+
+func validateKafkaAclOperationGroup(resourceType, operationGroup types.String) diag.Diagnostics {
+	if resourceType.IsNull() || resourceType.IsUnknown() || operationGroup.IsNull() || operationGroup.IsUnknown() {
+		return nil
+	}
+	resourceName := resourceType.ValueString()
+	groupName := operationGroup.ValueString()
+	if groupName == "DESCRIBE" && resourceName == "TRANSACTIONAL_ID" {
+		return diag.Diagnostics{diag.NewAttributeErrorDiagnostic(
+			path.Root("operation_group"),
+			"Unsupported ACL operation group",
+			"operation_group = \"DESCRIBE\" is supported for TOPIC, GROUP, and CLUSTER resources, but not TRANSACTIONAL_ID.",
+		)}
+	}
+	return nil
 }
 
 // KafkaAclResource defines the resource implementation.
@@ -91,10 +119,10 @@ func (r *KafkaAclResource) Schema(ctx context.Context, req resource.SchemaReques
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"operation_group": schema.StringAttribute{
-				MarkdownDescription: "Set the authorized operation group. For the Topic resource type, the supported operations are `ALL` (all permissions), `PRODUCE` (produce messages only), and `CONSUME` (consume messages only). For other resource types, only `ALL` (all permissions) is supported.",
+				MarkdownDescription: "Set the authorized operation group. `TOPIC` supports `ALL`, `PRODUCE`, `CONSUME`, and `DESCRIBE`; `GROUP` and `CLUSTER` support `ALL` and `DESCRIBE`; `TRANSACTIONAL_ID` supports only `ALL`. `DESCRIBE` grants Kafka `DESCRIBE` and, for topics and clusters, `DESCRIBE_CONFIGS`. It does not grant message read or resource modification permissions.",
 				Required:            true,
 				Validators: []validator.String{
-					stringvalidator.OneOf("ALL", "PRODUCE", "CONSUME"),
+					stringvalidator.OneOf("ALL", "PRODUCE", "CONSUME", "DESCRIBE"),
 				},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
@@ -132,6 +160,10 @@ func (r *KafkaAclResource) Create(ctx context.Context, req resource.CreateReques
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(validateKafkaAclOperationGroup(plan.ResourceType, plan.OperationGroup)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}

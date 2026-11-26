@@ -162,10 +162,12 @@ func validateKafkaAclImportIdentity(param KafkaAclBindingParam) error {
 
 	operationGroup := param.AccessControlParam.OperationGroup
 	if resourceType == "TOPIC" {
-		if operationGroup != "ALL" && operationGroup != "PRODUCE" && operationGroup != "CONSUME" {
+		if operationGroup != "ALL" && operationGroup != "PRODUCE" && operationGroup != "CONSUME" && operationGroup != "DESCRIBE" {
 			return fmt.Errorf("invalid ACL operation group %q for TOPIC", operationGroup)
 		}
-	} else if operationGroup != "ALL" {
+	} else if (resourceType == "GROUP" || resourceType == "CLUSTER") && operationGroup != "ALL" && operationGroup != "DESCRIBE" {
+		return fmt.Errorf("invalid ACL operation group %q for %s", operationGroup, resourceType)
+	} else if resourceType == "TRANSACTIONAL_ID" && operationGroup != "ALL" {
 		return fmt.Errorf("ACL operation group for %s must be ALL", resourceType)
 	}
 	return nil

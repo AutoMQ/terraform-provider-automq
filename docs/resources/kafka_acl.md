@@ -50,6 +50,18 @@ resource "automq_kafka_acl" "group" {
   permission      = "ALLOW"
 }
 
+resource "automq_kafka_acl" "monitor_groups" {
+  environment_id    = var.environment_id
+  kafka_instance_id = var.kafka_instance_id
+
+  resource_type   = "GROUP"
+  resource_name   = "*"
+  pattern_type    = "LITERAL"
+  principal       = "User:monitor"
+  operation_group = "DESCRIBE"
+  permission      = "ALLOW"
+}
+
 resource "automq_kafka_acl" "cluster" {
   environment_id    = var.environment_id
   kafka_instance_id = var.kafka_instance_id
@@ -82,7 +94,7 @@ resource "automq_kafka_acl" "transaction" {
 
 - `environment_id` (String) Target AutoMQ BYOC environment identifier (e.g. `env-xxxxx`). Find this on the AutoMQ console System Settings page.
 - `kafka_instance_id` (String) Target Kafka instance ID (e.g. `kf-xxxxx`). Each instance represents a Kafka cluster. Find this on the AutoMQ console instance list or detail page.
-- `operation_group` (String) Set the authorized operation group. For the Topic resource type, the supported operations are `ALL` (all permissions), `PRODUCE` (produce messages only), and `CONSUME` (consume messages only). For other resource types, only `ALL` (all permissions) is supported.
+- `operation_group` (String) Set the authorized operation group. `TOPIC` supports `ALL`, `PRODUCE`, `CONSUME`, and `DESCRIBE`; `GROUP` and `CLUSTER` support `ALL` and `DESCRIBE`; `TRANSACTIONAL_ID` supports only `ALL`. `DESCRIBE` grants Kafka `DESCRIBE` and, for topics and clusters, `DESCRIBE_CONFIGS`. It does not grant message read or resource modification permissions.
 - `pattern_type` (String) Set the resource name matching pattern, supporting `LITERAL` and `PREFIXED`. `LITERAL` represents exact matching, while `PREFIXED` represents prefix matching.
 - `principal` (String) Set the authorized target principal, which currently supports Kafka User type principals, i.e., `User:xxxx`. Specify the Kafka user name. Principal must start with `User:` and correspond to an `automq_kafka_user` resource.
 - `resource_name` (String) The target resource name for Kafka ACL authorization, can be a specific resource name or a resource name prefix (when using prefix matching, only the prefix needs to be provided without ending with `*`). If only `*` is specified, it represents all resources.
