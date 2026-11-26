@@ -71,6 +71,31 @@ func TestKafkaAclImportStateRejectsInvalidIDs(t *testing.T) {
 	}
 }
 
+func TestKafkaAclValidateConfigRejectsDescribeTransactionalID(t *testing.T) {
+	aclResource := &KafkaAclResource{}
+	var schemaResp resource.SchemaResponse
+	aclResource.Schema(context.Background(), resource.SchemaRequest{}, &schemaResp)
+	require.False(t, schemaResp.Diagnostics.HasError())
+
+	config := tfsdk.Config{
+		Schema: schemaResp.Schema,
+		Raw: tftypes.NewValue(schemaResp.Schema.Type().TerraformType(context.Background()), map[string]tftypes.Value{
+			"environment_id":    tftypes.NewValue(tftypes.String, "env-test"),
+			"kafka_instance_id": tftypes.NewValue(tftypes.String, "kf-test"),
+			"id":                tftypes.NewValue(tftypes.String, nil),
+			"resource_type":     tftypes.NewValue(tftypes.String, "TRANSACTIONAL_ID"),
+			"resource_name":     tftypes.NewValue(tftypes.String, "resource"),
+			"pattern_type":      tftypes.NewValue(tftypes.String, "LITERAL"),
+			"principal":         tftypes.NewValue(tftypes.String, "User:monitor"),
+			"operation_group":   tftypes.NewValue(tftypes.String, "DESCRIBE"),
+			"permission":        tftypes.NewValue(tftypes.String, "ALLOW"),
+		}),
+	}
+	resp := resource.ValidateConfigResponse{}
+	aclResource.ValidateConfig(context.Background(), resource.ValidateConfigRequest{Config: config}, &resp)
+	require.True(t, resp.Diagnostics.HasError())
+}
+
 func TestKafkaAclReadUsesCompleteLogicalIdentity(t *testing.T) {
 	wildcardHost := "*"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
